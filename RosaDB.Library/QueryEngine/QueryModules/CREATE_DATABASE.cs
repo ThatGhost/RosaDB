@@ -1,21 +1,16 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.StorageEngine;
-using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine.QueryModules;
 
-public class CREATE_DATABASE : QueryModule
+public class CREATE_DATABASE(string[] parts) : QueryModule
 {
-    private string _name;
-    
-    public CREATE_DATABASE(string name)
+    public override async Task<Result> Execute(CancellationToken ct)
     {
-        _name = name;
-    }
-    
-    public override async Task<Result> Execute(ClientSession client, CancellationToken ct)
-    {
-        await FolderManager.CreateFolder(_name);
+        string databaseName = parts[0];
+        if(string.IsNullOrEmpty(databaseName)) return new Error(ErrorPrefixes.DatatypeError, "Database name not specified");
+        
+        await FolderManager.CreateFolder(databaseName);
 
         return Result.Success();
     }

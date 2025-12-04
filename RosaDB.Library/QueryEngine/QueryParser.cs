@@ -1,5 +1,6 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.QueryEngine.QueryModules;
+using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine;
 
@@ -7,7 +8,7 @@ public class QueryParser
 {
     // TODO support transactions
     // TODO support multi query strings
-    public Result<QueryModule[]> Parse(string query)
+    public Result<QueryModule[]> Parse(string query, ClientSession client)
     {
         string[] queryParts = query.Split([' ','\n']);
 
@@ -16,7 +17,7 @@ public class QueryParser
         switch (queryParts[0].ToUpper())
         {
             case "CREATE" : return CREATE(queryParts[1..]);
-            case "USE" : return USE(queryParts[1..]);
+            case "USE" : return USE(queryParts[1..], client);
         }
         
         return new Error(ErrorPrefixes.QueryParsingError, "Unknown query format");
@@ -29,16 +30,16 @@ public class QueryParser
             case "DATABASE":
                 if(queryParts.Length == 1) return new Error(ErrorPrefixes.QueryParsingError, "No database name");
                 return new QueryModule[] 
-                    { new CREATE_DATABASE(queryParts[1]) };
+                    { new CREATE_DATABASE(queryParts) };
         }
         
         return new Error(ErrorPrefixes.QueryParsingError, "Unknown CREATE query format");
     }
 
-    private Result<QueryModule[]> USE(string[] queryParts)
+    private Result<QueryModule[]> USE(string[] queryParts, ClientSession clientSession)
     {
         if (queryParts.Length != 1) return new Error(ErrorPrefixes.QueryParsingError, "Database name missing");
         return new QueryModule[]
-            { new USE_DATABASE(queryParts[0]) };
+            { new USE_DATABASE(queryParts[0], clientSession) };
     }
 }

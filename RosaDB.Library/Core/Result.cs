@@ -1,27 +1,28 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace RosaDB.Library.Core;
 
 public record Error(ErrorPrefixes Prefix, string Message);
 public sealed class Result<T>
 {
+    [AllowNull]
     private readonly T _value;
 
     private Result(T value)
     {
         _value = value;
         IsSuccess = true;
-        Error = null;
     }
 
     private Result(Error error)
     {
-        _value = default;
         IsSuccess = false;
         Error = error;
     }
 
     public bool IsSuccess { get; }
     public bool IsFailure { get => !IsSuccess; }
-    public Error Error { get; }
+    public Error? Error { get; }
 
     public T Value => _value!;
 
@@ -55,12 +56,11 @@ public sealed class Result
     private Result()
     {
         IsSuccess = true;
-        Error = null;
     }
 
     public bool IsSuccess { get; }
     public bool IsFailure { get => !IsSuccess; }
-    public Error Error { get; }
+    public Error? Error { get; }
 
     public static implicit operator Result(Error error) => new(error);
 

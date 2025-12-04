@@ -9,7 +9,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\RosaDB.Library\RosaDB.Library.csproj" />
-      <ProjectReference Include="..\RosaDB.Server\RosaDB.Server.csproj" />
     </ItemGroup>
 
     <ItemGroup>

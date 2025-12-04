@@ -4,22 +4,15 @@ using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine.QueryModules;
 
-public class USE_DATABASE : QueryModule
+public class USE_DATABASE(string name, ClientSession client) : QueryModule
 {
-    private string _name;
-
-    public USE_DATABASE(string name)
+    public override async Task<Result> Execute(CancellationToken ct)
     {
-        _name = name;
-    }
-    
-    public override async Task<Result> Execute(ClientSession client,CancellationToken ct)
-    {
-        var path = Path.Combine(client.DatabaseName, _name);
+        var path = Path.Combine(client.DatabaseName, name);
         if(!await FolderManager.DoesFolderExist(path))
             return new Error(ErrorPrefixes.QueryExecutionError, "Folder does not exist");
         
-        client.SetDatabase(_name);
+        client.SetDatabase(name);
         return Result.Success();
     }
 }

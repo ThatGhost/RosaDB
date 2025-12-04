@@ -9,7 +9,6 @@
       "RosaDB.Client/1.0.0": {
         "dependencies": {
           "RosaDB.Library": "1.0.0",
-          "RosaDB.Server": "1.0.0",
           "Terminal.Gui": "1.19.0"
         },
         "runtime": {
@@ -81,17 +80,6 @@
             "fileVersion": "1.0.0.0"
           }
         }
-      },
-      "RosaDB.Server/1.0.0": {
-        "dependencies": {
-          "RosaDB.Library": "1.0.0"
-        },
-        "runtime": {
-          "RosaDB.Server.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
-          }
-        }
       }
     }
   },
@@ -130,11 +118,6 @@
       "hashPath": "terminal.gui.1.19.0.nupkg.sha512"
     },
     "RosaDB.Library/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "RosaDB.Server/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

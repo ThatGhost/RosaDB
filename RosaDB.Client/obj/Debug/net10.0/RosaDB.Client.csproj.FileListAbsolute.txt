@@ -25,8 +25,3 @@
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/RosaDB.Client.pdb
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/RosaDB.Client.genruntimeconfig.cache
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/ref/RosaDB.Client.dll
-/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/RosaDB.Server.deps.json
-/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/RosaDB.Server.runtimeconfig.json
-/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/RosaDB.Server
-/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/RosaDB.Server.dll
-/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/RosaDB.Server.pdb
