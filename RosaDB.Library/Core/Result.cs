@@ -1,6 +1,6 @@
 namespace RosaDB.Library.Core;
 
-public record Error(string Message);
+public record Error(ErrorPrefixes Prefix, string Message);
 public sealed class Result<T>
 {
     private readonly T _value;

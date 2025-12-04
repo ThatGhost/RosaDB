@@ -12,7 +12,7 @@ public class CREATE_DATABASE : QueryModule
         _name = name;
     }
     
-    public override async Task<Result> Excecute(CancellationToken ct)
+    public override async Task<Result> Execute(CancellationToken ct)
     {
         await FolderManager.CreateFolder(_name);
 

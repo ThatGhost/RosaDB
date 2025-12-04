@@ -10,7 +10,7 @@ public class CHAR : DataType
     public static Result<DataType> Create(short size, string content)
     {
         byte[] c = Encoding.UTF8.GetBytes(content);
-        if (c.Length != size) return new Error("Content is not the same size as set size");
+        if (c.Length != size) return new Error(ErrorPrefixes.DatatypeError, "Content is not the same size as set size");
         
         return new CHAR()
         {

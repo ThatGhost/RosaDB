@@ -4,5 +4,5 @@ namespace RosaDB.Library.QueryEngine;
 
 public abstract class QueryModule
 {
-    public abstract Task<Result> Excecute(CancellationToken ct);
+    public abstract Task<Result> Execute(CancellationToken ct);
 }

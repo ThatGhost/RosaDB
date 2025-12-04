@@ -11,14 +11,15 @@ public class QueryParser
     {
         string[] queryParts = query.Split([' ','\n']);
 
-        if (queryParts.Length <= 2) return new Error("Query parsing error: Not enough parameters");
+        if (queryParts.Length <= 2) return new Error(ErrorPrefixes.QueryParsingError, "Not enough parameters");
 
         switch (queryParts[0].ToUpper())
         {
             case "CREATE" : return CREATE(queryParts[1..]);
+            case "USE" : return USE(queryParts[1..]);
         }
         
-        return new Error("Query parsing error: Unknown query format");
+        return new Error(ErrorPrefixes.QueryParsingError, "Unknown query format");
     }
 
     private Result<QueryModule[]> CREATE(string[] queryParts)
@@ -26,12 +27,18 @@ public class QueryParser
         switch (queryParts[0].ToUpper())
         {
             case "DATABASE":
-                if(queryParts.Length == 1) return new Error("Query parsing error: No database name");
-                return new QueryModule[] {
-                    new CREATE_DATABASE(queryParts[1])
-                };
+                if(queryParts.Length == 1) return new Error(ErrorPrefixes.QueryParsingError, "No database name");
+                return new QueryModule[] 
+                    { new CREATE_DATABASE(queryParts[1]) };
         }
         
-        return new Error("Query parsing error: Unknown CREATE query format");
+        return new Error(ErrorPrefixes.QueryParsingError, "Unknown CREATE query format");
+    }
+
+    private Result<QueryModule[]> USE(string[] queryParts)
+    {
+        if (queryParts.Length != 1) return new Error(ErrorPrefixes.QueryParsingError, "Database name missing");
+        return new QueryModule[]
+            { new USE_DATABASE(queryParts[0]) };
     }
 }

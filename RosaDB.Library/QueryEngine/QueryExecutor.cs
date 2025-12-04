@@ -11,15 +11,15 @@ public class QueryExecutor
         _parser = new QueryParser();
     }
     
+    // TODO if one query fails all need to be reverted
     public async Task<Result> Execute(string query, CancellationToken ct)
     {
         var modules = _parser.Parse(query);
         if (modules.IsFailure) return modules.Error;
 
-        // TODO if one query fails all need to be reverted
         foreach (var queryModule in modules.Value)
         {
-            var result = await queryModule.Excecute(ct);
+            var result = await queryModule.Execute(ct);
             if (result.IsFailure) return result;
         }
         
