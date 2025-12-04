@@ -233,7 +233,8 @@
         "net10.0"
       ],
       "sources": {
-        "https://api.nuget.org/v3/index.json": {}
+        "https://api.nuget.org/v3/index.json": {},
+        "https://nuget.pkg.github.com/SpectralBotXR/index.json": {}
       },
       "frameworks": {
         "net10.0": {

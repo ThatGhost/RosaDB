@@ -1,0 +1,4 @@
+# JetBrains Rider
+*.sln.iml
+.idea/
+**/workspace.xml
