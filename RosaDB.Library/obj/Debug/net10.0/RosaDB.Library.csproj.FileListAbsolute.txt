@@ -9,3 +9,4 @@
 /home/ibn/Projects/RosaDB/RosaDB.Library/obj/Debug/net10.0/refint/RosaDB.Library.dll
 /home/ibn/Projects/RosaDB/RosaDB.Library/obj/Debug/net10.0/RosaDB.Library.pdb
 /home/ibn/Projects/RosaDB/RosaDB.Library/obj/Debug/net10.0/ref/RosaDB.Library.dll
+/home/ibn/Projects/RosaDB/RosaDB.Library/obj/Debug/net10.0/RosaDB.Library.sourcelink.json
