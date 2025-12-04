@@ -1,5 +1,6 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine.QueryModules;
 
@@ -12,7 +13,7 @@ public class CREATE_DATABASE : QueryModule
         _name = name;
     }
     
-    public override async Task<Result> Execute(CancellationToken ct)
+    public override async Task<Result> Execute(ClientSession client, CancellationToken ct)
     {
         await FolderManager.CreateFolder(_name);
 

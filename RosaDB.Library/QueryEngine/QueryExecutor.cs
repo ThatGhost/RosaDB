@@ -1,4 +1,5 @@
 using RosaDB.Library.Core;
+using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine;
 
@@ -12,14 +13,14 @@ public class QueryExecutor
     }
     
     // TODO if one query fails all need to be reverted
-    public async Task<Result> Execute(string query, CancellationToken ct)
+    public async Task<Result> Execute(ClientSession client, string query, CancellationToken ct)
     {
         var modules = _parser.Parse(query);
         if (modules.IsFailure) return modules.Error;
 
         foreach (var queryModule in modules.Value)
         {
-            var result = await queryModule.Execute(ct);
+            var result = await queryModule.Execute(client, ct);
             if (result.IsFailure) return result;
         }
         

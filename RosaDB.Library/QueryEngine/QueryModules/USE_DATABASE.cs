@@ -1,6 +1,6 @@
 using RosaDB.Library.Core;
-using RosaDB.Library.StateEngine;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Server;
 
 namespace RosaDB.Library.QueryEngine.QueryModules;
 
@@ -13,11 +13,13 @@ public class USE_DATABASE : QueryModule
         _name = name;
     }
     
-    public override async Task<Result> Execute(CancellationToken ct)
+    public override async Task<Result> Execute(ClientSession client,CancellationToken ct)
     {
-        if(!await FolderManager.DoesFolderExist(_name)) return new Error(ErrorPrefixes.QueryExecutionError, "Folder does not exist");
+        var path = Path.Combine(client.DatabaseName, _name);
+        if(!await FolderManager.DoesFolderExist(path))
+            return new Error(ErrorPrefixes.QueryExecutionError, "Folder does not exist");
         
-        await StateManager.UpdateUsedDatabase(_name);
+        client.SetDatabase(_name);
         return Result.Success();
     }
 }
