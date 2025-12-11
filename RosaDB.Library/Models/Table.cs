@@ -1,3 +1,6 @@
 namespace RosaDB.Library.Models;
 
-public record Cell(string name);
+public class Table
+{
+    
+}

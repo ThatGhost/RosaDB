@@ -9,17 +9,11 @@ public class CREATE_DATABASE(string[] parts) : QueryModule
     public override async Task<Result> Execute(CancellationToken ct)
     {
         string databaseName = parts[0];
-        if(string.IsNullOrEmpty(databaseName)) return new Error(ErrorPrefixes.DatatypeError, "Database name not specified");
-        
-        var databaseModel = new Database(databaseName, []);
-        
-        await FolderManager.CreateFolder(databaseName);
-        await ByteReaderWriter.WriteBytesToFile(
-            Path.Combine(databaseName, ".env"), 
-            ByteObjectConverter.ObjectToByteArray(databaseModel), 
-            ct
-        );
+        if (string.IsNullOrEmpty(databaseName))
+        {
+            return new Error(ErrorPrefixes.QueryExecutionError, "Database name not specified.");
+        }
 
-        return Result.Success();
+        return await EnvManager.CreateDatabase(databaseName);
     }
 }

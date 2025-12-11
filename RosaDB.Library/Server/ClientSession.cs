@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using System.Text;
 using RosaDB.Library.QueryEngine;
+using RosaDB.Library.StorageEngine;
 
 namespace RosaDB.Server;
 
@@ -9,6 +10,7 @@ public class ClientSession
     private readonly TcpClient _client;
     private string? _databaseName;
     public string DatabaseName => _databaseName ?? "";
+    public LogManager? LogManager { get; private set; }
 
     public ClientSession(TcpClient client)
     {
@@ -38,5 +40,12 @@ public class ClientSession
         }
     }
     
-    public void SetDatabase(string? usedDatabase) => _databaseName = usedDatabase;
+    public void SetDatabase(string? usedDatabase)
+    {
+        _databaseName = usedDatabase;
+        if (_databaseName != null)
+        {
+            LogManager = new LogManager();
+        }
+    }
 }
