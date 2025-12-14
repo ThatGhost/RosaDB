@@ -1,15 +1,19 @@
 using System.Net;
 using System.Net.Sockets;
+using LightInject;
 
-namespace RosaDB.Server;
+namespace RosaDB.Library.Server;
 
 public class Server
 {
     private readonly TcpListener _listener;
+    private readonly ServiceContainer _container;
 
     public Server(string ipAddress, int port)
     {
         _listener = new TcpListener(IPAddress.Parse(ipAddress), port);
+        _container = new ServiceContainer();
+        Installer.Install(_container);
     }
 
     public async Task Start()
@@ -20,10 +24,14 @@ public class Server
             while (true)
             {
                 var client = await _listener.AcceptTcpClientAsync();
-                var clientSession = new ClientSession(client);
-                Task.Run(() => clientSession.HandleClient());
+                _ = Task.Run(async () =>
+                {
+                    await using var scope = _container.BeginScope();
+                    var clientSession = scope.GetInstance<TcpClient, Scope, ClientSession>(client, scope);
+                    await clientSession.HandleClient();
+                });
             }
-        }
+        }        
         catch (SocketException)
         {
             // Ignore the exception that is thrown when the listener is stopped.
@@ -33,5 +41,6 @@ public class Server
     public void Stop()
     {
         _listener.Stop();
+        _container.Dispose();
     }
 }

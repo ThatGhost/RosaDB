@@ -24,6 +24,16 @@ public static class FolderManager
         }
         return Task.CompletedTask;
     }
+    
+    public static Task CreateFile(string filePath)
+    {
+        var fullPath = Path.Combine(BasePath, filePath);
+        if (!File.Exists(fullPath))
+        {
+            File.Create(fullPath).Dispose();
+        }
+        return Task.CompletedTask;
+    }
 
     public static Task DeleteFolder(string folderName)
     {

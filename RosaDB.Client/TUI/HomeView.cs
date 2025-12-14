@@ -23,7 +23,7 @@ public class HomeView : View
             Y = Pos.Center(),
         };
 
-        var startServerButton = new Button("Start Server")
+        var startServerButton = new Button("Stop Server")
         {
             X = Pos.Center(),
             Y = Pos.Bottom(artLabel) + 2
@@ -33,7 +33,7 @@ public class HomeView : View
         {
             if (ServerManager.Server == null)
             {
-                ServerManager.Server = new RosaDB.Server.Server("127.0.0.1", 7485);
+                ServerManager.Server = new Library.Server.Server("127.0.0.1", 7485);
                 Task.Run(() => ServerManager.Server.Start());
                 startServerButton.Text = "Stop Server";
             }

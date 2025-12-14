@@ -1,14 +1,20 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
+using RosaDB.Library.Server;
 
 namespace RosaDB.Library.StorageEngine;
 
-public class LogManager
+public class LogManager(LogCondenser logCondenser)
 {
     private readonly Dictionary<Cell, Dictionary<Table, Queue<Log>>> _writeAheadLogs = new();
     private readonly Dictionary<Cell, Dictionary<Table, long>> _latestIndex = new();
-    private readonly LogCondenser _logCondenser = new();
+    private readonly LogCondenser _logCondenser = logCondenser;
     private const int MaxLogQueueSize = 20;
+
+    public async Task Commit()
+    {
+        
+    }
     
     public void Put(Cell cell, Table table, long? logId, byte[] data)
     {
@@ -45,13 +51,6 @@ public class LogManager
         Dictionary<Table, Queue<Log>> tableLogs = FindOrCreateTableLogs(cell);
         Queue<Log> logs = FindOrCreateLogs(tableLogs, table);
         logs.Enqueue(log);
-
-        if (logs.Count >= MaxLogQueueSize)
-        {
-            var condensedLogs = _logCondenser.Condense(logs);
-            // TODO: Persist the condensed logs
-            logs.Clear();
-        }
     }
     
     private Dictionary<Table, Queue<Log>> FindOrCreateTableLogs(Cell cell)
@@ -59,6 +58,7 @@ public class LogManager
         if (_writeAheadLogs.TryGetValue(cell, out var list)) return list;
         return _writeAheadLogs[cell] = [];
     }
+    
     private Queue<Log> FindOrCreateLogs(Dictionary<Table, Queue<Log>> tableLogs, Table table)
     {
         if (tableLogs.TryGetValue(table, out var logs)) return logs;

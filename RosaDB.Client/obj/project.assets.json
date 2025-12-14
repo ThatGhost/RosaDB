@@ -2,6 +2,19 @@
   "version": 3,
   "targets": {
     "net10.0": {
+      "LightInject/7.0.1": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/LightInject.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/LightInject.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
+      },
       "NStack.Core/1.1.1": {
         "type": "package",
         "compile": {
@@ -83,6 +96,9 @@
       "RosaDB.Library/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "LightInject": "7.0.1"
+        },
         "compile": {
           "bin/placeholder/RosaDB.Library.dll": {}
         },
@@ -93,6 +109,26 @@
     }
   },
   "libraries": {
+    "LightInject/7.0.1": {
+      "sha512": "aw4ayG2Pe68i+85ws8zYk7MPCKjEd4DeBoTqVvmjA2cfpYYNnw+v0E5T3PKdriKaxdKF+eUzlnxWWZnYK/gx4w==",
+      "type": "package",
+      "path": "lightinject/7.0.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net462/LightInject.dll",
+        "lib/net462/LightInject.pdb",
+        "lib/net462/LightInject.xml",
+        "lib/net8.0/LightInject.dll",
+        "lib/net8.0/LightInject.pdb",
+        "lib/net8.0/LightInject.xml",
+        "lib/netstandard2.0/LightInject.dll",
+        "lib/netstandard2.0/LightInject.pdb",
+        "lib/netstandard2.0/LightInject.xml",
+        "lightinject.7.0.1.nupkg.sha512",
+        "lightinject.nuspec"
+      ]
+    },
     "NStack.Core/1.1.1": {
       "sha512": "5LhlYsmAe3A55zl8xCSD7AbuhDqZODpsfdMGgtygeBlHZmlb0tHmK5/PeKODnwYUhC6EbL2qHKGskPNvpY+z3w==",
       "type": "package",

@@ -3,11 +3,11 @@ using Environment = RosaDB.Library.Models.Environment;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public static class EnvManager
+    public class RootManager
     {
-        private static readonly string EnvFilePath = Path.Combine(FolderManager.BasePath, "_env");
+        private readonly string EnvFilePath = Path.Combine(FolderManager.BasePath, "_env");
 
-        public static async Task<Result> CreateDatabase(string databaseName)
+        public async Task<Result> CreateDatabase(string databaseName)
         {
             var env = await GetEnvironment();
             if (env.DatabaseNames.Contains(databaseName))
@@ -23,13 +23,13 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        public static async Task<List<string>> GetDatabases()
+        public async Task<List<string>> GetDatabaseNames()
         {
             var env = await GetEnvironment();
             return env.DatabaseNames;
         }
 
-        private static async Task<Environment> GetEnvironment()
+        private async Task<Environment> GetEnvironment()
         {
             if (!File.Exists(EnvFilePath))
             {
@@ -45,7 +45,7 @@ namespace RosaDB.Library.StorageEngine
             return ByteObjectConverter.ByteArrayToObject<Environment>(bytes) ?? new Environment();
         }
 
-        private static async Task SaveEnvironment(Environment env)
+        private async Task SaveEnvironment(Environment env)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
             await ByteReaderWriter.WriteBytesToFile(EnvFilePath, bytes, CancellationToken.None);

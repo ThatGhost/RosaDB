@@ -1,27 +1,16 @@
 using System.Net.Sockets;
 using System.Text;
-using RosaDB.Library.QueryEngine;
-using RosaDB.Library.StorageEngine;
+using LightInject;
+using RosaDB.Library.Core;
+using RosaDB.Library.MoqQueries;
 
-namespace RosaDB.Server;
+namespace RosaDB.Library.Server;
 
-public class ClientSession
+public class ClientSession(TcpClient client, Scope scope)
 {
-    private readonly TcpClient _client;
-    private string? _databaseName;
-    public string DatabaseName => _databaseName ?? "";
-    public LogManager? LogManager { get; private set; }
-
-    public ClientSession(TcpClient client)
-    {
-        _client = client;
-        _databaseName = null;
-    }
-
     public async Task HandleClient()
     {
-        var stream = _client.GetStream();
-        var executor = new QueryExecutor();
+        var stream = client.GetStream();
         while (true)
         {
             var buffer = new byte[1024];
@@ -32,20 +21,14 @@ public class ClientSession
             }
 
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            var result = await executor.Execute(this, query, CancellationToken.None);
-
-            var response = result.IsSuccess ? "Success" : result.Error.Message;
+            await scope.GetInstance<UseDatabaseQuery>().Execute("testy");
+            
+            // var result = await executor.Execute(this, query, CancellationToken.None);
+            Result result = Result.Success();
+            
+            var response = result.IsSuccess ? "Success" : result.Error?.Message ?? "An unknown error occurred.";
             var responseBuffer = Encoding.UTF8.GetBytes(response);
             await stream.WriteAsync(responseBuffer, 0, responseBuffer.Length);
-        }
-    }
-    
-    public void SetDatabase(string? usedDatabase)
-    {
-        _databaseName = usedDatabase;
-        if (_databaseName != null)
-        {
-            LogManager = new LogManager();
         }
     }
 }

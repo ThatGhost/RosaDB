@@ -25,3 +25,4 @@
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/RosaDB.Client.pdb
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/RosaDB.Client.genruntimeconfig.cache
 /home/ibn/Projects/RosaDB/RosaDB.Client/obj/Debug/net10.0/ref/RosaDB.Client.dll
+/home/ibn/Projects/RosaDB/RosaDB.Client/bin/Debug/net10.0/LightInject.dll

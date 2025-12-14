@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "z7Gn5cGESp8=",
+  "dgSpecHash": "tPUPBYLusRw=",
   "success": true,
   "projectFilePath": "/home/ibn/Projects/RosaDB/RosaDB.Library/RosaDB.Library.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "/home/ibn/.nuget/packages/lightinject/7.0.1/lightinject.7.0.1.nupkg.sha512"
+  ],
   "logs": []
 }

@@ -7,8 +7,19 @@
   "targets": {
     ".NETCoreApp,Version=v10.0": {
       "RosaDB.Library/1.0.0": {
+        "dependencies": {
+          "LightInject": "7.0.1"
+        },
         "runtime": {
           "RosaDB.Library.dll": {}
+        }
+      },
+      "LightInject/7.0.1": {
+        "runtime": {
+          "lib/net8.0/LightInject.dll": {
+            "assemblyVersion": "7.0.1.0",
+            "fileVersion": "7.0.1.0"
+          }
         }
       }
     }
@@ -18,6 +29,13 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "LightInject/7.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-aw4ayG2Pe68i+85ws8zYk7MPCKjEd4DeBoTqVvmjA2cfpYYNnw+v0E5T3PKdriKaxdKF+eUzlnxWWZnYK/gx4w==",
+      "path": "lightinject/7.0.1",
+      "hashPath": "lightinject.7.0.1.nupkg.sha512"
     }
   }
 }
