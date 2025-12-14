@@ -1,18 +1,13 @@
 using RosaDB.Library.Models;
 using System.Collections.Generic;
+using RosaDB.Library.StorageEngine;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class CreateCellQuery
+public class CreateCellQuery(DatabaseManager databaseManager)
 {
-    public void Execute(string cellName)
+    public async Task Execute(string cellName)
     {
-        var dummyColumns = new List<Column>
-        {
-            new Column("Id", DataType.BIGINT, isPrimaryKey: true)
-        };
-        Cell newCell = new Cell(cellName, dummyColumns);
-        
-        // In a real scenario, this cell would be passed to a manager
+        await databaseManager.CreateCell(cellName, [new Column("Id", DataType.BIGINT, isPrimaryKey: true)]);
     }
 }

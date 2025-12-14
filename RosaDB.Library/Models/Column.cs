@@ -8,7 +8,6 @@ public class Column
 
     public Column(string name, DataType dataType, bool isPrimaryKey = false)
     {
-        // Basic validation
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Column name cannot be empty.", nameof(name));
 

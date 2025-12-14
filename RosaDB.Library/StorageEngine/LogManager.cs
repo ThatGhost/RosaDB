@@ -8,8 +8,6 @@ public class LogManager(LogCondenser logCondenser)
 {
     private readonly Dictionary<Cell, Dictionary<Table, Queue<Log>>> _writeAheadLogs = new();
     private readonly Dictionary<Cell, Dictionary<Table, long>> _latestIndex = new();
-    private readonly LogCondenser _logCondenser = logCondenser;
-    private const int MaxLogQueueSize = 20;
 
     public async Task Commit()
     {

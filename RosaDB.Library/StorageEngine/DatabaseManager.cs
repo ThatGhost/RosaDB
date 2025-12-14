@@ -1,62 +1,57 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Environment = RosaDB.Library.Models.DatabaseEnvironment;
+using RosaDB.Library.Server;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class DatabaseManager
+    public class DatabaseManager(SessionState sessionState)
     {
-        private readonly string _databaseName;
-        private readonly string _dbEnvFilePath;
-
-        public DatabaseManager(string databaseName)
+        public async Task<Result> CreateDatabaseEnvironment(Database database)
         {
-            _databaseName = databaseName;
-            _dbEnvFilePath = Path.Combine(FolderManager.BasePath, _databaseName, "_db_env");
+            DatabaseEnvironment env = new DatabaseEnvironment();
+            await SaveEnvironment(env, database);
+            
+            return Result.Success();
         }
-
+        
         public async Task<Result> CreateCell(string cellName, List<Column> columns)
         {
-            var env = await GetEnvironment();
-            if (env.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
-            {
-                return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{_databaseName}'.");
-            }
+            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+            
+            var env = await GetEnvironment(sessionState.CurrentDatabase);
+            if (env.IsFailure) return env.Error!;
+            if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase))) return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
             var newCell = new Cell(cellName, columns);
-            env.Cells.Add(newCell);
-            await SaveEnvironment(env);
+            env.Value.Cells.Add(newCell);
+            await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
             
-            await FolderManager.CreateFolder(Path.Combine(_databaseName, cellName));
+            await FolderManager.CreateFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
 
             return Result.Success();
         }
 
-        private async Task<Environment> GetEnvironment()
+        private async Task<Result<DatabaseEnvironment>> GetEnvironment(Database database)
         {
-            if (!File.Exists(_dbEnvFilePath))
-            {
-                return new Environment();
-            }
+            if (!File.Exists(GetDatabaseFilePath(database))) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(_dbEnvFilePath, CancellationToken.None);
-            if (bytes.Length == 0)
-            {
-                return new Environment();
-            }
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(GetDatabaseFilePath(database), CancellationToken.None);
+            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
             
-            return ByteObjectConverter.ByteArrayToObject<Environment>(bytes) ?? new Environment();
+            var env = ByteObjectConverter.ByteArrayToObject<DatabaseEnvironment>(bytes);
+            if(env is null) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
+            return env;
         }
 
-        private async Task SaveEnvironment(Environment env)
+        private string GetDatabaseFilePath(Database database)
+        {
+            return Path.Combine(FolderManager.BasePath, database.Name, "_env");
+        }
+        
+        private async Task SaveEnvironment(DatabaseEnvironment env, Database database)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
-            await ByteReaderWriter.WriteBytesToFile(_dbEnvFilePath, bytes, CancellationToken.None);
+            await ByteReaderWriter.WriteBytesToFile(GetDatabaseFilePath(database), bytes, CancellationToken.None);
         }
     }
 }

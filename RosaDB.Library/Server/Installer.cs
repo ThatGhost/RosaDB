@@ -12,8 +12,11 @@ public static class Installer
         container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
         container.RegisterScoped<SessionState>();
         container.RegisterSingleton<LogManager>();
+        
         container.RegisterTransient<LogCondenser>();
-        container.RegisterSingleton<RootManager>();
+        container.RegisterTransient<RootManager>();
+        container.RegisterTransient<DatabaseManager>();
+        
         InstallMoqQueries(container);
     }
 

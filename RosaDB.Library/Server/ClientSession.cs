@@ -22,11 +22,12 @@ public class ClientSession(TcpClient client, Scope scope)
 
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             await scope.GetInstance<UseDatabaseQuery>().Execute("testy");
+            await scope.GetInstance<CreateCellQuery>().Execute(query);
             
             // var result = await executor.Execute(this, query, CancellationToken.None);
             Result result = Result.Success();
             
-            var response = result.IsSuccess ? "Success" : result.Error?.Message ?? "An unknown error occurred.";
+            var response = result.IsSuccess ? $"{DateTime.Now.ToShortTimeString()} : Success" : result.Error?.Message ?? "An unknown error occurred.";
             var responseBuffer = Encoding.UTF8.GetBytes(response);
             await stream.WriteAsync(responseBuffer, 0, responseBuffer.Length);
         }

@@ -1,48 +1,73 @@
 using RosaDB.Library.Core;
+using RosaDB.Library.Models;
 using Environment = RosaDB.Library.Models.Environment;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class RootManager
+    public class RootManager(DatabaseManager databaseManager)
     {
         private readonly string EnvFilePath = Path.Combine(FolderManager.BasePath, "_env");
 
         public async Task<Result> CreateDatabase(string databaseName)
         {
-            var env = await GetEnvironment();
-            if (env.DatabaseNames.Contains(databaseName))
+            try
             {
-                return new Error(ErrorPrefixes.FileError, $"Database '{databaseName}' already exists.");
-            }
+                var env = await GetEnvironment();
+                if (env.IsFailure) return new Error(ErrorPrefixes.FileError, "RosaDb not setup correctly");
+                if (env.Value.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.FileError, $"Database '{databaseName}' already exists.");
 
-            env.DatabaseNames.Add(databaseName);
-            await SaveEnvironment(env);
+                env.Value.DatabaseNames.Add(databaseName);
+                await SaveEnvironment(env.Value);
+
+                await FolderManager.CreateFolder(databaseName);
+                var envResult = await databaseManager.CreateDatabaseEnvironment(new Database(databaseName, []));
+                if (envResult.IsFailure)
+                {
+                    return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : envResult.Error!;
+                }
+
+                return Result.Success();
+            }
+            catch
+            {
+                return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Database creation failed");
+            }
+        }
+        
+        // Atomicity
+        private async Task<Result> WipeDatabase(string databaseName)
+        {
+            try
+            {
+                var env = await GetEnvironment();
+                if (env.IsFailure) return new CriticalError();
             
-            await FolderManager.CreateFolder(databaseName);
-
-            return Result.Success();
+                env.Value.DatabaseNames.Remove(databaseName);
+                await SaveEnvironment(env.Value);
+            
+                await FolderManager.DeleteFolder(databaseName);
+            
+                return Result.Success();
+            }
+            catch { return new CriticalError(); }
         }
 
-        public async Task<List<string>> GetDatabaseNames()
+        public async Task<Result<List<string>>> GetDatabaseNames()
         {
             var env = await GetEnvironment();
-            return env.DatabaseNames;
+            return env.IsSuccess ? env.Value.DatabaseNames : new Error(ErrorPrefixes.FileError, "Databases not found.");
         }
 
-        private async Task<Environment> GetEnvironment()
+        private async Task<Result<Environment>> GetEnvironment()
         {
-            if (!File.Exists(EnvFilePath))
-            {
-                return new Environment();
-            }
+            if (!File.Exists(EnvFilePath)) return new Error(ErrorPrefixes.FileError, "Database environment file not found.");
 
             var bytes = await ByteReaderWriter.ReadBytesFromFile(EnvFilePath, CancellationToken.None);
-            if (bytes.Length == 0)
-            {
-                return new Environment();
-            }
+            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Database environment file empty");
             
-            return ByteObjectConverter.ByteArrayToObject<Environment>(bytes) ?? new Environment();
+            var env = ByteObjectConverter.ByteArrayToObject<Environment>(bytes);
+            if(env is null) return new Error(ErrorPrefixes.FileError, "Database environment file empty");
+            return env;
         }
 
         private async Task SaveEnvironment(Environment env)
