@@ -6,8 +6,9 @@ namespace RosaDB.Library.MoqQueries;
 
 public class CreateCellQuery(DatabaseManager databaseManager)
 {
-    public async Task Execute(string cellName)
+    public async Task Execute(string cellName, List<Column>? columns = null)
     {
-        await databaseManager.CreateCell(cellName, [new Column("Id", DataType.BIGINT, isPrimaryKey: true)]);
+        columns ??= [new Column("Id", DataType.BIGINT, isPrimaryKey: true, isIndex: true)];
+        await databaseManager.CreateCell(cellName, columns);
     }
 }

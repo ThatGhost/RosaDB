@@ -22,7 +22,6 @@ public class ClientSession(TcpClient client, Scope scope)
 
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             await scope.GetInstance<UseDatabaseQuery>().Execute("testy");
-            await scope.GetInstance<CreateCellQuery>().Execute(query);
             
             // var result = await executor.Execute(this, query, CancellationToken.None);
             Result result = Result.Success();

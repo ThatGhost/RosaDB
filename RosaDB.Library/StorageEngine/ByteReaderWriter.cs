@@ -13,4 +13,10 @@ public static class ByteReaderWriter
     {
         await File.WriteAllBytesAsync(path, data, ct);
     }
+    
+    public static async Task AppendBytesToFile(string path, byte[] data, CancellationToken ct)
+    {
+        await using var stream = new FileStream(path, FileMode.Append);
+        await stream.WriteAsync(data, 0, data.Length, ct);
+    }
 }

@@ -18,7 +18,17 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        private async Task<Result<CellEnvironment>> GetEnvironment(Cell cell)
+        public async Task<Result> AddTables(Cell cell, Table[] tables)
+        {
+            var env = await GetEnvironment(cell);
+            if (env.IsFailure) return env.Error!;
+            
+            env.Value.Tables = env.Value.Tables.Concat(tables.ToArray()).ToArray();
+            await SaveEnvironment(env.Value, cell);
+            return Result.Success();
+        }
+
+        public async Task<Result<CellEnvironment>> GetEnvironment(Cell cell)
         {
             if (sessionState.CurrentDatabase is null)
                 return new Error(ErrorPrefixes.StateError, "Database not set");

@@ -25,21 +25,16 @@ namespace RosaDB.Library.StorageEngine
                 var env = await GetEnvironment(sessionState.CurrentDatabase);
                 if (env.IsFailure) return env.Error!;
                 if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
-                    return new Error(ErrorPrefixes.FileError,
-                        $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
+                    return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
                 var newCell = new Cell(cellName);
                 env.Value.Cells.Add(newCell);
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
 
-                await FolderManager.CreateFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
+                await FolderManager.CreateFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
 
                 var cellEnvResult = await cellManager.CreateCellEnvironment(newCell, columns);
-                if (cellEnvResult.IsFailure)
-                {
-                    // Rollback cell creation
-                    return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error!;
-                }
+                if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error!;
                 
                 return Result.Success();
             }
@@ -49,6 +44,26 @@ namespace RosaDB.Library.StorageEngine
             }
         }
 
+        // Need to add atomicity
+        public async Task<Result> DeleteCell(string cellName)
+        {
+            try
+            {
+                if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+                var env = await GetEnvironment(sessionState.CurrentDatabase);
+                
+                var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
+                if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
+                
+                env.Value.Cells.Remove(cell);
+                
+                await FolderManager.DeleteFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                
+                return Result.Success();
+            }
+            catch { return new Error(ErrorPrefixes.FileError, "Something went wrong"); }
+        }
+        
         private async Task<Result> WipeCell(string cellName)
         {
             try
@@ -58,7 +73,7 @@ namespace RosaDB.Library.StorageEngine
                 if(env.IsSuccess) env.Value.Cells.RemoveAll(c => c.Name == cellName);
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
                 
-                await FolderManager.DeleteFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
+                await FolderManager.DeleteFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
                 
                 return Result.Success();
             }
@@ -77,9 +92,11 @@ namespace RosaDB.Library.StorageEngine
             return env;
         }
 
+        private string GetDatabasePath(Database database) => Path.Combine(FolderManager.BasePath, database.Name);
+
         private string GetDatabaseFilePath(Database database)
         {
-            return Path.Combine(FolderManager.BasePath, database.Name, "_env");
+            return Path.Combine(GetDatabasePath(database), "_env");
         }
         
         private async Task SaveEnvironment(DatabaseEnvironment env, Database database)

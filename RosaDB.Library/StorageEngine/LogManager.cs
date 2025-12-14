@@ -1,83 +1,122 @@
+using System.Security.Cryptography;
+using System.Text;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 
 namespace RosaDB.Library.StorageEngine;
 
-public class LogManager(LogCondenser logCondenser)
+public class LogManager(LogCondenser logCondenser, SessionState sessionState)
 {
-    private readonly Dictionary<Cell, Dictionary<Table, Queue<Log>>> _writeAheadLogs = new();
-    private readonly Dictionary<Cell, Dictionary<Table, long>> _latestIndex = new();
+    private readonly record struct TableInstanceIdentifier(string CellName, string TableName, string InstanceHash);
+
+    private readonly Dictionary<TableInstanceIdentifier, Queue<Log>> _writeAheadLogs = new();
+    private readonly Dictionary<TableInstanceIdentifier, long> _latestIndex = new();
 
     public async Task Commit()
     {
+        if (sessionState.CurrentDatabase is null)
+        {
+            return;
+        }
+
+        foreach (var (identifier, logs) in _writeAheadLogs)
+        {
+            var condensedLogs = logCondenser.Condense(logs);
+            if (condensedLogs.Count == 0)
+            {
+                continue;
+            }
+
+            var logFilePath = GetLogFilePath(identifier);
+            var logDirectory = Path.GetDirectoryName(logFilePath);
+            if (!string.IsNullOrEmpty(logDirectory) && !Directory.Exists(logDirectory))
+            {
+                Directory.CreateDirectory(logDirectory);
+            }
+
+            // Current simplification. Will need to make an index file and save a btree in the future. also pages...
+            foreach (var log in condensedLogs)
+            {
+                var bytes = ByteObjectConverter.ObjectToByteArray(log);
+                await ByteReaderWriter.AppendBytesToFile(logFilePath, bytes, CancellationToken.None);
+            }
+        }
         
+        _writeAheadLogs.Clear();
     }
     
-    public void Put(Cell cell, Table table, long? logId, byte[] data)
+    public void Put(Cell cell, Table table, object[] indexValues, long? logId, byte[] data)
     {
-        long finalLogId = logId ?? GetLatestLogId(cell, table);
+        var identifier = CreateIdentifier(cell, table, indexValues);
+        long finalLogId = logId ?? GetLatestLogId(identifier);
         Log log = new Log()
         {
             TupleData = data,
             Id = finalLogId,
         };
-        PutLog(log, cell, table);
+        PutLog(log, identifier);
     }
 
-    public void Delete(Cell cell, Table table, long logId)
+    public void Delete(Cell cell, Table table, object[] indexValues, long logId)
     {
+        var identifier = CreateIdentifier(cell, table, indexValues);
         Log log = new Log()
         {
             Id = logId,
             IsDeleted = true,
         };
-        PutLog(log, cell, table);
+        PutLog(log, identifier);
     }
     
-    public Result<Log> FindLastestLog(Cell cell, Table table, long id)
+    public Result<Log> FindLastestLog(Cell cell, Table table, object[] indexValues, long id)
     {
-        if (!_writeAheadLogs.TryGetValue(cell, out var cellLogs)) return new Error(ErrorPrefixes.FileError, string.Empty);
-        if (!cellLogs.TryGetValue(table, out var logs)) return new Error(ErrorPrefixes.FileError, string.Empty);
+        var identifier = CreateIdentifier(cell, table, indexValues);
+        if (!_writeAheadLogs.TryGetValue(identifier, out var logs))
+        {
+            return new Error(ErrorPrefixes.FileError, "Log not found in memory.");
+        }
         
-        Log? log = logs.FirstOrDefault(l => l.Id == id);
-        return log is null ? new Error(ErrorPrefixes.FileError, string.Empty) : log;
+        Log? log = logs.AsEnumerable().Reverse().FirstOrDefault(l => l.Id == id);
+        return log is null ? new Error(ErrorPrefixes.FileError, "Log not found in memory.") : log;
     }
     
-    private void PutLog(Log log, Cell cell, Table table)
+    private void PutLog(Log log, TableInstanceIdentifier identifier)
     {
-        Dictionary<Table, Queue<Log>> tableLogs = FindOrCreateTableLogs(cell);
-        Queue<Log> logs = FindOrCreateLogs(tableLogs, table);
+        if (!_writeAheadLogs.TryGetValue(identifier, out var logs))
+        {
+            logs = new Queue<Log>();
+            _writeAheadLogs[identifier] = logs;
+        }
         logs.Enqueue(log);
     }
     
-    private Dictionary<Table, Queue<Log>> FindOrCreateTableLogs(Cell cell)
+    private long GetLatestLogId(TableInstanceIdentifier identifier)
     {
-        if (_writeAheadLogs.TryGetValue(cell, out var list)) return list;
-        return _writeAheadLogs[cell] = [];
-    }
-    
-    private Queue<Log> FindOrCreateLogs(Dictionary<Table, Queue<Log>> tableLogs, Table table)
-    {
-        if (tableLogs.TryGetValue(table, out var logs)) return logs;
-        return tableLogs[table] = [];
-    }
-    
-    private Dictionary<Table, long> FindOrCreateTableIndexes(Cell cell)
-    {
-        if (_latestIndex.TryGetValue(cell, out var list)) return list;
-        return _latestIndex[cell] = [];
-    }
-    
-    private long FindOrCreateIndex(Dictionary<Table, long> tableIndexes, Table table)
-    {
-        if (tableIndexes.TryGetValue(table, out var index)) return index;
-        return tableIndexes[table] = 0;
+        var index = _latestIndex.GetValueOrDefault(identifier, 0);
+        _latestIndex[identifier] = index + 1;
+        return index + 1;
     }
 
-    public long GetLatestLogId(Cell cell, Table table)
+    private TableInstanceIdentifier CreateIdentifier(Cell cell, Table table, object[] indexValues)
     {
-        Dictionary<Table, long> tableIndexes = FindOrCreateTableIndexes(cell);
-        return FindOrCreateIndex(tableIndexes, table);
+        var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
+        return new TableInstanceIdentifier(cell.Name, table.Name, hash);
+    }
+
+    private string GetLogFilePath(TableInstanceIdentifier identifier)
+    {
+        if (sessionState.CurrentDatabase is null)
+        {
+            throw new InvalidOperationException("Current database is not set.");
+        }
+        
+        return Path.Combine(
+            FolderManager.BasePath, 
+            sessionState.CurrentDatabase.Name, 
+            identifier.CellName, 
+            identifier.TableName, 
+            $"{identifier.InstanceHash}.log");
     }
 }

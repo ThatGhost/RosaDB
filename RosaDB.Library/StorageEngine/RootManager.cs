@@ -33,6 +33,21 @@ namespace RosaDB.Library.StorageEngine
                 return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Database creation failed");
             }
         }
+
+        public async Task<Result> InitializeRoot()
+        {
+            try
+            {
+                var result = await GetEnvironment();
+                if (result.IsSuccess) return new Error(ErrorPrefixes.StateError, "Root already setup");
+                
+                RootEnvironment env = new RootEnvironment();
+                await SaveEnvironment(env);
+                
+                return Result.Success();
+            }
+            catch { return new Error(ErrorPrefixes.FileError, "RosaDb not setup correctly"); }
+        }
         
         // Atomicity
         private async Task<Result> WipeDatabase(string databaseName)

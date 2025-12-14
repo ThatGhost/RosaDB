@@ -11,7 +11,7 @@ public static class Installer
     {
         container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
         container.RegisterScoped<SessionState>();
-        container.RegisterSingleton<LogManager>();
+        container.RegisterScoped<LogManager>();
         
         container.RegisterTransient<LogCondenser>();
         container.RegisterTransient<RootManager>();
@@ -27,5 +27,6 @@ public static class Installer
         container.Register<WriteLogAndCommitQuery>();
         container.Register<CreateDatabaseQuery>();
         container.Register<UseDatabaseQuery>();
+        container.Register<InitializeDbQuery>();
     }
 }

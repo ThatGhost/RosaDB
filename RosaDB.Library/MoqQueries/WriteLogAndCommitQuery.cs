@@ -18,19 +18,13 @@ public class WriteLogAndCommitQuery
     public async Task Execute()
     {
         // Example data - these would normally come from the query parsing
-        // We need a dummy Cell and Table for the Put method
-        // Since we don't have a real query execution context, we'll create simple ones.
-        var dummyColumns = new List<Column>
-        {
-            new Column("Id", DataType.BIGINT, isPrimaryKey: true),
-            new Column("Value", DataType.VARCHAR)
-        };
         Cell dummyCell = new Cell("DummyCell");
-        Table dummyTable = new Table();
+        Table dummyTable = new Table() { Name = "DummyTable" };
         byte[] dummyData = Encoding.UTF8.GetBytes("This is a dummy log entry.");
+        object[] dummyIndex = { 1 };
 
         // Write one log
-        _logManager.Put(dummyCell, dummyTable, null, dummyData);
+        _logManager.Put(dummyCell, dummyTable, dummyIndex, null, dummyData);
 
         // Commit the log
         await _logManager.Commit();
