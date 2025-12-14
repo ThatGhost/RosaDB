@@ -17,19 +17,47 @@ namespace RosaDB.Library.StorageEngine
         
         public async Task<Result> CreateCell(string cellName, List<Column> columns)
         {
-            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
-            
-            var env = await GetEnvironment(sessionState.CurrentDatabase);
-            if (env.IsFailure) return env.Error!;
-            if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase))) return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
+            try
+            {
+                if (sessionState.CurrentDatabase is null)
+                    return new Error(ErrorPrefixes.StateError, "Database not set");
 
-            var newCell = new Cell(cellName);
-            env.Value.Cells.Add(newCell);
-            await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
-            
-            await FolderManager.CreateFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
+                var env = await GetEnvironment(sessionState.CurrentDatabase);
+                if (env.IsFailure) return env.Error!;
+                if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
+                    return new Error(ErrorPrefixes.FileError,
+                        $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
-            return Result.Success();
+                var newCell = new Cell(cellName);
+                env.Value.Cells.Add(newCell);
+                await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
+
+                await FolderManager.CreateFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
+
+                // TODO create cell manager and save env there
+                
+                return Result.Success();
+            }
+            catch
+            {
+                return (await WipeCell(cellName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Cell creation failed");
+            }
+        }
+
+        private async Task<Result> WipeCell(string cellName)
+        {
+            try
+            {
+                if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+                var env = await GetEnvironment(sessionState.CurrentDatabase);
+                if(env.IsSuccess) env.Value.Cells.RemoveAll(c => c.Name == cellName);
+                await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
+                
+                await FolderManager.DeleteFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
+                
+                return Result.Success();
+            }
+            catch { return new CriticalError(); }
         }
 
         private async Task<Result<DatabaseEnvironment>> GetEnvironment(Database database)
