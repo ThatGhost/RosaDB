@@ -5,7 +5,7 @@ using RosaDB.Library.Server;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class DatabaseManager(SessionState sessionState)
+    public class DatabaseManager(SessionState sessionState, CellManager cellManager)
     {
         public async Task<Result> CreateDatabaseEnvironment(Database database)
         {
@@ -34,7 +34,12 @@ namespace RosaDB.Library.StorageEngine
 
                 await FolderManager.CreateFolder(Path.Combine(GetDatabaseFilePath(sessionState.CurrentDatabase), cellName));
 
-                // TODO create cell manager and save env there
+                var cellEnvResult = await cellManager.CreateCellEnvironment(newCell, columns);
+                if (cellEnvResult.IsFailure)
+                {
+                    // Rollback cell creation
+                    return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error!;
+                }
                 
                 return Result.Success();
             }

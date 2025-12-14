@@ -16,6 +16,7 @@ public static class Installer
         container.RegisterTransient<LogCondenser>();
         container.RegisterTransient<RootManager>();
         container.RegisterTransient<DatabaseManager>();
+        container.RegisterTransient<CellManager>();
         
         InstallMoqQueries(container);
     }
