@@ -13,7 +13,7 @@ public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState
         
         if (existingDbs.Value.Contains(dbName))
         {
-            Database newDb = new Database(dbName, []);
+            Database newDb = new Database(dbName);
             sessionState.CurrentDatabase = newDb;
         }
     }

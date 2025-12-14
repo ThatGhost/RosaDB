@@ -1,6 +1,6 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
-using Environment = RosaDB.Library.Models.Environment;
+using RosaDB.Library.Models.Environments;
 
 namespace RosaDB.Library.StorageEngine
 {
@@ -20,7 +20,7 @@ namespace RosaDB.Library.StorageEngine
                 await SaveEnvironment(env.Value);
 
                 await FolderManager.CreateFolder(databaseName);
-                var envResult = await databaseManager.CreateDatabaseEnvironment(new Database(databaseName, []));
+                var envResult = await databaseManager.CreateDatabaseEnvironment(new Database(databaseName));
                 if (envResult.IsFailure)
                 {
                     return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : envResult.Error!;
@@ -58,19 +58,19 @@ namespace RosaDB.Library.StorageEngine
             return env.IsSuccess ? env.Value.DatabaseNames : new Error(ErrorPrefixes.FileError, "Databases not found.");
         }
 
-        private async Task<Result<Environment>> GetEnvironment()
+        private async Task<Result<RootEnvironment>> GetEnvironment()
         {
             if (!File.Exists(EnvFilePath)) return new Error(ErrorPrefixes.FileError, "Database environment file not found.");
 
             var bytes = await ByteReaderWriter.ReadBytesFromFile(EnvFilePath, CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Database environment file empty");
             
-            var env = ByteObjectConverter.ByteArrayToObject<Environment>(bytes);
+            var env = ByteObjectConverter.ByteArrayToObject<RootEnvironment>(bytes);
             if(env is null) return new Error(ErrorPrefixes.FileError, "Database environment file empty");
             return env;
         }
 
-        private async Task SaveEnvironment(Environment env)
+        private async Task SaveEnvironment(RootEnvironment env)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
             await ByteReaderWriter.WriteBytesToFile(EnvFilePath, bytes, CancellationToken.None);

@@ -25,7 +25,7 @@ public class WriteLogAndCommitQuery
             new Column("Id", DataType.BIGINT, isPrimaryKey: true),
             new Column("Value", DataType.VARCHAR)
         };
-        Cell dummyCell = new Cell("DummyCell", dummyColumns);
+        Cell dummyCell = new Cell("DummyCell");
         Table dummyTable = new Table();
         byte[] dummyData = Encoding.UTF8.GetBytes("This is a dummy log entry.");
 

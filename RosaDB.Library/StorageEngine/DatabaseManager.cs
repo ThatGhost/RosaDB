@@ -1,5 +1,6 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
+using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
 
 namespace RosaDB.Library.StorageEngine
@@ -22,7 +23,7 @@ namespace RosaDB.Library.StorageEngine
             if (env.IsFailure) return env.Error!;
             if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase))) return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
-            var newCell = new Cell(cellName, columns);
+            var newCell = new Cell(cellName);
             env.Value.Cells.Add(newCell);
             await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
             
