@@ -24,7 +24,7 @@ public class WriteLogAndCommitQuery
         object[] dummyIndex = { 1 };
 
         // Write one log
-        _logManager.Put(dummyCell, dummyTable, dummyIndex, null, dummyData);
+        _logManager.Put(dummyCell, dummyTable, dummyIndex, dummyData);
 
         // Commit the log
         await _logManager.Commit();

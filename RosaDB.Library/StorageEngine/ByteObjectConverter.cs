@@ -1,17 +1,45 @@
-
 using System.Text.Json;
 
 namespace RosaDB.Library.StorageEngine;
 
-public class ByteObjectConverter
+public static class ByteObjectConverter
 {
     public static byte[] ObjectToByteArray(object obj)
     {
-        return JsonSerializer.SerializeToUtf8Bytes(obj);
+        var jsonData = JsonSerializer.SerializeToUtf8Bytes(obj);
+        var length = jsonData.Length;
+        var lengthBytes = BitConverter.GetBytes(length);
+
+        // This check is important for cross-platform consistency.
+        if (!BitConverter.IsLittleEndian) Array.Reverse(lengthBytes);
+
+        var result = new byte[4 + length];
+        lengthBytes.CopyTo(result, 0);
+        jsonData.CopyTo(result, 4);
+
+        return result;
     }
     
     public static T? ByteArrayToObject<T>(byte[] bytes)
     {
-        return JsonSerializer.Deserialize<T>(bytes);
+        return JsonSerializer.Deserialize<T>(bytes[4..]);
+    }
+
+    public static T? ReadObjectFromStream<T>(Stream stream)
+    {
+        var lengthBytes = new byte[4];
+        int bytesRead = stream.Read(lengthBytes, 0, 4);
+        if (bytesRead < 4) return default;
+
+        if (!BitConverter.IsLittleEndian) Array.Reverse(lengthBytes);
+
+        var length = BitConverter.ToInt32(lengthBytes, 0);
+
+        if (stream.Length - stream.Position < length) return default;
+
+        var objectBytes = new byte[length];
+        _ = stream.Read(objectBytes, 0, length);
+        
+        return JsonSerializer.Deserialize<T>(objectBytes);
     }
 }
