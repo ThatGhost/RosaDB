@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RosaDB.Client")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8868bd76fd2bffd5f6ccee15c95da90a58a28411")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7b5c97d71a4758967eea211fd0f3e76b77b647d3")]
 [assembly: System.Reflection.AssemblyProductAttribute("RosaDB.Client")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RosaDB.Client")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
