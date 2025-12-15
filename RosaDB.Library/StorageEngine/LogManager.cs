@@ -247,4 +247,73 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         }
         return segmentIndexes;
     }
+
+    public async Task<Result<List<Log>>> GetAllLogsForCellTable(Cell cell, Table table)
+    {
+        List<Log> allLogs = new List<Log>();
+
+        var matchingIdentifiers = _sparseIndexCache.Keys
+            .Where(id => id.CellName == cell.Name && id.TableName == table.Name)
+            .ToList();
+
+        foreach (var identifier in matchingIdentifiers)
+        {
+            if (_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
+            {
+                foreach (var segmentNumber in segmentIndexes.Keys.OrderBy(k => k)) // Order by segment number
+                {
+                    var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
+                    if (!File.Exists(segmentFilePath)) continue;
+
+                    var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath, CancellationToken.None);
+                    if (bytesBlock.Length == 0) continue;
+
+                    using var stream = new MemoryStream(bytesBlock);
+                    while (stream.Position < stream.Length)
+                    {
+                        var log = ByteObjectConverter.ReadObjectFromStream<Log>(stream);
+                        if (log is null) break;
+                        allLogs.Add(log);
+                    }
+                }
+            }
+        }
+
+        return allLogs;
+    }
+
+    public async Task<Result<List<Log>>> GetAllLogsForCellInstanceTable(Cell cell, Table table, object[] indexValues)
+    {
+        List<Log> allLogs = new List<Log>();
+        var identifier = CreateIdentifier(cell, table, indexValues);
+
+        // First, check in-memory write-ahead logs
+        if (_writeAheadLogs.TryGetValue(identifier, out var inMemoryLogs))
+        {
+            allLogs.AddRange(inMemoryLogs);
+        }
+
+        // Then, check on-disk segments
+        if (_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
+        {
+            foreach (var segmentNumber in segmentIndexes.Keys.OrderBy(k => k))
+            {
+                var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
+                if (!File.Exists(segmentFilePath)) continue;
+
+                var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath, CancellationToken.None);
+                if (bytesBlock.Length == 0) continue;
+
+                using var stream = new MemoryStream(bytesBlock);
+                while (stream.Position < stream.Length)
+                {
+                    var log = ByteObjectConverter.ReadObjectFromStream<Log>(stream);
+                    if (log is null) break;
+                    allLogs.Add(log);
+                }
+            }
+        }
+
+        return allLogs;
+    }
 }

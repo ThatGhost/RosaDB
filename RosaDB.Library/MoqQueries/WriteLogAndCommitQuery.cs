@@ -15,18 +15,24 @@ public class WriteLogAndCommitQuery
         _logManager = logManager;
     }
     
-    public async Task Execute()
+    public async Task Execute(string cell, string table, string data)
     {
-        // Example data - these would normally come from the query parsing
-        Cell dummyCell = new Cell("DummyCell");
-        Table dummyTable = new Table() { Name = "DummyTable" };
-        byte[] dummyData = Encoding.UTF8.GetBytes("This is a dummy log entry.");
-        object[] dummyIndex = { 1 };
+        Cell dummyCell = new Cell(cell);
+        Table dummyTable = new Table() { Name = table };
+        var random = new System.Random();
 
-        // Write one log
-        _logManager.Put(dummyCell, dummyTable, dummyIndex, dummyData);
+        for (int i = 0; i < 10000; i++)
+        {
+            int instanceIndex = random.Next(0, 20);
+            object[] indexValues = { instanceIndex };
+            
+            // Convert string to char[] and then serialize using the converter to match reader expectations
+            var payload = ($"{data} - {i}").ToCharArray();
+            byte[] bytes = ByteObjectConverter.ObjectToByteArray(payload);
 
-        // Commit the log
+            _logManager.Put(dummyCell, dummyTable, indexValues, bytes);
+        }
+
         await _logManager.Commit();
     }
 }

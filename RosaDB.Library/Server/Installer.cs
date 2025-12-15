@@ -28,5 +28,8 @@ public static class Installer
         container.Register<CreateDatabaseQuery>();
         container.Register<UseDatabaseQuery>();
         container.Register<InitializeDbQuery>();
+        container.Register<CreateTableDefinition>();
+        container.Register<GetAllLogsQuery>();
+        container.Register<GetCellLogsQuery>();
     }
 }
