@@ -32,6 +32,7 @@ public class WriteLogAndCommitQuery
             _logManager.Put(dummyCell, dummyTable, indexValues, bytes);
         }
 
+        // Commit the log
         await _logManager.Commit();
     }
 }
