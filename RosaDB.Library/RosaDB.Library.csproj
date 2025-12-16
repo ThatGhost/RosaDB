@@ -11,4 +11,8 @@
       <PackageReference Include="LightInject" Version="7.0.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Query\" />
+    </ItemGroup>
+
 </Project>
