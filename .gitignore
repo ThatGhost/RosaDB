@@ -7,8 +7,11 @@ nupkg/
 
 */debug/
 */obj/
+*/bin/
 /RosaDB.Client/obj/
 /RosaDB.Library/obj/
+/RosaDB.Client/bin/
+/RosaDB.Library/bin/
 
 # Visual Studio Code
 .vscode/*
