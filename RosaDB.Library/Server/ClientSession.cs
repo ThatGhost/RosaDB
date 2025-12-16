@@ -3,6 +3,7 @@ using System.Text;
 using LightInject;
 using RosaDB.Library.Core;
 using RosaDB.Library.MoqQueries;
+using RosaDB.Library.Query;
 
 namespace RosaDB.Library.Server;
 
@@ -11,6 +12,7 @@ public class ClientSession(TcpClient client, Scope scope)
     public async Task HandleClient()
     {
         await scope.GetInstance<UseDatabaseQuery>().Execute("db");
+        var queryTokenizer = scope.GetInstance<QueryTokenizer>();
         var stream = client.GetStream();
         while (true)
         {
@@ -29,13 +31,13 @@ public class ClientSession(TcpClient client, Scope scope)
             //await scope.GetInstance<CreateCellQuery>().Execute("cell");
             //await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
             //await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
-            await scope.GetInstance<GetCellLogsQuery>().Execute("cell","table", [4]);
-            //await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [4], query);
             //await scope.GetInstance<GetCellLogsQuery>().Execute("cell","table", [4]);
+            //await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [4], query);
             //await scope.GetInstance<GetAllLogsQuery>().Execute("cell","table");
 
-            // var result = await executor.Execute(this, query, CancellationToken.None);
             Result result = Result.Success();
+            var tokens = queryTokenizer.TokenizeQuery(query);
+            if (tokens.IsFailure) result = Result.Failure(tokens.Error!);
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;

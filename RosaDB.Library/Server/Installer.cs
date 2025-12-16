@@ -1,5 +1,6 @@
 using LightInject;
 using RosaDB.Library.MoqQueries;
+using RosaDB.Library.Query;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Validation;
 using System.Net.Sockets;
@@ -21,6 +22,7 @@ public static class Installer
 
         container.Register<DataValidator>();
         container.Register<DataParser>();
+        container.Register<QueryTokenizer>();
 
         InstallMoqQueries(container);
     }
