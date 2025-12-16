@@ -1,7 +1,8 @@
-using System.Net.Sockets;
 using LightInject;
 using RosaDB.Library.MoqQueries;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.Validation;
+using System.Net.Sockets;
 
 namespace RosaDB.Library.Server;
 
@@ -17,7 +18,9 @@ public static class Installer
         container.RegisterTransient<RootManager>();
         container.RegisterTransient<DatabaseManager>();
         container.RegisterTransient<CellManager>();
-        
+
+        container.Register<DataValidator>();
+
         InstallMoqQueries(container);
     }
 
@@ -31,5 +34,6 @@ public static class Installer
         container.Register<CreateTableDefinition>();
         container.Register<GetAllLogsQuery>();
         container.Register<GetCellLogsQuery>();
+        container.Register<UpdateCellLogsQuery>();
     }
 }

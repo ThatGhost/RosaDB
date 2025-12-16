@@ -5,13 +5,25 @@ namespace RosaDB.Library.MoqQueries;
 
 public class GetAllLogsQuery(LogManager logManager)
 {
-    public async Task<List<Log>> Execute(string cellName, string tableName)
+    public async Task<List<string>> Execute(string cellName, string tableName)
     {
         Cell cell = new Cell(cellName);
         Table table = new Table() { Name = tableName };
+
+        // Retrieve all logs for the cell and table, across all instances
         var logs = await logManager.GetAllLogsForCellTable(cell, table);
         if (logs.IsFailure) return [];
-        
-        return logs.Value;
+
+        List<string> data = new List<string>();
+        foreach (var log in logs.Value)
+        {
+            var chars = ByteObjectConverter.ByteArrayToObject<char[]>(log.TupleData);
+            if (chars != null)
+            {
+                data.Add(new string(chars));
+            }
+        }
+
+        return data;
     }
 }

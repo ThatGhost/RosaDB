@@ -5,13 +5,12 @@ namespace RosaDB.Library.MoqQueries;
 
 public class GetCellLogsQuery(LogManager logManager)
 {
-    public async Task<List<string>> Execute(string cellName, string tableName)
+    public async Task<List<string>> Execute(string cellName, string tableName, object[] index)
     {
         Cell cell = new Cell(cellName);
         Table table = new Table() { Name = tableName };
         
-        // Retrieve all logs for the cell and table, across all instances
-        var logs = await logManager.GetAllLogsForCellTable(cell, table);
+        var logs = await logManager.GetAllLogsForCellInstanceTable(cell, table, index);
         if (logs.IsFailure) return [];
 
         List<string> data = new List<string>();

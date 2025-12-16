@@ -6,15 +6,8 @@ using System.Threading.Tasks;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class WriteLogAndCommitQuery
+public class WriteLogAndCommitQuery(LogManager logManager)
 {
-    private readonly LogManager _logManager;
-
-    public WriteLogAndCommitQuery(LogManager logManager)
-    {
-        _logManager = logManager;
-    }
-    
     public async Task Execute(string cell, string table, string data)
     {
         Cell dummyCell = new Cell(cell);
@@ -29,11 +22,11 @@ public class WriteLogAndCommitQuery
             var payload = ($"{data} - {i}").ToCharArray();
             byte[] bytes = ByteObjectConverter.ObjectToByteArray(payload);
 
-            _logManager.Put(dummyCell, dummyTable, indexValues, bytes);
+            logManager.Put(dummyCell, dummyTable, indexValues, bytes);
         }
 
         // Commit the log
-        await _logManager.Commit();
+        await logManager.Commit();
     }
 }
 
