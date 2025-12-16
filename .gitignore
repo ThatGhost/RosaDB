@@ -5,6 +5,11 @@ project.lock.json
 *.pyc
 nupkg/
 
+*/debug/
+*/obj/
+/RosaDB.Client/obj/
+/RosaDB.Library/obj/
+
 # Visual Studio Code
 .vscode/*
 !.vscode/settings.json
