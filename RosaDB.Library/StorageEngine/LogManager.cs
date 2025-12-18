@@ -248,8 +248,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         return segmentIndexes;
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellTable(Cell cell, Table table)
+    public async Task<Result<List<Log>>> GetAllLogsForCellTable(Cell cell, Table table)
     {
+        List<Log> allLogs = new List<Log>();
+
         var matchingIdentifiers = _sparseIndexCache.Keys
             .Where(id => id.CellName == cell.Name && id.TableName == table.Name)
             .ToList();
@@ -263,29 +265,32 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
                     var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
                     if (!File.Exists(segmentFilePath)) continue;
 
-                    await using var stream = new FileStream(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                    var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath, CancellationToken.None);
+                    if (bytesBlock.Length == 0) continue;
+
+                    using var stream = new MemoryStream(bytesBlock);
                     while (stream.Position < stream.Length)
                     {
-                        var log = await ByteObjectConverter.ReadObjectFromStreamAsync<Log>(stream);
+                        var log = ByteObjectConverter.ReadObjectFromStream<Log>(stream);
                         if (log is null) break;
-                        yield return log;
+                        allLogs.Add(log);
                     }
                 }
             }
         }
+
+        return allLogs;
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(Cell cell, Table table, object[] indexValues)
+    public async Task<Result<List<Log>>> GetAllLogsForCellInstanceTable(Cell cell, Table table, object[] indexValues)
     {
+        List<Log> allLogs = new List<Log>();
         var identifier = CreateIdentifier(cell, table, indexValues);
 
         // First, check in-memory write-ahead logs
         if (_writeAheadLogs.TryGetValue(identifier, out var inMemoryLogs))
         {
-            foreach (var log in inMemoryLogs)
-            {
-                yield return log;
-            }
+            allLogs.AddRange(inMemoryLogs);
         }
 
         // Then, check on-disk segments
@@ -296,14 +301,19 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
                 var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
                 if (!File.Exists(segmentFilePath)) continue;
 
-                await using var stream = new FileStream(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath, CancellationToken.None);
+                if (bytesBlock.Length == 0) continue;
+
+                using var stream = new MemoryStream(bytesBlock);
                 while (stream.Position < stream.Length)
                 {
-                    var log = await ByteObjectConverter.ReadObjectFromStreamAsync<Log>(stream);
+                    var log = ByteObjectConverter.ReadObjectFromStream<Log>(stream);
                     if (log is null) break;
-                    yield return log;
+                    allLogs.Add(log);
                 }
             }
         }
+
+        return allLogs;
     }
 }

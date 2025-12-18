@@ -9,8 +9,13 @@ namespace RosaDB.Library.StorageEngine
             var condensedLogs = new Dictionary<long, Log>();
             foreach (var log in logs)
             {
-                condensedLogs[log.Id] = log;
+                if(condensedLogs.TryGetValue(log.Id, out var existingLog))
+                {
+                    if(log.Date > existingLog.Date) condensedLogs[log.Id] = log;
+                }
+                else condensedLogs[log.Id] = log;
             }
+
             return condensedLogs.Values.ToList();
         }
     }

@@ -4,4 +4,14 @@ public class Table
 {
     public string Name { get; set; } = string.Empty;
     public Column[] Columns { get; set; } = [];
+
+    public Table(string name)
+    {
+        Name = name;
+    }
+
+    public Table()
+    {
+        
+    }
 }
