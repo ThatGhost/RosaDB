@@ -9,9 +9,14 @@ public class GetAllLogsQuery(LogManager logManager)
     {
         Cell cell = new Cell(cellName);
         Table table = new Table() { Name = tableName };
-        var logs = await logManager.GetAllLogsForCellTable(cell, table);
-        if (logs.IsFailure) return [];
+        var logs = logManager.GetAllLogsForCellTable(cell, table);
         
-        return logs.Value;
+        List<Log> result = new();
+        await foreach (var log in logs)
+        {
+            result.Add(log);
+        }
+        
+        return result;
     }
 }

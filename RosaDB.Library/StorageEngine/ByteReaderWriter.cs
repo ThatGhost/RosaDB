@@ -34,13 +34,13 @@ public static class ByteReaderWriter
             // Read to the end of the file
             int bytesToRead = (int)(stream.Length - offset);
             var buffer = new byte[bytesToRead];
-            await stream.ReadAsync(buffer, 0, bytesToRead, ct);
+            await stream.ReadExactlyAsync(buffer, 0, bytesToRead, ct);
             return buffer;
         }
         else
         {
             var buffer = new byte[count];
-            await stream.ReadAsync(buffer, 0, count, ct);
+            await stream.ReadExactlyAsync(buffer, 0, count, ct);
             return buffer;
         }
     }
