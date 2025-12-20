@@ -45,25 +45,41 @@ namespace RosaDB.Library.StorageEngine
                 return (await WipeCell(cellName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Cell creation failed");
             }
         }
-
-        // Need to add atomicity
+        
         public async Task<Result> DeleteCell(string cellName)
         {
-            try
-            {
-                if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
-                var env = await GetEnvironment(sessionState.CurrentDatabase);
+            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+            var env = await GetEnvironment(sessionState.CurrentDatabase);
+            if (env.IsFailure) return env.Error!;
+            
+            var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
+            if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
+            
+            string folderPath = Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName);
+            string trashFolderPath = Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+cellName);
+            
+            try { await FolderManager.RenameFolder(folderPath, trashFolderPath); }
+            catch { return new Error(ErrorPrefixes.FileError, "Could not prepare cell for deletion (Folder Rename Failed)."); }
+            
+            env.Value.Cells.Remove(cell);
+            
+            try { await SaveEnvironment(env.Value, sessionState.CurrentDatabase); }
+            catch 
+            { 
+                try
+                {
+                    env.Value.Cells.Add(cell);
+                    await FolderManager.RenameFolder(trashFolderPath, folderPath);
+                }
+                catch { return new CriticalError(); }
                 
-                var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
-                if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
-                
-                env.Value.Cells.Remove(cell);
-                
-                await FolderManager.DeleteFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
-                
-                return Result.Success();
+                return new Error(ErrorPrefixes.FileError, "Failed to update database definition. Deletion reverted.");
             }
-            catch { return new Error(ErrorPrefixes.FileError, "Something went wrong"); }
+
+            try { await FolderManager.DeleteFolder(trashFolderPath); }
+            catch { return Result.Success(); } // TODO It is not integral to the database function that this is deleted. But need to add it to logging 
+            
+            return Result.Success();
         }
         
         private async Task<Result> WipeCell(string cellName)

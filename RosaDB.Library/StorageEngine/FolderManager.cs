@@ -40,4 +40,16 @@ public static class FolderManager
         var folderPath = Path.Combine(BasePath, folderName);
         return Task.FromResult(Directory.Exists(folderPath));
     }
+
+    public static Task RenameFolder(string oldName, string newName)
+    {
+        var oldPath = Path.Combine(BasePath, oldName);
+        var newPath = Path.Combine(BasePath, newName);
+
+        if (Directory.Exists(oldPath))
+        {
+            Directory.Move(oldPath, newPath);
+        }
+        return Task.CompletedTask;
+    }
 }
