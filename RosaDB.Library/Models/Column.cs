@@ -1,20 +1,25 @@
+using RosaDB.Library.Core;
+
 namespace RosaDB.Library.Models;
 
 public class Column
 {
-    public string Name { get; }
-    public DataType DataType { get; }
-    public bool IsPrimaryKey { get; }
-    public bool IsIndex { get; }
+    public string Name { get; private init; } = "";
+    public DataType DataType { get; private init; } = DataType.INT;
+    public bool IsPrimaryKey { get; private init; }
+    public bool IsIndex { get; private init; }
 
-    public Column(string name, DataType dataType, bool isPrimaryKey = false, bool isIndex = false)
+    public static Result<Column> Create(string name, DataType dataType, bool isPrimaryKey = false, bool isIndex = false)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Column name cannot be empty.", nameof(name));
+            return new Error(ErrorPrefixes.DataError, "Column name cannot be empty.");
 
-        Name = name;
-        DataType = dataType;
-        IsPrimaryKey = isPrimaryKey;
-        IsIndex = isIndex;
+        return new Column()
+        {
+            Name = name,
+            DataType = dataType,
+            IsIndex = isIndex,
+            IsPrimaryKey = isPrimaryKey
+        };
     }
 }

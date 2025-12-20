@@ -28,8 +28,9 @@ namespace RosaDB.Library.StorageEngine
                 if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
                     return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
-                var newCell = new Cell(cellName);
-                env.Value.Cells.Add(newCell);
+                var newCell = Cell.Create(cellName);
+                if (newCell.IsFailure) return newCell.Error!;
+                env.Value.Cells.Add(newCell.Value);
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
 
                 await FolderManager.CreateFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));

@@ -1,14 +1,19 @@
+using RosaDB.Library.Core;
+
 namespace RosaDB.Library.Models;
 
 public class Cell
 {
-    public string Name { get; }
+    public string Name { get; private init; }
 
-    public Cell(string name)
+    public static Result<Cell> Create(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Column name cannot be empty.", nameof(name));
-        
-        Name = name;
+            return new Error(ErrorPrefixes.DataError, "Cell name cannot be empty.");
+
+        return new Cell()
+        {
+            Name = name
+        };
     }
 }

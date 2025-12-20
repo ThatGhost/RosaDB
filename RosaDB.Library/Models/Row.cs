@@ -1,3 +1,5 @@
+using RosaDB.Library.Core;
+
 namespace RosaDB.Library.Models;
 
 public interface IRow
@@ -10,45 +12,31 @@ public interface IRow
 
 public class Row : IRow
 {
-    private readonly Dictionary<string, int> _columnIndexMap;
-
-    public Row(object?[] values, Column[] columns)
+    private Dictionary<string, int> _columnIndexMap { get; } = [];
+    
+    public static Result<Row> Create(object?[] values, Column[] columns)
     {
         if (values.Length != columns.Length)
-            throw new ArgumentException("Value count must match column count.");
+            return new Error(ErrorPrefixes.DataError, "Value count must match column count.");
 
-        Values = values;
-        Columns = columns;
-        _columnIndexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        Row row = new Row()
+        {
+            Values = values,
+            Columns = columns,
+        };
 
         for (int i = 0; i < columns.Length; i++)
         {
-            _columnIndexMap[columns[i].Name] = i;
+            row._columnIndexMap[columns[i].Name] = i;
         }
+
+        return row;
     }
 
-    public object?[] Values { get; }
-    public Column[] Columns { get; }
+    public object?[] Values { get; private init; } = [];
+    public Column[] Columns { get; private init; } = [];
 
-    public object? this[int index]
-    {
-        get
-        {
-            if (index < 0 || index >= Values.Length)
-                throw new IndexOutOfRangeException($"Column index {index} is out of range.");
-            return Values[index];
-        }
-    }
+    public object? this[int index] => index < 0 || index >= Values.Length ? null : Values[index];
 
-    public object? this[string columnName]
-    {
-        get
-        {
-            if (_columnIndexMap.TryGetValue(columnName, out int index))
-            {
-                return Values[index];
-            }
-            throw new KeyNotFoundException($"Column '{columnName}' not found in row.");
-        }
-    }
+    public object? this[string columnName] => _columnIndexMap.TryGetValue(columnName, out int index) ? Values[index] : null;
 }

@@ -19,11 +19,13 @@ public class WriteLogAndCommitQuery(LogManager logManager, CellManager cellManag
         for (int i = 0; i < 10000; i++)
         {
             object?[] rowValues = [i, $"{data}", random.Next(10, 100)];
-            Row row = new Row(rowValues, columns.Value);
-
-            byte[] bytes = RowSerializer.Serialize(row);
-
-            logManager.Put(cell, table, [random.Next(0,4)], bytes);
+            var row = Row.Create(rowValues, columns.Value);
+            if(row.IsFailure) return;
+            
+            var bytes = RowSerializer.Serialize(row.Value);
+            if(bytes.IsFailure) return;
+            
+            logManager.Put(cell, table, [random.Next(0,4)], bytes.Value);
         }
 
         // Commit the log

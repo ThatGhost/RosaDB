@@ -8,9 +8,8 @@ namespace RosaDB.Library.Validation
     {
         public async Task<Result> ValidateDataForCellAndTable(string cellName, string tableName, string[] collumnNames, object[] data)
         {
-            if (collumnNames.Length != data.Length) return new Error(ErrorPrefixes.DataError, "Number of data does not match amout collums");
+            if (collumnNames.Length != data.Length) return new Error(ErrorPrefixes.DataError, "Number of data does not match amount columns");
             
-            Cell cell = new Cell(cellName);
             var cellEnvironment = await cellManager.GetEnvironment(cellName);
             if (cellEnvironment.IsFailure) return cellEnvironment.Error!;
 

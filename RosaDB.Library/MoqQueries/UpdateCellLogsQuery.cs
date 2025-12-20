@@ -19,11 +19,13 @@ namespace RosaDB.Library.MoqQueries
                 if(deserializeResult.IsFailure || deserializeResult.Value.Values.Length != 3) continue;
                 
                 object?[] rowValues = { deserializeResult.Value.Values[0], $"{data}", deserializeResult.Value.Values[2] };
-                Row row = new Row(rowValues, columnResult.Value);
+                var row = Row.Create(rowValues, columnResult.Value);
+                if(row.IsFailure) return;
 
-                byte[] bytes = RowSerializer.Serialize(row);
-
-                logManager.Put(cellName, tableName, index, bytes, log.Id);
+                var bytes = RowSerializer.Serialize(row.Value);
+                if(bytes.IsFailure) return;
+                
+                logManager.Put(cellName, tableName, index, bytes.Value, log.Id);
                 i++;
             }
 

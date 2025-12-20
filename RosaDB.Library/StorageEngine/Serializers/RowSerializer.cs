@@ -6,7 +6,7 @@ namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class RowSerializer
 {
-    public static byte[] Serialize(Row row)
+    public static Result<byte[]> Serialize(Row row)
     {
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
@@ -37,7 +37,7 @@ public static class RowSerializer
                     writer.Write((bool)value!);
                     break;
                 default:
-                    throw new NotSupportedException($"Data type {type} is not supported for serialization.");
+                    return new Error(ErrorPrefixes.DataError, $"Data type {type} is not supported for serialization.");
             }
         }
 
@@ -81,7 +81,7 @@ public static class RowSerializer
             if(values.Length != columns.Length)
                 return new Error(ErrorPrefixes.DataError, "Column count mismatch");
             
-            return new Row(values, columns);
+            return Row.Create(values, columns);
         }
         catch { return new CriticalError(); }
     }

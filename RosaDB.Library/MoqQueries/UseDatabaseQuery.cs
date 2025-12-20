@@ -13,8 +13,9 @@ public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState
         
         if (existingDbs.Value.Contains(dbName))
         {
-            Database newDb = new Database(dbName);
-            sessionState.CurrentDatabase = newDb;
+            var database = Database.Create(dbName);
+            if(database.IsFailure) return;
+            sessionState.CurrentDatabase = database.Value;
             await logManager.LoadIndexesAsync();
         }
     }
