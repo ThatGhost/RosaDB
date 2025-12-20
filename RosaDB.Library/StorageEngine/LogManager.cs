@@ -210,9 +210,15 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
     {
         if (sessionState.CurrentDatabase is null) throw new InvalidOperationException("Current database is not set.");
         
+        // Use first 2 chars of hash for bucketing to avoid large flat directories
+        var hashPrefix = identifier.InstanceHash.Length >= 3 
+            ? identifier.InstanceHash.Substring(0, 3) 
+            : "xyz"; // Fallback for unexpected short hashes
+
         return Path.Combine(
             FolderManager.BasePath, sessionState.CurrentDatabase.Name, 
             identifier.CellName, identifier.TableName, 
+            hashPrefix,
             $"{identifier.InstanceHash}_{segmentNumber}.dat");
     }
 
@@ -247,7 +253,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             using var stream = new MemoryStream(bytesBlock);
             while (stream.Position < stream.Length)
             {
-                var log = LogSerializer.Deserialize(stream);
+                var log = await LogSerializer.DeserializeAsync(stream);
                 if (log is null) break;
                 if (log.Id == logId) return log;
             }
