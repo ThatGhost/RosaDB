@@ -9,9 +9,7 @@ public class GetAllLogsQuery(LogManager logManager)
 {
     public async Task<List<Log>> Execute(string cellName, string tableName)
     {
-        Cell cell = new Cell(cellName);
-        Table table = new Table() { Name = tableName };
-        var logs = logManager.GetAllLogsForCellTable(cell, table);
+        var logs = logManager.GetAllLogsForCellTable(cellName, tableName);
         
         List<Log> result = new();
         await foreach (var log in logs)

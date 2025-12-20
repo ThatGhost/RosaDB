@@ -142,25 +142,25 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         return Result.Success();
     }
     
-    public void Put(Cell cell, Table table, object[] indexValues, byte[] data, long? logId = null)
+    public void Put(string cellName, string tableName, object[] indexValues, byte[] data, long? logId = null)
     {
-        var identifier = CreateIdentifier(cell, table, indexValues);
+        var identifier = CreateIdentifier(cellName, tableName, indexValues);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
         Log log = new() { TupleData = data, Id = finalLogId };
         PutLog(log, identifier);
     }
 
-    public void Delete(Cell cell, Table table, object[] indexValues, long logId)
+    public void Delete(string cellName, string tableName, object[] indexValues, long logId)
     {
-        var identifier = CreateIdentifier(cell, table, indexValues);
+        var identifier = CreateIdentifier(cellName, tableName, indexValues);
         Log log = new() { Id = logId, IsDeleted = true };
         PutLog(log, identifier);
     }
     
-    public async Task<Result<Log>> FindLastestLog(Cell cell, Table table, object[] indexValues, long id)
+    public async Task<Result<Log>> FindLastestLog(string cellName, string tableName, object[] indexValues, long id)
     {
-        var identifier = CreateIdentifier(cell, table, indexValues);
+        var identifier = CreateIdentifier(cellName, tableName, indexValues);
         
         if (_writeAheadLogs.TryGetValue(identifier, out var logs))
         {
@@ -181,11 +181,11 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         logs.Enqueue(log);
     }
     
-    private TableInstanceIdentifier CreateIdentifier(Cell cell, Table table, object[] indexValues)
+    private TableInstanceIdentifier CreateIdentifier(string cellName, string tableName, object[] indexValues)
     {
         var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
-        return new TableInstanceIdentifier(cell.Name, table.Name, hash);
+        return new TableInstanceIdentifier(cellName, tableName, hash);
     }
 
     private string GetSegmentFilePath(TableInstanceIdentifier identifier, int segmentNumber)
@@ -248,12 +248,12 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         return segmentIndexes;
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellTable(Cell cell, Table table)
+    public async IAsyncEnumerable<Log> GetAllLogsForCellTable(string cellName, string tableName)
     {
         HashSet<long> seenLogIds = new HashSet<long>();
 
         var matchingIdentifiers = _sparseIndexCache.Keys
-            .Where(id => id.CellName == cell.Name && id.TableName == table.Name)
+            .Where(id => id.CellName == cellName && id.TableName == tableName)
             .ToList();
 
         foreach (var identifier in matchingIdentifiers)
@@ -281,10 +281,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         }
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(Cell cell, Table table, object[] indexValues)
+    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object[] indexValues)
     {
         HashSet<long> seenLogIds = new HashSet<long>();
-        var identifier = CreateIdentifier(cell, table, indexValues);
+        var identifier = CreateIdentifier(cellName, tableName, indexValues);
 
         // In memory logs
         if (_writeAheadLogs.TryGetValue(identifier, out var inMemoryLogs))

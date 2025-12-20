@@ -33,7 +33,7 @@ namespace RosaDB.Library.StorageEngine
 
                 await FolderManager.CreateFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
 
-                var cellEnvResult = await cellManager.CreateCellEnvironment(newCell, columns);
+                var cellEnvResult = await cellManager.CreateCellEnvironment(cellName, columns);
                 if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error!;
                 
                 return Result.Success();

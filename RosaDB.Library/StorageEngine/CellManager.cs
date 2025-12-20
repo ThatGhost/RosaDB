@@ -9,70 +9,67 @@ namespace RosaDB.Library.StorageEngine
     {
         private Dictionary<string,CellEnvironment> _cachedEnvironment = new(); 
 
-        public async Task<Result> CreateCellEnvironment(Cell cell, List<Column> columns)
+        public async Task<Result> CreateCellEnvironment(string cellName, List<Column> columns)
         {
             CellEnvironment env = new CellEnvironment
             {
                 Columns = columns.ToArray()
             };
-            await SaveEnvironment(env, cell);
+            await SaveEnvironment(env, cellName);
             
             return Result.Success();
         }
 
-        public async Task<Result> AddTables(Cell cell, Table[] tables)
+        public async Task<Result> AddTables(string cellName, Table[] tables)
         {
-            var env = await GetEnvironment(cell);
+            var env = await GetEnvironment(cellName);
             if (env.IsFailure) return env.Error!;
             
             env.Value.Tables = env.Value.Tables.Concat(tables.ToArray()).ToArray();
-            await SaveEnvironment(env.Value, cell);
+            await SaveEnvironment(env.Value, cellName);
             return Result.Success();
         }
 
-        public async Task<Result<CellEnvironment>> GetEnvironment(Cell cell)
+        public async Task<Result<CellEnvironment>> GetEnvironment(string cellName)
         {
             if (sessionState.CurrentDatabase is null)
                 return new Error(ErrorPrefixes.StateError, "Database not set");
 
-            if (_cachedEnvironment.TryGetValue(cell.Name, out var env)) return env;
+            if (_cachedEnvironment.TryGetValue(cellName, out var env)) return env;
 
-            if (!File.Exists(GetCellFilePath(cell))) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            if (!File.Exists(GetCellFilePath(cellName))) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(GetCellFilePath(cell), CancellationToken.None);
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(GetCellFilePath(cellName), CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
             
             env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
             if(env is null) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
 
-            _cachedEnvironment[cell.Name] = env;
+            _cachedEnvironment[cellName] = env;
             return env;
         }
 
-        private string GetCellFilePath(Cell cell)
+        private string GetCellFilePath(string cellName)
         {
-            return Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase!.Name, cell.Name, "_env");
+            return Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase!.Name, cellName, "_env");
         }
         
-        private async Task SaveEnvironment(CellEnvironment env, Cell cell)
+        private async Task SaveEnvironment(CellEnvironment env, string cellName)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
-            await ByteReaderWriter.WriteBytesToFile(GetCellFilePath(cell), bytes, CancellationToken.None);
-            _cachedEnvironment[cell.Name] = env;
+            await ByteReaderWriter.WriteBytesToFile(GetCellFilePath(cellName), bytes, CancellationToken.None);
+            _cachedEnvironment[cellName] = env;
         }
-
-        public async Task<Result<DataType[]>> GetDataTypesFromTableCollums(string cellName, string tableName, string[] collumNames)
+        
+        public async Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName)
         {
-            Cell cell = new Cell(cellName);
-            var env = await GetEnvironment(cell);
+            var env = await GetEnvironment(cellName);
             if(env.IsFailure) return env.Error!;
 
             var table = env.Value.Tables.FirstOrDefault(t => t.Name == tableName);
             if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in cell environment");
 
             return table.Columns
-                .Where(c => collumNames.Contains(c.Name))
-                .Select(c => c.DataType)
                 .ToArray();
         }
     }

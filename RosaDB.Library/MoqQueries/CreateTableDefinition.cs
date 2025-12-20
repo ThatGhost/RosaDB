@@ -8,7 +8,7 @@ public class CreateTableDefinition(CellManager cellManager)
     public async Task Execute(string cellName, string tableName)
     {
         Cell cell = new Cell(cellName);
-        cellManager.AddTables(cell, [
+        cellManager.AddTables(cellName, [
             new Table()
             {
                 Name = tableName,
