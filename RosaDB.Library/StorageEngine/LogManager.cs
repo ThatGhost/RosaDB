@@ -101,24 +101,27 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             }
             
             long currentOffset = metadata.CurrentSegmentSize;
-            if (!File.Exists(segmentFilePath))
+
+            await using var segmentStream = new FileStream(segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
+            await using var indexStream = new FileStream(indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
+
+            if (currentOffset == 0)
             {
-                currentOffset = 0;
                 var header = new IndexHeader(identifier.CellName, identifier.TableName, identifier.InstanceHash, metadata.CurrentSegmentNumber);
                 var headerBytes = ByteObjectConverter.ObjectToByteArray(header);
-                await ByteReaderWriter.AppendBytesToFile(indexFilePath, headerBytes, CancellationToken.None);
+                await indexStream.WriteAsync(headerBytes, CancellationToken.None);
             }
 
             int recordCounter = 0;
             foreach ((Log log, byte[] bytes) in serializedLogs)
             {
-                await ByteReaderWriter.AppendBytesToFile(segmentFilePath, bytes, CancellationToken.None);
+                await segmentStream.WriteAsync(bytes, CancellationToken.None);
                 
                 if (recordCounter % SparseIndexFrequency == 0)
                 {
                     var indexEntry = new SparseIndexEntry(log.Id, currentOffset);
                     var indexBytes = ByteObjectConverter.ObjectToByteArray(indexEntry); 
-                    await ByteReaderWriter.AppendBytesToFile(indexFilePath, indexBytes, CancellationToken.None);
+                    await indexStream.WriteAsync(indexBytes, CancellationToken.None);
 
                     if (!_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
                     {

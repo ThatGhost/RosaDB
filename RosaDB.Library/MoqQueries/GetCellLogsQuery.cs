@@ -7,9 +7,9 @@ namespace RosaDB.Library.MoqQueries;
 
 public class GetCellLogsQuery(LogManager logManager, CellManager cellManager)
 {
-    public async Task<List<string>> Execute(string cellName, string tableName)
+    public async Task<List<string>> Execute(string cellName, string tableName, object[] indexValues)
     {
-        var logs = logManager.GetAllLogsForCellTable(cellName, tableName);
+        var logs = logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues);
 
         var cellFromDb = await cellManager.GetColumnsFromTable(cellName, tableName);
         if(cellFromDb.IsFailure) return [];

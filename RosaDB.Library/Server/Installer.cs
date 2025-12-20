@@ -21,7 +21,7 @@ public static class Installer
         container.RegisterScoped<CellManager>();
 
         container.Register<DataValidator>();
-        container.Register<DataParser>();
+        container.Register<StringToDataParser>();
         container.Register<QueryTokenizer>();
 
         InstallMoqQueries(container);
