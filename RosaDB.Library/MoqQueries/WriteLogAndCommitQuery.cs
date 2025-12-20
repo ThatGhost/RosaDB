@@ -3,6 +3,7 @@ using RosaDB.Library.StorageEngine;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries;
 

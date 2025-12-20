@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries;
 

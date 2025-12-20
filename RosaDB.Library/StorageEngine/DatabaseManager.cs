@@ -2,6 +2,7 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine
 {

@@ -2,7 +2,7 @@ using System.Text;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 
-namespace RosaDB.Library.StorageEngine;
+namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class RowSerializer
 {
