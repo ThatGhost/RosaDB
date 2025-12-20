@@ -38,5 +38,6 @@ public static class Installer
         container.Register<GetAllLogsQuery>();
         container.Register<GetCellLogsQuery>();
         container.Register<UpdateCellLogsQuery>();
+        container.Register<RandomDeleteLogsQuery>();
     }
 }

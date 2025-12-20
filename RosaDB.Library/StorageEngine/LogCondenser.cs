@@ -7,13 +7,15 @@ namespace RosaDB.Library.StorageEngine
         public List<Log> Condense(Queue<Log> logs)
         {
             var condensedLogs = new Dictionary<long, Log>();
+            var deletedIds = new HashSet<long>();
+            
             foreach (var log in logs)
             {
-                if(condensedLogs.TryGetValue(log.Id, out var existingLog))
-                {
-                    if(log.Date > existingLog.Date) condensedLogs[log.Id] = log;
-                }
-                else condensedLogs[log.Id] = log;
+                if (deletedIds.Contains(log.Id))
+                    continue;
+                
+                if(log.IsDeleted) deletedIds.Add(log.Id);
+                condensedLogs[log.Id] = log;
             }
 
             return condensedLogs.Values.ToList();

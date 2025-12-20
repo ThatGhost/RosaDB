@@ -3,6 +3,7 @@ using System.Text;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine;
 
@@ -19,6 +20,79 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
     private readonly Dictionary<TableInstanceIdentifier, Queue<Log>> _writeAheadLogs = new();
     private readonly Dictionary<TableInstanceIdentifier, SegmentMetadata> _segmentMetadata = new();
     private readonly Dictionary<TableInstanceIdentifier, Dictionary<int, List<SparseIndexEntry>>> _sparseIndexCache = new();
+
+    private async Task<long> WriteSerializedLogsAndSparseIndex(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, FileStream segmentStream, FileStream indexStream, long initialOffset)
+    {
+        long currentOffset = initialOffset;
+        int recordCounter = 0;
+
+        foreach ((Log log, byte[] bytes) in serializedLogs)
+        {
+            await segmentStream.WriteAsync(bytes, CancellationToken.None);
+            
+            if (recordCounter % SparseIndexFrequency == 0)
+            {
+                var indexEntry = new SparseIndexEntry(log.Id, currentOffset);
+                var indexBytes = ByteObjectConverter.ObjectToByteArray(indexEntry); 
+                await indexStream.WriteAsync(indexBytes, CancellationToken.None);
+
+                if (!_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
+                {
+                    segmentIndexes = new Dictionary<int, List<SparseIndexEntry>>();
+                    _sparseIndexCache[identifier] = segmentIndexes;
+                }
+                if (!segmentIndexes.TryGetValue(metadata.CurrentSegmentNumber, out var sparseIndex))
+                {
+                    sparseIndex = new List<SparseIndexEntry>();
+                    segmentIndexes[metadata.CurrentSegmentNumber] = sparseIndex;
+                }
+                sparseIndex.Add(indexEntry);
+            }
+            
+            currentOffset += bytes.Length;
+            recordCounter++;
+        }
+        return currentOffset;
+    }
+
+    private async Task WriteSegmentHeaderIfNeeded(long currentOffset, IndexHeader header, FileStream indexStream)
+    {
+        if (currentOffset == 0)
+        {
+            var headerBytes = ByteObjectConverter.ObjectToByteArray(header);
+            await indexStream.WriteAsync(headerBytes, CancellationToken.None);
+        }
+    }
+
+    private async Task<(SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs)> GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
+    {
+        if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
+        
+        long batchSize = 0;
+        var serializedLogs = new List<(Log log, byte[] bytes)>();
+        foreach (var log in condensedLogs)
+        {
+            var bytes = LogSerializer.Serialize(log);
+            serializedLogs.Add((log, bytes));
+            batchSize += bytes.Length;
+        }
+        
+        if (metadata.CurrentSegmentSize + batchSize > MaxSegmentSize)
+        {
+            metadata = new SegmentMetadata(metadata.CurrentSegmentNumber + 1, 0);
+        }
+
+        var segmentFilePath = GetSegmentFilePath(identifier, metadata.CurrentSegmentNumber);
+        var indexFilePath = GetIndexFilePath(identifier, metadata.CurrentSegmentNumber);
+        var segmentDirectory = Path.GetDirectoryName(segmentFilePath);
+        
+        if (!string.IsNullOrEmpty(segmentDirectory) && !Directory.Exists(segmentDirectory))
+        {
+            Directory.CreateDirectory(segmentDirectory);
+        }
+
+        return (metadata, segmentFilePath, indexFilePath, serializedLogs);
+    }
 
     public async Task LoadIndexesAsync()
     {
@@ -75,72 +149,17 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
-            if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
+            var (metadata, segmentFilePath, indexFilePath, serializedLogs) = await GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             
-            long batchSize = 0;
-            var serializedLogs = new List<(Log log, byte[] bytes)>();
-            foreach (var log in condensedLogs)
-            {
-                var bytes = ByteObjectConverter.ObjectToByteArray(log);
-                serializedLogs.Add((log, bytes));
-                batchSize += bytes.Length;
-            }
-            
-            if (metadata.CurrentSegmentSize + batchSize > MaxSegmentSize)
-            {
-                metadata = new SegmentMetadata(metadata.CurrentSegmentNumber + 1, 0);
-            }
-
-            var segmentFilePath = GetSegmentFilePath(identifier, metadata.CurrentSegmentNumber);
-            var indexFilePath = GetIndexFilePath(identifier, metadata.CurrentSegmentNumber);
-            var segmentDirectory = Path.GetDirectoryName(segmentFilePath);
-            
-            if (!string.IsNullOrEmpty(segmentDirectory) && !Directory.Exists(segmentDirectory))
-            {
-                Directory.CreateDirectory(segmentDirectory);
-            }
-            
-            long currentOffset = metadata.CurrentSegmentSize;
-
             await using var segmentStream = new FileStream(segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
             await using var indexStream = new FileStream(indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
 
-            if (currentOffset == 0)
-            {
-                var header = new IndexHeader(identifier.CellName, identifier.TableName, identifier.InstanceHash, metadata.CurrentSegmentNumber);
-                var headerBytes = ByteObjectConverter.ObjectToByteArray(header);
-                await indexStream.WriteAsync(headerBytes, CancellationToken.None);
-            }
+            var header = new IndexHeader(identifier.CellName, identifier.TableName, identifier.InstanceHash, metadata.CurrentSegmentNumber);
+            await WriteSegmentHeaderIfNeeded(metadata.CurrentSegmentSize, header, indexStream);
 
-            int recordCounter = 0;
-            foreach ((Log log, byte[] bytes) in serializedLogs)
-            {
-                await segmentStream.WriteAsync(bytes, CancellationToken.None);
-                
-                if (recordCounter % SparseIndexFrequency == 0)
-                {
-                    var indexEntry = new SparseIndexEntry(log.Id, currentOffset);
-                    var indexBytes = ByteObjectConverter.ObjectToByteArray(indexEntry); 
-                    await indexStream.WriteAsync(indexBytes, CancellationToken.None);
-
-                    if (!_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
-                    {
-                        segmentIndexes = new Dictionary<int, List<SparseIndexEntry>>();
-                        _sparseIndexCache[identifier] = segmentIndexes;
-                    }
-                    if (!segmentIndexes.TryGetValue(metadata.CurrentSegmentNumber, out var sparseIndex))
-                    {
-                        sparseIndex = new List<SparseIndexEntry>();
-                        segmentIndexes[metadata.CurrentSegmentNumber] = sparseIndex;
-                    }
-                    sparseIndex.Add(indexEntry);
-                }
-                
-                currentOffset += bytes.Length;
-                recordCounter++;
-            }
+            var finalOffset = await WriteSerializedLogsAndSparseIndex(identifier, metadata, serializedLogs, segmentStream, indexStream, metadata.CurrentSegmentSize);
             
-            _segmentMetadata[identifier] = metadata with { CurrentSegmentSize = currentOffset };
+            _segmentMetadata[identifier] = metadata with { CurrentSegmentSize = finalOffset };
         }
         return Result.Success();
     }
@@ -232,7 +251,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             using var stream = new MemoryStream(bytesBlock);
             while (stream.Position < stream.Length)
             {
-                var log = ByteObjectConverter.ReadObjectFromStream<Log>(stream);
+                var log = LogSerializer.Deserialize(stream);
                 if (log is null) break;
                 if (log.Id == logId) return log;
             }
@@ -263,18 +282,25 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         {
             if (_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
             {
-                foreach (var segmentNumber in segmentIndexes.Keys.OrderBy(k => k)) // Order by segment number
+                foreach (var segmentNumber in segmentIndexes.Keys.OrderByDescending(k => k)) // Order by segment number descending
                 {
                     var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
                     if (!File.Exists(segmentFilePath)) continue;
 
+                    var segmentLogs = new List<Log>();
                     await using var stream = new FileStream(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
                     while (stream.Position < stream.Length)
                     {
-                        var log = await ByteObjectConverter.ReadObjectFromStreamAsync<Log>(stream);
+                        var log = await LogSerializer.DeserializeAsync(stream);
                         if (log is null) break;
-                        
-                        if (seenLogIds.Add(log.Id))
+                        segmentLogs.Add(log);
+                    }
+
+                    segmentLogs.Reverse();
+
+                    foreach (var log in segmentLogs)
+                    {
+                        if (seenLogIds.Add(log.Id) && !log.IsDeleted)
                         {
                             yield return log;
                         }
@@ -289,10 +315,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         HashSet<long> seenLogIds = new HashSet<long>();
         var identifier = CreateIdentifier(cellName, tableName, indexValues);
 
-        // In memory logs
+        // In memory logs - Reverse order to see newest first
         if (_writeAheadLogs.TryGetValue(identifier, out var inMemoryLogs))
         {
-            foreach (var log in inMemoryLogs)
+            foreach (var log in inMemoryLogs.Reverse())
             {
                 if (seenLogIds.Add(log.Id))
                 {
@@ -301,20 +327,28 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             }
         }
 
-        // Disk logs
+        // Disk logs - Iterate segments in descending order (Newest segment first)
         if (_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
         {
-            foreach (var segmentNumber in segmentIndexes.Keys.OrderBy(k => k))
+            foreach (var segmentNumber in segmentIndexes.Keys.OrderByDescending(k => k))
             {
                 var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
                 if (!File.Exists(segmentFilePath)) continue;
 
+                var segmentLogs = new List<Log>();
                 await using var stream = new FileStream(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
                 while (stream.Position < stream.Length)
                 {
-                    var log = await ByteObjectConverter.ReadObjectFromStreamAsync<Log>(stream);
+                    var log = await LogSerializer.DeserializeAsync(stream);
                     if (log is null) break;
-                    if (seenLogIds.Add(log.Id))
+                    segmentLogs.Add(log);
+                }
+
+                segmentLogs.Reverse();
+
+                foreach (var log in segmentLogs)
+                {
+                    if (seenLogIds.Add(log.Id) && !log.IsDeleted)
                     {
                         yield return log;
                     }

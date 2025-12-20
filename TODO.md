@@ -3,7 +3,7 @@
 ## High Priority
 
 - [ ] **Atomicity & Transactions**: `DatabaseManager.DeleteCell` and other operations lack transactional safety. Implement a mechanism to ensure operations are atomic (all or nothing).
-- [ ] **Serialization Efficiency**: Replace JSON serialization (`System.Text.Json`) in `ByteObjectConverter` with a more compact binary format (e.g., Protobuf, MessagePack, or a custom binary serializer) to reduce storage size and improve performance.
+- [ ] **Index Serialization**: Convert `IndexHeader` and `SparseIndexEntry` serialization to binary (currently JSON via `ByteObjectConverter`) to match the new efficient `Log` format.
 
 ## Medium Priority
 
@@ -16,3 +16,8 @@
 - [ ] **Documentation**: Expand code comments and add architectural documentation (like diagrams).
 - [ ] **Unit Tests**: Increase test coverage for `LogManager` and `CellManager`, especially for edge cases and failure scenarios.
 - [ ] **TUI Enhancements**: Improve the `RosaDB.Client` TUI with better navigation and query result visualization.
+
+## Completed
+
+- [x] **Log Serialization**: Switched `Log` object serialization from JSON to custom binary format for improved performance and storage efficiency.
+
