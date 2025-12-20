@@ -5,7 +5,6 @@ namespace RosaDB.Library.MoqQueries
 {
     public class UpdateCellLogsQuery(LogManager logManager, CellManager cellManager)
     {
-
         public async Task Execute(string cellName, string tableName, object[] index, string data)
         {
             var columnResult = await cellManager.GetColumnsFromTable(cellName, tableName);

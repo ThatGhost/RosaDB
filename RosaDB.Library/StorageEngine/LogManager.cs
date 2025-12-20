@@ -12,59 +12,11 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
     private const long MaxSegmentSize = 1024 * 1024; // 1MB
     private const int SparseIndexFrequency = 100;
 
-    private readonly record struct TableInstanceIdentifier(string CellName, string TableName, string InstanceHash);
-    private readonly record struct SegmentMetadata(int CurrentSegmentNumber, long CurrentSegmentSize);
-    private readonly record struct SparseIndexEntry(long Key, long Offset);
-    private readonly record struct IndexHeader(string CellName, string TableName, string InstanceHash, int SegmentNumber);
-
     private readonly Dictionary<TableInstanceIdentifier, Queue<Log>> _writeAheadLogs = new();
     private readonly Dictionary<TableInstanceIdentifier, SegmentMetadata> _segmentMetadata = new();
     private readonly Dictionary<TableInstanceIdentifier, Dictionary<int, List<SparseIndexEntry>>> _sparseIndexCache = new();
 
-    private async Task<long> WriteSerializedLogsAndSparseIndex(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, FileStream segmentStream, FileStream indexStream, long initialOffset)
-    {
-        long currentOffset = initialOffset;
-        int recordCounter = 0;
-
-        foreach ((Log log, byte[] bytes) in serializedLogs)
-        {
-            await segmentStream.WriteAsync(bytes, CancellationToken.None);
-            
-            if (recordCounter % SparseIndexFrequency == 0)
-            {
-                var indexEntry = new SparseIndexEntry(log.Id, currentOffset);
-                var indexBytes = ByteObjectConverter.ObjectToByteArray(indexEntry); 
-                await indexStream.WriteAsync(indexBytes, CancellationToken.None);
-
-                if (!_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
-                {
-                    segmentIndexes = new Dictionary<int, List<SparseIndexEntry>>();
-                    _sparseIndexCache[identifier] = segmentIndexes;
-                }
-                if (!segmentIndexes.TryGetValue(metadata.CurrentSegmentNumber, out var sparseIndex))
-                {
-                    sparseIndex = new List<SparseIndexEntry>();
-                    segmentIndexes[metadata.CurrentSegmentNumber] = sparseIndex;
-                }
-                sparseIndex.Add(indexEntry);
-            }
-            
-            currentOffset += bytes.Length;
-            recordCounter++;
-        }
-        return currentOffset;
-    }
-
-    private async Task WriteSegmentHeaderIfNeeded(long currentOffset, IndexHeader header, FileStream indexStream)
-    {
-        if (currentOffset == 0)
-        {
-            var headerBytes = ByteObjectConverter.ObjectToByteArray(header);
-            await indexStream.WriteAsync(headerBytes, CancellationToken.None);
-        }
-    }
-
-    private async Task<(SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs)> GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
+    private (SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs) GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
     {
         if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
         
@@ -94,6 +46,49 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         return (metadata, segmentFilePath, indexFilePath, serializedLogs);
     }
 
+    private async Task WriteSegmentHeaderIfNeeded(long currentOffset, IndexHeader header, FileStream indexStream)
+    {
+        if (currentOffset == 0)
+        {
+            var headerBytes = IndexSerializer.Serialize(header);
+            await indexStream.WriteAsync(headerBytes, CancellationToken.None);
+        }
+    }
+
+    private async Task<long> WriteSerializedLogsAndSparseIndex(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, FileStream segmentStream, FileStream indexStream, long initialOffset)
+    {
+        long currentOffset = initialOffset;
+        int recordCounter = 0;
+
+        foreach ((Log log, byte[] bytes) in serializedLogs)
+        {
+            await segmentStream.WriteAsync(bytes, CancellationToken.None);
+            
+            if (recordCounter % SparseIndexFrequency == 0)
+            {
+                var indexEntry = new SparseIndexEntry(log.Id, currentOffset);
+                var indexBytes = IndexSerializer.Serialize(indexEntry);
+                await indexStream.WriteAsync(indexBytes, CancellationToken.None);
+
+                if (!_sparseIndexCache.TryGetValue(identifier, out var segmentIndexes))
+                {
+                    segmentIndexes = new Dictionary<int, List<SparseIndexEntry>>();
+                    _sparseIndexCache[identifier] = segmentIndexes;
+                }
+                if (!segmentIndexes.TryGetValue(metadata.CurrentSegmentNumber, out var sparseIndex))
+                {
+                    sparseIndex = new List<SparseIndexEntry>();
+                    segmentIndexes[metadata.CurrentSegmentNumber] = sparseIndex;
+                }
+                sparseIndex.Add(indexEntry);
+            }
+            
+            currentOffset += bytes.Length;
+            recordCounter++;
+        }
+        return currentOffset;
+    }
+
     public async Task LoadIndexesAsync()
     {
         if (sessionState.CurrentDatabase is null) return;
@@ -113,29 +108,30 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
 
             using var stream = new MemoryStream(indexBytes);
             
-            var header = ByteObjectConverter.ReadObjectFromStream<IndexHeader>(stream);
-            if (header.Equals(default(IndexHeader))) continue;
+            var header = IndexSerializer.DeserializeHeader(stream);
+            if (header == null) continue;
             
-            var identifier = new TableInstanceIdentifier(header.CellName, header.TableName, header.InstanceHash);
+            var identifier = new TableInstanceIdentifier(header.Value.CellName, header.Value.TableName, header.Value.InstanceHash);
             var indexEntries = new List<SparseIndexEntry>();
 
             while (stream.Position < stream.Length)
             {
-                var entry = ByteObjectConverter.ReadObjectFromStream<SparseIndexEntry>(stream);
-                if (entry.Equals(default(SparseIndexEntry))) continue;
-                indexEntries.Add(entry);
+                var entry = IndexSerializer.DeserializeEntry(stream);
+                if (entry == null) break;
+                indexEntries.Add(entry.Value);
             }
 
-            GetOrCreateSegmentIndexes(identifier)[header.SegmentNumber] = indexEntries;
+            GetOrCreateSegmentIndexes(identifier)[header.Value.SegmentNumber] = indexEntries;
 
-            var segmentFilePath = GetSegmentFilePath(identifier, header.SegmentNumber);
+            var segmentFilePath = GetSegmentFilePath(identifier, header.Value.SegmentNumber);
             if (File.Exists(segmentFilePath))
             {
                 var segmentInfo = new FileInfo(segmentFilePath);
-                _segmentMetadata[identifier] = new SegmentMetadata(header.SegmentNumber, segmentInfo.Length);
+                _segmentMetadata[identifier] = new SegmentMetadata(header.Value.SegmentNumber, segmentInfo.Length);
             }
         }
     }
+
 
     public async Task<Result> Commit()
     {
@@ -149,7 +145,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
-            var (metadata, segmentFilePath, indexFilePath, serializedLogs) = await GetCommitFilePathsAndMetadata(identifier, condensedLogs);
+            var (metadata, segmentFilePath, indexFilePath, serializedLogs) = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             
             await using var segmentStream = new FileStream(segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
             await using var indexStream = new FileStream(indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);

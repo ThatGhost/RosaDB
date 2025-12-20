@@ -3,7 +3,7 @@
 ## High Priority
 
 - [ ] **Atomicity & Transactions**: `DatabaseManager.DeleteCell` and other operations lack transactional safety. Implement a mechanism to ensure operations are atomic (all or nothing).
-- [ ] **Index Serialization**: Convert `IndexHeader` and `SparseIndexEntry` serialization to binary (currently JSON via `ByteObjectConverter`) to match the new efficient `Log` format.
+- [ ] **Primairy key indexes**: Implement the b-tree logic to facilitate primairy keys (and other indexes) on rows.
 
 ## Medium Priority
 
@@ -20,4 +20,5 @@
 ## Completed
 
 - [x] **Log Serialization**: Switched `Log` object serialization from JSON to custom binary format for improved performance and storage efficiency.
+- [x] **Index Serialization**: Converted `IndexHeader` and `SparseIndexEntry` serialization to binary.
 
