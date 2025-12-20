@@ -27,14 +27,14 @@ public class ClientSession(TcpClient client, Scope scope)
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             // await scope.GetInstance<InitializeDbQuery>().Execute();
             // await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
+            // await scope.GetInstance<UseDatabaseQuery>().Execute("db");
             // await scope.GetInstance<CreateCellQuery>().Execute("cell");
             // await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
             // await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
-            //await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [4], "Updated: " + query);
-            await scope.GetInstance<UseDatabaseQuery>().Execute("db");
-            await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell","table", [4]);
-            await scope.GetInstance<GetCellLogsQuery>().Execute("cell","table", [4]);
-            //var result = await scope.GetInstance<GetAllLogsQuery>().Execute("cell","table");
+            // await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell","table", [4]);
+            // await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [4], "Updated: " + query);
+            // await scope.GetInstance<GetCellLogsQuery>().Execute("cell","table", [1]);
+            await scope.GetInstance<GetAllLogsQuery>().Execute("cell","table");
 
             Result result = Result.Success();
             // var tokens = queryTokenizer.TokenizeQuery(query);

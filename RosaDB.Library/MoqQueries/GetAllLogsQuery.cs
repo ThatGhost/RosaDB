@@ -17,9 +17,9 @@ public class GetAllLogsQuery(LogManager logManager, CellManager cellManager)
         await foreach (var log in logs)
         {
             var deserializerResult = RowSerializer.Deserialize(log.TupleData, columns.Value);
-            if(deserializerResult.Values.Length == 0) continue;
+            if(deserializerResult.IsFailure || deserializerResult.Value.Values.Length == 0) continue;
             
-            result.Add(((string)deserializerResult.Values[0]!)!);
+            result.Add(((string)deserializerResult.Value.Values[1]!)!);
         }
         
         return result;

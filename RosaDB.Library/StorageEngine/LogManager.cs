@@ -160,9 +160,9 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         return Result.Success();
     }
     
-    public void Put(string cellName, string tableName, object[] indexValues, byte[] data, long? logId = null)
+    public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, long? logId = null)
     {
-        var identifier = CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = CreateIdentifier(cellName, tableName, tableIndex);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
         Log log = new() { TupleData = data, Id = finalLogId };

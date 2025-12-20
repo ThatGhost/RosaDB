@@ -4,6 +4,7 @@
 
 - [ ] **Atomicity & Transactions**: `DatabaseManager.DeleteCell` and other operations lack transactional safety. Implement a mechanism to ensure operations are atomic (all or nothing).
 - [ ] **Primairy key indexes**: Implement the b-tree logic to facilitate primairy keys (and other indexes) on rows.
+- [ ] **Further folder divisions**: Refactor the folder devisions so that the Table folder does not get overwelmed with files
 
 ## Medium Priority
 

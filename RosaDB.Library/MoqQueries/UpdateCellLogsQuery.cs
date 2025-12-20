@@ -14,7 +14,10 @@ namespace RosaDB.Library.MoqQueries
             int i = 0;
             await foreach (var log in logs)
             {
-                object?[] rowValues = { $"{data} - {i}" };
+                var deserializeResult = RowSerializer.Deserialize(log.TupleData, columnResult.Value);
+                if(deserializeResult.IsFailure || deserializeResult.Value.Values.Length != 3) continue;
+                
+                object?[] rowValues = { deserializeResult.Value.Values[0], $"{data}", deserializeResult.Value.Values[2] };
                 Row row = new Row(rowValues, columnResult.Value);
 
                 byte[] bytes = RowSerializer.Serialize(row);

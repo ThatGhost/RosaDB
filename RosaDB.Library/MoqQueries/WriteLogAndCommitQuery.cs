@@ -6,25 +6,23 @@ using System.Threading.Tasks;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class WriteLogAndCommitQuery(LogManager logManager)
+public class WriteLogAndCommitQuery(LogManager logManager, CellManager cellManager)
 {
     public async Task Execute(string cell, string table, string data)
     {
-        Column[] dummyColumns = [new Column("DataColumn", DataType.VARCHAR)];
+        var columns = await cellManager.GetColumnsFromTable(cell, table);
+        if (columns.IsFailure) return;
 
         var random = new Random();
 
         for (int i = 0; i < 10000; i++)
         {
-            int instanceIndex = random.Next(0, 20);
-            object[] indexValues = { instanceIndex };
-            
-            object?[] rowValues = { $"{data} - {i}" };
-            Row row = new Row(rowValues, dummyColumns);
+            object?[] rowValues = [i, $"{data}", random.Next(10, 100)];
+            Row row = new Row(rowValues, columns.Value);
 
             byte[] bytes = RowSerializer.Serialize(row);
 
-            logManager.Put(cell, table, indexValues, bytes);
+            logManager.Put(cell, table, [random.Next(0,4)], bytes);
         }
 
         // Commit the log

@@ -1,10 +1,10 @@
 # RosaDB Project Overview
 
-This document provides an overview of the RosaDB project's current architecture and key components, derived from a recent code analysis.
+This document provides a technical overview of the RosaDB project's current architecture and key components.
 
 ## 1. Project Goal
 
-RosaDB is an in-development database solution written in C# targeting .NET.
+RosaDB is an in-development database solution written in C# targeting .NET 10.
 
 ## 2. Core Components
 
@@ -25,47 +25,73 @@ The database's logical structure follows a hierarchical model:
 -   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It appears to be analogous to a schema or a partition.
 -   **`Table`**: Standard relational concept, containing `Column` definitions.
 -   **`Column`**: Defines the name and `DataType` for data within a `Table`.
--   **`Row`**: Represents a single record within a `Table` (implicitly, as it's not a direct model but data within `Log` entries).
+-   **`Row`**: Represents a single record within a `Table`.
 -   **`DataType`**: Supported types include `INT`, `BIGINT`, `VARCHAR`, and `BOOLEAN`.
 
 ### 3.2. Storage Engine (`RosaDB.Library/StorageEngine`)
 
-The storage mechanism is inspired by log-structured merge-trees (LSM-trees), emphasizing append-only writes.
+The storage mechanism is inspired by log-structured merge-trees (LSM-trees), emphasizing append-only writes with periodic compaction.
 
--   **Persistence Strategy**: Data modifications are recorded as `Log` entries. These logs are batched and written to disk.
--   **File Organization**: Data for specific `Table` instances within `Cell`s is stored in segmented `.dat` files.
--   **Indexing**: Sparse indexes (`.idx` files) are created alongside data segments to facilitate faster lookups by `Log.Id` and offset.
--   **Serialization**: Objects are serialized to disk using `ByteObjectConverter`, which employs **length-prefixed JSON** (`System.Text.Json`). The object's JSON representation is converted to UTF8 bytes, and its length (4 bytes) is prepended to the byte array.
--   **Concurrency**: Currently, atomicity for certain operations (e.g., `DeleteCell`) is explicitly noted as a pending improvement.
+#### 3.2.1. Persistence & File Formats
+Data persistence is handled by the `LogManager` and split into segments.
+
+-   **Data Segments (`.dat` files)**:
+    -   Store actual data records as `Log` entries.
+    -   **Serialization**: Custom binary format via `LogSerializer`.
+        -   Format: `[Length (4B)][LogId (8B)][IsDeleted (1B)][Date (8B)][TupleDataLength (4B)][TupleData (N bytes)]`.
+    -   `TupleData` itself is a binary serialization of a `Row` (via `RowSerializer`).
+
+-   **Index Segments (`.idx` files)**:
+    -   Store sparse indexes pointing to offsets in the corresponding `.dat` file.
+    -   **Header**: `IndexHeader` written at the start of the file.
+        -   Serialization: `IndexSerializer`. Format: `[Version (4B)][CellName (Str)][TableName (Str)][InstanceHash (Str)][SegmentNumber (4B)]`.
+    -   **Entries**: `SparseIndexEntry` written periodically (every 100 records).
+        -   Serialization: `IndexSerializer`. Format (20 bytes fixed): `[Version (4B)][Key/LogId (8B)][Offset (8B)]`.
+
+-   **Environment Files (`_env`)**:
+    -   Store metadata for Cells and Databases.
+    -   **Serialization**: Length-prefixed JSON via `ByteObjectConverter` (retained for readability/debuggability).
+
+#### 3.2.2. Write Path (`Commit`)
+-   Modifications (`Put`/`Delete`) are buffered in an in-memory `_writeAheadLogs` queue.
+-   **`Commit` Process**:
+    1.  **Condensation**: Logs are condensed via `LogCondenser`. Tombstones (`IsDeleted=true`) are preserved to mask previous data, but intermediate updates for deleted keys within the batch are discarded.
+    2.  **Serialization**: Condensed logs are serialized to binary.
+    3.  **Persistence**:
+        -   Appropriate `.dat` and `.idx` files are identified or created (rollover at 1MB).
+        -   Persistent `FileStream`s are opened for the duration of the commit to minimize I/O overhead.
+        -   Data is appended to the `.dat` stream.
+        -   Sparse index entries are appended to the `.idx` stream every 100 records.
+
+#### 3.2.3. Read Path
+-   **`GetAllLogs...`**:
+    -   To retrieve the latest state, logs are read in **reverse chronological order**:
+        1.  In-memory buffer is iterated in reverse.
+        2.  Disk segments are iterated from newest (highest segment number) to oldest.
+        3.  Logs within each segment are read fully and then reversed.
+    -   Deduplication logic ensures only the first encountered (i.e., latest) version of a Log ID is returned.
 
 ### 3.3. Server (`RosaDB.Library/Server`)
 
 -   **Communication**: Implements a `TcpListener` to accept incoming client connections.
--   **Dependency Injection**: Uses `LightInject` for managing dependencies within server-side components.
+-   **Dependency Injection**: Uses `LightInject` for managing dependencies (`LogManager` is Scoped per session).
 -   **Client Handling**: Each incoming client connection is handled by a `ClientSession` running in its own asynchronous task.
 
 ### 3.4. Querying (`RosaDB.Library/Query`)
 
--   **Tokenization**: A `QueryTokenizer` class is responsible for breaking down raw query strings into individual tokens, recognizing parentheses, semicolons, and whitespace as delimiters.
+-   **Tokenization**: A `QueryTokenizer` class breaks down query strings into tokens.
+-   **Mock Queries**: `RosaDB.Library/MoqQueries` contains hardcoded query implementations (e.g., `RandomDeleteLogsQuery`) used for testing and development.
 
 ### 3.5. Error Handling (`RosaDB.Library/Core`)
 
--   The project utilizes a `Result<T>` monad pattern (`Result.cs`) for robust error handling, returning `Success` or `Error` objects instead of relying heavily on exceptions for control flow.
+-   Uses a functional `Result<T>` monad pattern for explicit error handling, avoiding exceptions for control flow.
 
-## 4. `RosaDB.Client` Project
+## 4. Client & Server Projects
 
--   **Purpose**: Provides a user interface for interacting with the RosaDB server.
--   **Technology**: Built as a Terminal User Interface (TUI) using the `Terminal.Gui` library.
--   **Current Setup**: Notably, the `RosaDB.Client` application currently **instantiates and starts the `RosaDB.Library.Server` directly within its own process** as a background task.
+-   **`RosaDB.Client`**: A TUI application (using `Terminal.Gui`) that currently embeds and runs the `RosaDB.Library.Server` in a background task.
+-   **`RosaDB.Server`**: A standalone server entry point.
 
-## 5. `RosaDB.Server` Project
+## 5. Technical Constraints & Todos
 
--   This project is likely intended as a standalone server application, but its `Program.cs` was not thoroughly analyzed due to the `RosaDB.Client`'s self-contained server initiation. It would typically serve as the primary entry point for a dedicated database server process.
-
-## 6. Key Implementation Details & Future Considerations
-
--   **JSON Serialization**: While convenient, using JSON for on-disk storage may lead to performance bottlenecks and larger storage footprints compared to more compact binary serialization formats.
--   **Atomicity**: Enhancements for transactional safety and atomicity are needed for data consistency.
--   **Server Decoupling**: For a production-ready system, the server component should be run as a separate process, decoupled from any client application.
-
-This overview should serve as a useful starting point for understanding the RosaDB project.
+-   **Atomicity**: File operations are not yet fully atomic (no WAL or two-phase commit for file system operations).
+-   **Server Decoupling**: The Client currently embeds the Server, which should be decoupled for production.

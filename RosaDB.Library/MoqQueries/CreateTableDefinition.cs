@@ -7,13 +7,14 @@ public class CreateTableDefinition(CellManager cellManager)
 {
     public async Task Execute(string cellName, string tableName)
     {
-        Cell cell = new Cell(cellName);
         await cellManager.AddTables(cellName, [
             new Table()
             {
                 Name = tableName,
                 Columns = [
-                    new Column("data", DataType.VARCHAR, true)
+                    new Column("id", DataType.INT, true),
+                    new Column("name", DataType.VARCHAR),
+                    new Column("age", DataType.INT),
                 ]
             }
         ]);

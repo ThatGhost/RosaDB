@@ -17,17 +17,11 @@ public class GetCellLogsQuery(LogManager logManager, CellManager cellManager)
         List<string> data = new List<string>();
         await foreach (var log in logs)
         {
-            try
+            var row = RowSerializer.Deserialize(log.TupleData, cellFromDb.Value);
+            if(row.IsFailure) continue;
+            if (row.Value.Values[0] is string strValue)
             {
-                Row row = RowSerializer.Deserialize(log.TupleData, cellFromDb.Value);
-                if (row.Values[0] is string strValue)
-                {
-                    data.Add(strValue);
-                }
-            }
-            catch
-            {
-                // In case of deserialization errors (e.g. old data format), just skip or handle gracefully
+                data.Add(strValue);
             }
         }
         
