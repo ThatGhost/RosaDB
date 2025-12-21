@@ -13,6 +13,7 @@ public class ClientSession(TcpClient client, Scope scope)
     {
         await scope.GetInstance<UseDatabaseQuery>().Execute("db");
         var queryTokenizer = scope.GetInstance<QueryTokenizer>();
+        var queryPlanner = scope.GetInstance<QueryPlanner>();
         var stream = client.GetStream();
         while (true)
         {
@@ -31,14 +32,14 @@ public class ClientSession(TcpClient client, Scope scope)
             // await scope.GetInstance<CreateCellQuery>().Execute("cell");
             // await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
             // await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
-            // await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell","table", [4]);
-            // await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [4], "Updated: " + query);
+            // await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell","table", [1]);
+            // await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell","table", [1], "Updated: " + query);
             // await scope.GetInstance<GetCellLogsQuery>().Execute("cell","table", [1]);
-            await scope.GetInstance<GetAllLogsQuery>().Execute("cell","table");
+            // await scope.GetInstance<GetAllLogsQuery>().Execute("cell","table");
 
             Result result = Result.Success();
-            // var tokens = queryTokenizer.TokenizeQuery(query);
-            // if (tokens.IsFailure) result = Result.Failure(tokens.Error!);
+            var tokens = queryTokenizer.TokenizeQuery(query);
+            if (tokens.IsFailure) result = Result.Failure(tokens.Error!);
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;

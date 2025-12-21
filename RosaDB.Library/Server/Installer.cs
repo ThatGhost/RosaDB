@@ -4,6 +4,7 @@ using RosaDB.Library.Query;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Validation;
 using System.Net.Sockets;
+using RosaDB.Library.Query.Queries;
 
 namespace RosaDB.Library.Server;
 
@@ -23,6 +24,7 @@ public static class Installer
         container.Register<DataValidator>();
         container.Register<StringToDataParser>();
         container.Register<QueryTokenizer>();
+        container.Register<QueryPlanner>();
 
         InstallMoqQueries(container);
     }

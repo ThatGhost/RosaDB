@@ -22,7 +22,7 @@ This project encapsulates all the fundamental logic for the database.
 The database's logical structure follows a hierarchical model:
 
 -   **`Database`**: The top-level container for a specific database instance.
--   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It appears to be analogous to a schema or a partition.
+-   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It appears to be analogous to a partition.
 -   **`Table`**: Standard relational concept, containing `Column` definitions.
 -   **`Column`**: Defines the name and `DataType` for data within a `Table`.
 -   **`Row`**: Represents a single record within a `Table`.
@@ -88,10 +88,5 @@ Data persistence is handled by the `LogManager` and split into segments.
 
 ## 4. Client & Server Projects
 
--   **`RosaDB.Client`**: A TUI application (using `Terminal.Gui`) that currently embeds and runs the `RosaDB.Library.Server` in a background task.
+-   **`RosaDB.Client`**: A TUI application (using `Terminal.Gui`) that talks to the server.
 -   **`RosaDB.Server`**: A standalone server entry point.
-
-## 5. Technical Constraints & Todos
-
--   **Atomicity**: File operations are not yet fully atomic (no WAL or two-phase commit for file system operations).
--   **Server Decoupling**: The Client currently embeds the Server, which should be decoupled for production.
