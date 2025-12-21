@@ -48,7 +48,7 @@ public class QueryView : View
         {
             if (ClientManager.Client == null)
             {
-                ClientManager.Client = new Client.Client("127.0.0.1", 7485);
+                ClientManager.Client = new Client.Client("127.0.0.1", 7575);
             }
             var result = await ClientManager.Client.SendQueryAsync(queryTextView.Text?.ToString() ?? "");
             resultTextView.Text = result;

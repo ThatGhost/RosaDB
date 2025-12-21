@@ -8,8 +8,6 @@ class Program
     static void Main(string[] args)
     {
         Application.Init();
-        ServerManager.Server = new Library.Server.Server("127.0.0.1", 7485);
-        Task.Run(() => ServerManager.Server.Start());
         
         Colors.Base.Normal = Application.Driver.MakeAttribute(Color.White, Color.Black);
         
@@ -31,7 +29,6 @@ class Program
         top.Add(mainWindow, menu);
         
         Application.Run();
-        ServerManager.Server?.Stop();
         Application.Shutdown();
     }
 }

@@ -29,22 +29,6 @@ public class HomeView : View
             Y = Pos.Bottom(artLabel) + 2
         };
 
-        startServerButton.Clicked += () =>
-        {
-            if (ServerManager.Server == null)
-            {
-                ServerManager.Server = new Library.Server.Server("127.0.0.1", 7485);
-                Task.Run(() => ServerManager.Server.Start());
-                startServerButton.Text = "Stop Server";
-            }
-            else
-            {
-                ServerManager.Server.Stop();
-                ServerManager.Server = null;
-                startServerButton.Text = "Start Server";
-            }
-        };
-
         Add(artLabel, startServerButton);
     }
 }
