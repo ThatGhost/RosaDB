@@ -21,11 +21,17 @@ public sealed class Result<T>
         Error = error;
     }
 
+    [MemberNotNullWhen(false, nameof(Error))]
+    [MemberNotNullWhen(true, nameof(Value))]
     public bool IsSuccess { get; }
-    public bool IsFailure { get => !IsSuccess; }
+
+    [MemberNotNullWhen(true, nameof(Error))]
+    [MemberNotNullWhen(false, nameof(Value))]
+    public bool IsFailure => !IsSuccess;
+
     public Error? Error { get; }
 
-    public T Value => _value!;
+    public T? Value => _value!;
 
     public static implicit operator Result<T>(T value) => new(value);
     public static implicit operator Result<T>(Error error) => new(error);
@@ -34,7 +40,7 @@ public sealed class Result<T>
     public static Result<T> Failure(Error error) => new(error);
 
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onFailure)
-        => IsSuccess ? onSuccess(Value!) : onFailure(Error!);
+        => IsSuccess ? onSuccess(Value!) : onFailure(Error);
 
     public async Task<TResult> MatchAsync<TResult>(
         Func<T, Task<TResult>> onSuccess,
@@ -42,7 +48,7 @@ public sealed class Result<T>
     {
         return IsSuccess
             ? await onSuccess(Value)
-            : await onFailure(Error!);
+            : await onFailure(Error);
     }
 }
 
@@ -59,8 +65,11 @@ public sealed class Result
         IsSuccess = true;
     }
 
+    [MemberNotNullWhen(false, nameof(Error))]
     public bool IsSuccess { get; }
-    public bool IsFailure { get => !IsSuccess; }
+    [MemberNotNullWhen(true, nameof(Error))]
+    public bool IsFailure => !IsSuccess;
+
     public Error? Error { get; }
 
     public static implicit operator Result(Error error) => new(error);
@@ -69,7 +78,7 @@ public sealed class Result
     public static Result Failure(Error error) => new(error);
 
     public TResult Match<TResult>(Func<TResult> onSuccess, Func<Error, TResult> onFailure)
-        => IsSuccess ? onSuccess() : onFailure(Error!);
+        => IsSuccess ? onSuccess() : onFailure(Error);
 
     public async Task<TResult> MatchAsync<TResult>(
         Func<Task<TResult>> onSuccess,
@@ -77,6 +86,6 @@ public sealed class Result
     {
         return IsSuccess
             ? await onSuccess()
-            : await onFailure(Error!);
+            : await onFailure(Error);
     }
 }

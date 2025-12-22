@@ -12,9 +12,9 @@ public class CreateTableDefinition(CellManager cellManager)
             {
                 Name = tableName,
                 Columns = [
-                    Column.Create("id", DataType.INT, true).Value,
-                    Column.Create("name", DataType.VARCHAR).Value,
-                    Column.Create("age", DataType.INT).Value,
+                    Column.Create("id", DataType.INT, true).Value!,
+                    Column.Create("name", DataType.VARCHAR).Value!,
+                    Column.Create("age", DataType.INT).Value!,
                 ]
             }
         ]);

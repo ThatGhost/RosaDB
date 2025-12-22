@@ -24,19 +24,19 @@ namespace RosaDB.Library.StorageEngine
                     return new Error(ErrorPrefixes.StateError, "Database not set");
 
                 var env = await GetEnvironment(sessionState.CurrentDatabase);
-                if (env.IsFailure) return env.Error!;
+                if (env.IsFailure) return env.Error;
                 if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
                     return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
                 var newCell = Cell.Create(cellName);
-                if (newCell.IsFailure) return newCell.Error!;
+                if (newCell.IsFailure) return newCell.Error;
                 env.Value.Cells.Add(newCell.Value);
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
 
                 await FolderManager.CreateFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
 
                 var cellEnvResult = await cellManager.CreateCellEnvironment(cellName, columns);
-                if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error!;
+                if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error;
                 
                 return Result.Success();
             }
@@ -50,7 +50,7 @@ namespace RosaDB.Library.StorageEngine
         {
             if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
             var env = await GetEnvironment(sessionState.CurrentDatabase);
-            if (env.IsFailure) return env.Error!;
+            if (env.IsFailure) return env.Error;
             
             var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
             if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
@@ -88,7 +88,10 @@ namespace RosaDB.Library.StorageEngine
             {
                 if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
                 var env = await GetEnvironment(sessionState.CurrentDatabase);
-                if(env.IsSuccess) env.Value.Cells.RemoveAll(c => c.Name == cellName);
+                
+                if (env.IsSuccess) env.Value.Cells.RemoveAll(c => c.Name == cellName);
+                else return env.Error;
+                
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
                 
                 await FolderManager.DeleteFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));

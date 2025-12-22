@@ -4,7 +4,7 @@ namespace RosaDB.Library.Models;
 
 public class Cell
 {
-    public string Name { get; private init; }
+    public string Name { get; private init; } = string.Empty;
 
     public static Result<Cell> Create(string name)
     {

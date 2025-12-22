@@ -3,6 +3,7 @@
 ## High Priority
 
 - [ ] **Primairy key indexes**: Implement the b-tree logic to facilitate primairy keys (and other indexes) on tuples.
+- [ ] **Save data on cells**: Cells can have meta data collumns attached to them. Currently only indexes are supported
 
 ## Medium Priority
 

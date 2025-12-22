@@ -10,7 +10,7 @@ public class GetAllLogsQuery(LogManager logManager, CellManager cellManager)
     public async Task<Result<List<string>>> Execute(string cellName, string tableName)
     {
         var columns = await cellManager.GetColumnsFromTable(cellName, tableName);
-        if (columns.IsFailure) return columns.Error!;
+        if (columns.IsFailure) return columns.Error;
         
         var logs = logManager.GetAllLogsForCellTable(cellName, tableName);
         

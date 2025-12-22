@@ -20,13 +20,13 @@ namespace RosaDB.Library.StorageEngine
                 env.Value.DatabaseNames.Add(databaseName);
                 await SaveEnvironment(env.Value);
                 var database = Database.Create(databaseName);
-                if (database.IsFailure) return database.Error!;
+                if (database.IsFailure) return database.Error;
                     
                 await FolderManager.CreateFolder(databaseName);
                 var envResult = await databaseManager.CreateDatabaseEnvironment(database.Value);
                 if (envResult.IsFailure)
                 {
-                    return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : envResult.Error!;
+                    return (await WipeDatabase(databaseName)).IsFailure ? new CriticalError() : envResult.Error;
                 }
 
                 return Result.Success();

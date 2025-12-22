@@ -35,10 +35,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         }
 
         var segmentFilePathResult = GetSegmentFilePath(identifier, metadata.CurrentSegmentNumber);
-        if (segmentFilePathResult.IsFailure) return segmentFilePathResult.Error!;
+        if (segmentFilePathResult.IsFailure) return segmentFilePathResult.Error;
 
         var indexFilePathResult = GetIndexFilePath(identifier, metadata.CurrentSegmentNumber);
-        if (indexFilePathResult.IsFailure) return indexFilePathResult.Error!;
+        if (indexFilePathResult.IsFailure) return indexFilePathResult.Error;
 
         var segmentDirectory = Path.GetDirectoryName(segmentFilePathResult.Value);
         
@@ -152,7 +152,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
 
             
             Result<(SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
-            if (result.IsFailure) return result.Error!;
+            if (result.IsFailure) return result.Error;
             
             await using var segmentStream = new FileStream(result.Value.segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
             await using var indexStream = new FileStream(result.Value.indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
@@ -232,7 +232,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
     private Result<string> GetIndexFilePath(TableInstanceIdentifier identifier, int segmentNumber)
     {
         var segmentPathResult = GetSegmentFilePath(identifier, segmentNumber);
-        if (segmentPathResult.IsFailure) return segmentPathResult.Error!;
+        if (segmentPathResult.IsFailure) return segmentPathResult.Error;
 
         return Path.ChangeExtension(segmentPathResult.Value, ".idx");
     }
@@ -254,7 +254,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             if (indexEntryIndex + 1 < sparseIndex.Count) endOffset = sparseIndex[indexEntryIndex + 1].Offset;
 
             var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
-            if (segmentFilePath.IsFailure) return segmentFilePath.Error!;
+            if (segmentFilePath.IsFailure) return segmentFilePath.Error;
             int readLength = endOffset != -1 ? (int)(endOffset - startOffset) : -1;
 
             var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath.Value, startOffset, readLength, CancellationToken.None);

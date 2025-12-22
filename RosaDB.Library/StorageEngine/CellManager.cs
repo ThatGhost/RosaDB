@@ -24,7 +24,7 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result> AddTables(string cellName, Table[] tables)
         {
             var env = await GetEnvironment(cellName);
-            if (env.IsFailure) return env.Error!;
+            if (env.IsFailure) return env.Error;
             
             env.Value.Tables = env.Value.Tables.Concat(tables.ToArray()).ToArray();
             await SaveEnvironment(env.Value, cellName);
@@ -65,7 +65,7 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName)
         {
             var env = await GetEnvironment(cellName);
-            if(env.IsFailure) return env.Error!;
+            if(env.IsFailure) return env.Error;
 
             var table = env.Value.Tables.FirstOrDefault(t => t.Name == tableName);
             if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in cell environment");

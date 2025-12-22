@@ -39,12 +39,12 @@ public class ClientSession(TcpClient client, Scope scope)
 
             Result result = Result.Success();
             var tokens = queryTokenizer.TokenizeQuery(query);
-            if (tokens.IsFailure) result = Result.Failure(tokens.Error!);
+            if (tokens.IsFailure) result = Result.Failure(tokens.Error);
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;
 
-            var response = result.IsSuccess ? $"{DateTime.Now.ToShortTimeString()} : Success in {duration.Milliseconds}ms" : result.Error?.Message ?? "An unknown error occurred.";
+            var response = result.IsSuccess ? $"{DateTime.Now.ToShortTimeString()} : Success in {duration.Milliseconds}ms" : result.Error.Message;
             var responseBuffer = Encoding.UTF8.GetBytes(response);
             await stream.WriteAsync(responseBuffer, 0, responseBuffer.Length);
         }

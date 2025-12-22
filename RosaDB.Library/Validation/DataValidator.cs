@@ -11,7 +11,7 @@ namespace RosaDB.Library.Validation
             if (collumnNames.Length != data.Length) return new Error(ErrorPrefixes.DataError, "Number of data does not match amount columns");
             
             var cellEnvironment = await cellManager.GetEnvironment(cellName);
-            if (cellEnvironment.IsFailure) return cellEnvironment.Error!;
+            if (cellEnvironment.IsFailure) return cellEnvironment.Error;
 
             Table? tableFromEnvironment = cellEnvironment.Value.Tables.FirstOrDefault(t => t.Name == tableName);
             if (tableFromEnvironment == null) return new Error(ErrorPrefixes.DataError, $"Table {tableName} does not exist in cell {cellName}");

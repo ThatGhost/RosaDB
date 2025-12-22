@@ -2,6 +2,7 @@ namespace RosaDB.Library.Models;
 
 public enum DataType
 {
+    CHAR,
     INT,
     BIGINT,
     VARCHAR,

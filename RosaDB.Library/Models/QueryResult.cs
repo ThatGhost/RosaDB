@@ -15,8 +15,8 @@ public class QueryResult
         Message = error.Message;
     }
 
-    public QueryResult()
+    public QueryResult(string message)
     {
-        
+        Message = message;
     }
 }
