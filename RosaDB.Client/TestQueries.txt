@@ -1,0 +1,1 @@
+CREATE CELL testCell (name VARCHAR(255), X BIGINT, Y BIGINT);

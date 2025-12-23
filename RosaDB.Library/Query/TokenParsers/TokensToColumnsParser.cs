@@ -16,11 +16,12 @@ public static class TokensToColumnsParser
         
         var tokens = columnTokens.ToList();
         if(tokens[0] == "(") tokens.RemoveAt(0);
+        if(tokens[^1] == ";") tokens.RemoveAt(tokens.Count - 1);
         if(tokens[^1] == ")") tokens.RemoveAt(tokens.Count - 1);
 
         List<List<string>> tokensPerColumn = [];
         List<string> currentColumn = [];
-        foreach (var token in columnTokens)
+        foreach (var token in tokens)
         {
             if (token == ",")
             {

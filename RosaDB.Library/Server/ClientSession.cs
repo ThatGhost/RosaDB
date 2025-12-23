@@ -40,6 +40,15 @@ public class ClientSession(TcpClient client, Scope scope)
             Result result = Result.Success();
             var tokens = queryTokenizer.TokenizeQuery(query);
             if (tokens.IsFailure) result = Result.Failure(tokens.Error);
+            else
+            {
+                var queryPlan = queryPlanner.CreateQueryPlanFromTokens(tokens.Value);
+                if (queryPlan.IsFailure) result = Result.Failure(queryPlan.Error);
+                else
+                {
+                    var queryResult = await queryPlan.Value.Execute();
+                }
+            }
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;

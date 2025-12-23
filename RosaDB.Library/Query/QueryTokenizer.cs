@@ -36,6 +36,15 @@ namespace RosaDB.Library.Query
                         }
                         tokens.Add(c.ToString());
                     }
+                    else if (c == ',')
+                    {
+                        if (currentToken.Length > 0)
+                        {
+                            tokens.Add(currentToken.ToString());
+                            currentToken.Clear();
+                        }
+                        tokens.Add(c.ToString());
+                    }
                     else if (char.IsWhiteSpace(c))
                     {
                         if (currentToken.Length > 0)
