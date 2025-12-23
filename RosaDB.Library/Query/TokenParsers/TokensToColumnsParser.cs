@@ -51,20 +51,65 @@ public static class TokensToColumnsParser
     {
         if(columnTokens.Length <= 1) return new Error(ErrorPrefixes.QueryParsingError, "No column specified");
         string columnName = columnTokens[0];
-        switch (columnTokens[1])
+        
+        //TODO add primary key
+        //TODO add indexes
+        //TODO add optional parameterising
+        switch (columnTokens[1].ToUpperInvariant())
         {
-            case "CHAR": return TokensToCHAR(columnName, columnTokens[1..]);
-            default: return new Error(ErrorPrefixes.QueryParsingError, $"datatype {columnTokens[1]} is unkown");
+            case "CHAR": return TokensToSingleParse(columnName, columnTokens[1..], DataType.CHAR);
+            case "CHARACTER": return TokensToSingleParse(columnName, columnTokens[1..], DataType.CHARACTER);
+            case "VARCHAR": return TokensToSingleParse(columnName, columnTokens[1..], DataType.VARCHAR);
+            case "NUMBER": return TokensToDoubleParse(columnName, columnTokens[1..], DataType.NUMBER);
+            case "FLOAT": return TokensToSingleParse(columnName, columnTokens[1..], DataType.FLOAT);
+            case "LONG": return TokensToNoParse(columnName, columnTokens[1..], DataType.LONG);
+            case "BIGINT": return TokensToNoParse(columnName, columnTokens[1..], DataType.BIGINT);
+            case "DECIMAL": return TokensToDoubleParse(columnName, columnTokens[1..], DataType.DECIMAL);
+            case "NUMERIC": return TokensToDoubleParse(columnName, columnTokens[1..], DataType.NUMERIC);
+            case "INT": return TokensToNoParse(columnName, columnTokens[1..], DataType.INT);
+            case "INTEGER": return TokensToNoParse(columnName, columnTokens[1..], DataType.INTEGER);
+            case "SMALLINT": return TokensToNoParse(columnName, columnTokens[1..], DataType.SMALLINT);
+            default: return new Error(ErrorPrefixes.QueryParsingError, $"datatype {columnTokens[1]} is unknown");
         }
     }
-
-    private static Result<Column> TokensToCHAR(string name, string[] tokens)
+    
+    private static Result<Column> TokensToDoubleParse(string name, string[] tokens, DataType dataType)
     {
-        if (tokens[0] != "CHAR") return new CriticalError();
-        if (tokens[1] != "(") return new Error(ErrorPrefixes.QueryParsingError, "No beginning '(' found for CHAR type");
-        if (!int.TryParse(tokens[2], out int size)) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse size for CHAR type");
-        if (tokens[2] != ")") return new Error(ErrorPrefixes.QueryParsingError, "No end ')' found for CHAR type");
+        string typeName = tokens[0].ToUpperInvariant();
+        if (typeName != dataType.ToString()) return new CriticalError();
+        if (tokens[1] != "(") return new NoBeginningFound(typeName);
+        if (!int.TryParse(tokens[2], out int firstParse)) return new CouldNotParse(nameof(firstParse), typeName);
+        if (tokens[3] != ",") return new NoCommaFound(typeName);
+        if (!int.TryParse(tokens[4], out int secondParse)) return new CouldNotParse(nameof(secondParse), typeName);
+        if (tokens[5] != ")") return new NoEndFound(typeName);
 
-        return Column.Create(name, DataType.CHAR, new {size});
+        return Column.Create(name, dataType, new {firstParse, secondParse});
     }
+    
+    private static Result<Column> TokensToNoParse(string name, string[] tokens, DataType dataType)
+    {
+        string typeName = tokens[0].ToUpperInvariant();
+        if (typeName != dataType.ToString()) return new CriticalError();
+
+        return Column.Create(name, dataType);
+    }
+
+    private static Result<Column> TokensToSingleParse(string name, string[] tokens, DataType dataType)
+    {
+        string typeName = tokens[0].ToUpperInvariant();
+        if (typeName != dataType.ToString()) return new CriticalError();
+        if (tokens[1] != "(") return new NoBeginningFound(typeName);
+        if (!int.TryParse(tokens[2], out int parsingNumber)) return new CouldNotParse(nameof(parsingNumber), typeName);
+        if (tokens[3] != ")") return new NoEndFound(typeName);
+
+        return Column.Create(name, dataType, new {parsingNumber});
+    }
+    
+#pragma warning disable CS9113
+    private record NoBeginningFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"No beginning '(' found for {Type} type");
+    private record NoEndFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"No end ')' found for {Type} type");
+    private record CouldNotParse(string Value, string Type) : Error(ErrorPrefixes.QueryParsingError, $"Could not parse {Value} for {Type} type");
+    private record NoCommaFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"Could not find comma separator for {Type} type");
+#pragma warning restore CS9113
+    
 }
