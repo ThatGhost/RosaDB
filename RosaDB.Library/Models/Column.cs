@@ -21,6 +21,7 @@ public class Column
             Name = name,
             DataType = dataType,
             IsIndex = isIndex,
+            MetaData = metadata,
             IsPrimaryKey = isPrimaryKey
         };
     }

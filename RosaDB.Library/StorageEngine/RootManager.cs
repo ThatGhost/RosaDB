@@ -1,11 +1,12 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
+using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class RootManager(DatabaseManager databaseManager)
+    public class RootManager(DatabaseManager databaseManager, SessionState sessionState)
     {
         private readonly string EnvFilePath = Path.Combine(FolderManager.BasePath, "_env");
 
@@ -52,8 +53,7 @@ namespace RosaDB.Library.StorageEngine
             catch { return new Error(ErrorPrefixes.FileError, "RosaDb not setup correctly"); }
         }
         
-        // Atomicity
-        private async Task<Result> WipeDatabase(string databaseName)
+        public async Task<Result> WipeDatabase(string databaseName)
         {
             try
             {
@@ -68,6 +68,43 @@ namespace RosaDB.Library.StorageEngine
                 return Result.Success();
             }
             catch { return new CriticalError(); }
+        }
+
+        public async Task<Result> DeleteDatabase(string databaseName)
+        {
+            var envResult = await GetEnvironment();
+            if (envResult.IsFailure) return envResult.Error;
+
+            if (!envResult.Value.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.DataError, $"Database '{databaseName}' not found.");
+
+            string folderPath = Path.Combine(FolderManager.BasePath, databaseName);
+            string trashFolderPath = Path.Combine(FolderManager.BasePath, "trash_" + databaseName);
+
+            try { await FolderManager.RenameFolder(folderPath, trashFolderPath); }
+            catch { return new Error(ErrorPrefixes.FileError, "Could not prepare database for deletion (Folder Rename Failed)."); }
+
+            envResult.Value.DatabaseNames.Remove(databaseName);
+
+            try { await SaveEnvironment(envResult.Value); }
+            catch
+            {
+                try
+                {
+                    await FolderManager.RenameFolder(trashFolderPath, folderPath);
+                    envResult.Value.DatabaseNames.Add(databaseName); 
+                }
+                catch { return new CriticalError(); }
+                
+                return new Error(ErrorPrefixes.FileError, "Failed to update root definition. Deletion reverted.");
+            }
+
+            if (sessionState.CurrentDatabase is not null && sessionState.CurrentDatabase.Name == databaseName)
+                sessionState.CurrentDatabase = null;
+
+            try { await FolderManager.DeleteFolder(trashFolderPath); }
+            catch { return Result.Success(); }
+
+            return Result.Success();
         }
 
         public async Task<Result<List<string>>> GetDatabaseNames()

@@ -44,16 +44,32 @@ public class QueryView : View
             Y = 15
         };
 
-        sendButton.Clicked += async () =>
+        var newClientButton = new Button("Create new Client")
         {
-            if (ClientManager.Client == null)
-            {
-                ClientManager.Client = new Client.Client("127.0.0.1", 7575);
-            }
-            var result = await ClientManager.Client.SendQueryAsync(queryTextView.Text?.ToString() ?? "");
-            resultTextView.Text = result;
+            X = Pos.Center(),
+            Y = 17
         };
 
-        Add(queryLabel, queryTextView, resultLabel, resultTextView, sendButton);
+        sendButton.Clicked += async () =>
+        {
+            try
+            {
+                if(ClientManager.Client is null) ClientManager.Client = new Client.Client("127.0.0.1", 7575);
+                var result = await ClientManager.Client.SendQueryAsync(queryTextView.Text?.ToString() ?? "");
+                resultTextView.Text = result;
+            }
+            catch
+            {
+                resultTextView.Text = "Could not connect to server at port 7575";
+            }
+        };
+
+        newClientButton.Clicked += () =>
+        {
+            ClientManager.Client = new Client.Client("127.0.0.1", 7575);
+            resultTextView.Text = "Created new client";
+        };
+
+        Add(queryLabel, queryTextView, resultLabel, resultTextView, sendButton, newClientButton);
     }
 }

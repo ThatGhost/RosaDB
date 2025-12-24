@@ -31,6 +31,43 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
+        public async Task<Result> DeleteTable(string cellName, string tableName)
+        {
+            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+
+            var envResult = await GetEnvironment(cellName);
+            if (envResult.IsFailure) return envResult.Error;
+
+            var tableToDelete = envResult.Value.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+            if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in cell '{cellName}'.");
+
+            string tablePath = Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
+            string trashPath = Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
+
+            try { await FolderManager.RenameFolder(tablePath, trashPath); }
+            catch { return new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."); }
+
+            envResult.Value.Tables = envResult.Value.Tables.Where(t => t != tableToDelete).ToArray();
+
+            try { await SaveEnvironment(envResult.Value, cellName); }
+            catch
+            {
+                try
+                {
+                    await FolderManager.RenameFolder(trashPath, tablePath);
+                    envResult.Value.Tables = envResult.Value.Tables.Append(tableToDelete).ToArray();
+                }
+                catch{ return new CriticalError(); }
+                
+                return new Error(ErrorPrefixes.FileError, "Failed to update cell definition. Deletion reverted.");
+            }
+
+            try { await FolderManager.DeleteFolder(trashPath); }
+            catch { return Result.Success(); }
+
+            return Result.Success();
+        }
+
         public async Task<Result<CellEnvironment>> GetEnvironment(string cellName)
         {
             if (sessionState.CurrentDatabase is null)

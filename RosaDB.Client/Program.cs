@@ -27,7 +27,6 @@ class Program
         ]);
 
         top.Add(mainWindow, menu);
-        
         Application.Run();
         Application.Shutdown();
     }
