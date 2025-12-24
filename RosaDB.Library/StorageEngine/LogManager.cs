@@ -218,9 +218,9 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database is not set");
         
         // Use first 2 chars of hash for bucketing to avoid large flat directories
-        var hashPrefix = identifier.InstanceHash.Length >= 3 
-            ? identifier.InstanceHash.Substring(0, 3) 
-            : "xyz"; // Fallback for unexpected short hashes
+        var hashPrefix = identifier.InstanceHash.Length >= 2 
+            ? identifier.InstanceHash.Substring(0, 2) 
+            : "xy"; // Fallback for unexpected short hashes
 
         return Path.Combine(
             FolderManager.BasePath, sessionState.CurrentDatabase.Name, 
