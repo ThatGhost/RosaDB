@@ -2,15 +2,15 @@
 
 This document outlines a sequential development plan for RosaDB, based on a detailed review of the codebase.
 
-## Phase 1: Foundations & Parser Enhancement
+## ~~Phase 1: Foundations & Parser Enhancement~~
 
 1.  ~~**Create Test Project:** Create a new xUnit or NUnit test project within the solution to house unit and integration tests for `RosaDB.Library`. This is crucial before making major changes.~~
-2.  **Test Core Storage:** ~~Add integration tests for the `LogManager`'s `Commit` and `GetAllLogs...` methods~~. Add unit tests for `RowSerializer`, `LogSerializer`, and `IndexSerializer` to ensure data integrity and proper serialization.
+2.  **Test Core Storage:** ~~Add integration tests for the `LogManager`'s `Commit` and `GetAllLogs...` methods. Add unit tests for `RowSerializer`, `LogSerializer`, and `IndexSerializer` to ensure data integrity and proper serialization.~~
 3.  ~~**Refactor `QueryTokenizer`:** Improve `QueryTokenizer.cs` to handle string literals (e.g., 'hello world'), quoted identifiers, and a wider range of special characters more robustly without splitting them incorrectly.~~
-4.  **Enhance `TokensToColumnsParser` for Constraints:**
-    *   Modify `TokensToColumnsParser.TokensToColumn` to parse `PRIMARY KEY` and `INDEX` keywords from `CREATE TABLE` statements.
-    *   Set the existing `IsPrimaryKey` and `IsIndex` flags on the `Column` model (`Column.cs`).
-    *   Add an `IsNullable` property to `Column.cs` and implement parsing for `NOT NULL` constraints.
+4.  ~~**Enhance `TokensToColumnsParser` for Constraints:**~~
+    *   ~~Modify `TokensToColumnsParser.TokensToColumn` to parse `PRIMARY KEY` and `INDEX` keywords from `CREATE TABLE` statements.~~
+    *   ~~Set the existing `IsPrimaryKey` and `IsIndex` flags on the `Column` model (`Column.cs`).~~
+    *   ~~Add an `IsNullable` property to `Column.cs` and implement parsing for `NOT NULL` constraints.~~
 
 ## Phase 2: B-Tree Indexing Implementation
 

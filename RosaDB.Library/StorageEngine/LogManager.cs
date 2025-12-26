@@ -4,6 +4,7 @@ using System.Text;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine;

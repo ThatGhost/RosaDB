@@ -43,7 +43,7 @@ public static class LogSerializer
 
         var log = new Log()
         {
-            Id = reader.ReadInt32(),
+            Id = reader.ReadInt64(),
             IsDeleted = reader.ReadBoolean(),
             Date = DateTime.FromBinary(reader.ReadInt64()),
         };

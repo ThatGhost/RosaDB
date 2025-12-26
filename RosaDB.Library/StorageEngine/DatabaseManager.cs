@@ -2,12 +2,13 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class DatabaseManager(SessionState sessionState, CellManager cellManager, IFileSystem fileSystem, IFolderManager folderManager)
+    public class DatabaseManager(SessionState sessionState, ICellManager cellManager, IFileSystem fileSystem, IFolderManager folderManager) : IDatabaseManager
     {
         private readonly IFileSystem _fileSystem = fileSystem;
         private readonly IFolderManager _folderManager = folderManager;

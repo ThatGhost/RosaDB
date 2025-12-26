@@ -6,6 +6,7 @@ using RosaDB.Library.Validation;
 using System.Net.Sockets;
 using RosaDB.Library.Query.Queries;
 using System.IO.Abstractions;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Server;
 
@@ -21,8 +22,8 @@ public static class Installer
         
         container.RegisterTransient<LogCondenser>();
         container.RegisterTransient<RootManager>();
-        container.RegisterTransient<DatabaseManager>();
-        container.RegisterScoped<CellManager>();
+        container.RegisterTransient<IDatabaseManager, DatabaseManager>();
+        container.RegisterScoped<ICellManager, CellManager>();
 
         container.Register<DataValidator>();
         container.Register<StringToDataParser>();

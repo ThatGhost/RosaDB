@@ -5,6 +5,7 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 using System.Collections;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;

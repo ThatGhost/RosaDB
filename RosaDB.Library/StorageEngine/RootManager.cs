@@ -1,13 +1,16 @@
+#nullable disable
+
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class RootManager(DatabaseManager databaseManager, SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager)
+    public class RootManager(IDatabaseManager databaseManager, SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager)
     {
         private readonly IFileSystem _fileSystem = fileSystem;
         private readonly IFolderManager _folderManager = folderManager;
@@ -43,17 +46,16 @@ namespace RosaDB.Library.StorageEngine
 
         public async Task<Result> InitializeRoot()
         {
-            try
+            var result = await GetEnvironment();
+            if (result.IsSuccess)
             {
-                var result = await GetEnvironment();
-                if (result.IsSuccess) return new Error(ErrorPrefixes.StateError, "Root already setup");
-                
-                RootEnvironment env = new RootEnvironment();
-                await SaveEnvironment(env);
-                
-                return Result.Success();
+                return new Error(ErrorPrefixes.StateError, "Root already setup");
             }
-            catch { return new Error(ErrorPrefixes.FileError, "RosaDb not setup correctly"); }
+            
+            RootEnvironment env = new RootEnvironment();
+            await SaveEnvironment(env);
+            
+            return Result.Success();
         }
         
         public async Task<Result> WipeDatabase(string databaseName)
@@ -130,6 +132,12 @@ namespace RosaDB.Library.StorageEngine
 
         private async Task SaveEnvironment(RootEnvironment env)
         {
+            var directory = _fileSystem.Path.GetDirectoryName(EnvFilePath);
+            if (!_fileSystem.Directory.Exists(directory))
+            {
+                _fileSystem.Directory.CreateDirectory(directory);
+            }
+
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
             await ByteReaderWriter.WriteBytesToFile(_fileSystem, EnvFilePath, bytes, CancellationToken.None);
         }

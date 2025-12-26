@@ -1,4 +1,4 @@
-namespace RosaDB.Library.StorageEngine;
+namespace RosaDB.Library.StorageEngine.Interfaces;
 
 public interface IFolderManager
 {

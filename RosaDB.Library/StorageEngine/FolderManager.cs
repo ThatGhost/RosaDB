@@ -1,3 +1,4 @@
+using RosaDB.Library.StorageEngine.Interfaces;
 using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine;
