@@ -6,7 +6,7 @@ namespace RosaDB.Library.StorageEngine;
 public class FolderManager : IFolderManager
 {
     private readonly IFileSystem _fileSystem;
-    public string BasePath { get; }
+    public string BasePath { get; set; }
 
     public FolderManager(IFileSystem fileSystem)
     {

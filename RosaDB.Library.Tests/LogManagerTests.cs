@@ -7,10 +7,11 @@ using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
-using System.Collections;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
 using System.Text;
+using System.IO.Abstractions;
+using RosaDB.Library.MoqQueries;
 
 namespace RosaDB.Library.Tests
 {
@@ -46,6 +47,93 @@ namespace RosaDB.Library.Tests
                 _mockFileSystem, 
                 _mockFolderManager.Object,
                 _mockIndexManager.Object);
+        }
+
+        // This goes through a whole flow 
+        // -> Init database
+        // -> Create database
+        // -> use database
+        // -> create cell
+        // -> create table
+        // -> add logs
+        // -> update logs
+        // -> get logs
+        [Test]
+        public async Task Full_IntegrationTestFlow()
+        {
+            var tempDirectory = Path.Combine(Path.GetTempPath(), "rosadb_test_" + Path.GetRandomFileName());
+            
+            var fileSystem = _mockFileSystem; 
+            var folderManager = new FolderManager(fileSystem) { BasePath = tempDirectory };
+            var sessionState = new SessionState();
+            
+            Mock<IIndexManager> mockIndexManager = new Mock<IIndexManager>();
+            IIndexManager indexManager = mockIndexManager.Object;
+
+            ICellManager cellManager = new CellManager(sessionState, fileSystem, folderManager);
+            IDatabaseManager databaseManager = new DatabaseManager(sessionState, cellManager, fileSystem, folderManager);
+            var rootManager = new RootManager(databaseManager, sessionState, fileSystem, folderManager);
+            var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager);
+            
+            var createDbQuery = new CreateDatabaseQuery(rootManager);
+            var useDbQuery = new UseDatabaseQuery(rootManager, sessionState);
+            var createCellQuery = new CreateCellQuery(databaseManager);
+            var createTableQuery = new CreateTableDefinition(cellManager);
+            var writeQuery = new WriteLogAndCommitQuery(logManager, cellManager);
+            var updateQuery = new UpdateCellLogsQuery(logManager, cellManager);
+            var getQuery = new GetCellLogsQuery(logManager, cellManager);
+
+            mockIndexManager.Setup(im => im.Insert(
+                It.IsAny<TableInstanceIdentifier>(),
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<LogLocation>()));
+            
+            mockIndexManager.Setup(im => im.Search(
+                It.IsAny<TableInstanceIdentifier>(),
+                It.IsAny<string>(),
+                It.IsAny<long>()))
+                .Returns(new Error(ErrorPrefixes.DataError, "Log not found in mocked index."));
+
+            try
+            {
+                var initializeRootResult = await rootManager.InitializeRoot();
+                Assert.That(initializeRootResult.IsSuccess, Is.True, $"InitializeRoot failed: {initializeRootResult.Error?.Message}");
+
+                var createDbResult = await createDbQuery.Execute("db");
+                Assert.That(createDbResult.IsSuccess, Is.True, $"CreateDatabaseQuery failed: {createDbResult.Error?.Message}");
+
+                var useDbResult = await useDbQuery.Execute("db");
+                Assert.That(useDbResult.IsSuccess, Is.True, $"UseDatabaseQuery failed: {useDbResult.Error?.Message}");
+                var createCellResult = await createCellQuery.Execute("cell");
+                Assert.That(createCellResult.IsSuccess, Is.True, $"CreateCellQuery failed: {createCellResult.Error?.Message}");
+
+                var createTableResult = await createTableQuery.Execute("cell", "table");
+                Assert.That(createTableResult.IsSuccess, Is.True, $"CreateTableDefinition failed: {createTableResult.Error?.Message}");
+
+                await writeQuery.Execute("cell", "table", "initial data");
+
+                Assert.That(_mockFileSystem.Directory.Exists(Path.Combine(tempDirectory, "db", "cell", "table")), Is.True, "Table directory should exist in MockFileSystem.");
+
+                var files = _mockFileSystem.Directory.GetFiles(Path.Combine(tempDirectory, "db", "cell", "table"), "*.dat", SearchOption.AllDirectories);
+                Assert.That(files, Is.Not.Empty, "Data files should be created after write query.");
+
+                var initialResult = await getQuery.Execute("cell", "table", new object[] { 2 });
+                Assert.That(initialResult, Is.Not.Empty, "GetCellLogsQuery should return results before update.");
+
+                await updateQuery.Execute("cell", "table", new object[] { 2 }, "updated data");
+                var result = await getQuery.Execute("cell", "table", new object[] { 2 });
+
+                Assert.That(result, Is.Not.Empty, "GetCellLogsQuery should return results after update.");
+                Assert.That(result.All(r => r.Contains("updated data")), Is.True, "All results should contain 'updated data'.");
+            }
+            finally
+            {
+                if (_mockFileSystem.Directory.Exists(tempDirectory))
+                {
+                    _mockFileSystem.Directory.Delete(tempDirectory, true);
+                }
+            }
         }
 
         [Test]

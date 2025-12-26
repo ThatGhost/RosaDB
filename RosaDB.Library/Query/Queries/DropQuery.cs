@@ -1,13 +1,14 @@
 ﻿using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 public class DropQuery(
     string[] tokens,
     RootManager rootManager,
-    DatabaseManager databaseManager,
-    CellManager cellManager) : IQuery
+    IDatabaseManager databaseManager,
+    ICellManager cellManager) : IQuery
 {
     public async Task<QueryResult> Execute()
     {

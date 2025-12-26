@@ -22,6 +22,7 @@ public class IndexManager(
 
         return fileSystem.Path.Combine(
             folderManager.BasePath,
+            "indexes",
             identifier.CellName,
             identifier.TableName,
             hashPrefix,

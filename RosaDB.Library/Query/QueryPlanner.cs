@@ -3,12 +3,13 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Query.Queries;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Server;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query;
 
 public class QueryPlanner(
-    DatabaseManager databaseManager, 
-    CellManager cellManager, 
+    IDatabaseManager databaseManager, 
+    ICellManager cellManager, 
     RootManager rootManager,
     SessionState sessionState
     )

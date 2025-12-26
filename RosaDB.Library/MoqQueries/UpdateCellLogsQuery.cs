@@ -1,10 +1,11 @@
 ﻿using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries
 {
-    public class UpdateCellLogsQuery(LogManager logManager, CellManager cellManager)
+    public class UpdateCellLogsQuery(LogManager logManager, ICellManager cellManager)
     {
         public async Task Execute(string cellName, string tableName, object[] index, string data)
         {

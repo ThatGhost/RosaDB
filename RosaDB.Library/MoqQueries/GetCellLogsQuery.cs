@@ -1,12 +1,10 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class GetCellLogsQuery(LogManager logManager, CellManager cellManager)
+public class GetCellLogsQuery(LogManager logManager, ICellManager cellManager)
 {
     public async Task<List<string>> Execute(string cellName, string tableName, object[] indexValues)
     {
@@ -20,7 +18,7 @@ public class GetCellLogsQuery(LogManager logManager, CellManager cellManager)
         {
             var row = RowSerializer.Deserialize(log.TupleData, cellFromDb.Value);
             if(row.IsFailure) continue;
-            if (row.Value.Values[0] is string strValue)
+            if (row.Value.Values[1] is string strValue)
             {
                 data.Add(strValue);
             }

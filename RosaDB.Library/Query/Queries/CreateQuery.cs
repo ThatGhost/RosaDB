@@ -2,13 +2,14 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
 public class CreateQuery(
     string[] tokens,
     RootManager rootManager,
-    DatabaseManager databaseManager)
+    IDatabaseManager databaseManager)
     : IQuery
 {
     public async Task<QueryResult> Execute()

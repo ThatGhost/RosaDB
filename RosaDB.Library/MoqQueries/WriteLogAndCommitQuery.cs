@@ -1,13 +1,11 @@
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
 using RosaDB.Library.StorageEngine.Serializers;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class WriteLogAndCommitQuery(LogManager logManager, CellManager cellManager)
+public class WriteLogAndCommitQuery(LogManager logManager, ICellManager cellManager)
 {
     public async Task Execute(string cell, string table, string data)
     {

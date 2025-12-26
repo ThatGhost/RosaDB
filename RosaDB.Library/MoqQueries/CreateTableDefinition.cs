@@ -1,3 +1,4 @@
+using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Interfaces;
 
@@ -5,7 +6,7 @@ namespace RosaDB.Library.MoqQueries;
 
 public class CreateTableDefinition(ICellManager cellManager)
 {
-    public async Task Execute(string cellName, string tableName)
+    public async Task<Result> Execute(string cellName, string tableName)
     {
         var tableResult = Table.Create(tableName, new[]
         {
@@ -14,9 +15,11 @@ public class CreateTableDefinition(ICellManager cellManager)
             Column.Create("age", DataType.INT).Value!,
         });
 
-        if (tableResult.IsSuccess)
-        {
-            await cellManager.AddTables(cellName, new[] { tableResult.Value });
-        }
+        if (tableResult.IsFailure) return tableResult.Error;
+        
+        var addTableResult = await cellManager.AddTables(cellName, new[] { tableResult.Value });
+        if (addTableResult.IsFailure) return addTableResult.Error;
+        
+        return Result.Success();
     }
 }

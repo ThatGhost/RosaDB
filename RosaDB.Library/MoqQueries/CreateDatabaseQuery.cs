@@ -1,3 +1,4 @@
+using RosaDB.Library.Core;
 using RosaDB.Library.StorageEngine;
 using System.Threading.Tasks;
 
@@ -12,8 +13,12 @@ public class CreateDatabaseQuery
         _rootManager = rootManager;
     }
 
-    public async Task Execute(string dbName)
+    public async Task<Result> Execute(string dbName)
     {
-        await _rootManager.CreateDatabase(dbName);
+        try
+        {
+            return await _rootManager.CreateDatabase(dbName);
+        }
+        catch { return new CriticalError(); }
     }
 }

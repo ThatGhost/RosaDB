@@ -32,10 +32,10 @@ public class ClientSession(TcpClient client, Scope scope)
             await scope.GetInstance<CreateCellQuery>().Execute("cell");
             await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
             await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
-            await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell", "table", [1]);
-            await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [1], "Updated: " + query);
-            await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [1]);
-            await scope.GetInstance<GetAllLogsQuery>().Execute("cell", "table");
+            //await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell", "table", [1]);
+            await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [2], "Updated: " + query);
+            await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [2]);
+            //await scope.GetInstance<GetAllLogsQuery>().Execute("cell", "table");
 
             QueryResult result = new QueryResult("succes");
 

@@ -32,6 +32,24 @@ namespace RosaDB.Library.StorageEngine
             
             env.Value.Tables = env.Value.Tables.Concat(tables.ToArray()).ToArray();
             await SaveEnvironment(env.Value, cellName);
+
+            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+
+            foreach(var table in tables)
+            {
+                var tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
+                try
+                {
+                    if(!_fileSystem.Directory.Exists(tablePath))
+                    {
+                        _fileSystem.Directory.CreateDirectory(tablePath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}");
+                }
+            }
             return Result.Success();
         }
 
