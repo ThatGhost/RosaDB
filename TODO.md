@@ -14,12 +14,12 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 
 ## Phase 2: B-Tree Indexing Implementation
 
-5.  **B-Tree Data Structures:** Create the necessary classes for the B-Tree (e.g., `BTreeNode`, `BTreeLeaf`, `BTreeInternalNode`), designed for efficient serialization to disk.
-6.  **B-Tree Serializer:** Implement a `BTreeSerializer` to manage the conversion of B-Tree nodes to and from fixed-size byte arrays (pages) for persistent storage.
-7.  **Core B-Tree Logic:** Develop the fundamental B-Tree operations: `Insert`, `Search`, and `Delete`. These will operate on the in-memory representation of nodes, using the serializer for disk interaction.
-8.  **Create `IndexManager`:** Introduce a new `IndexManager` class within the `StorageEngine` to handle the creation, opening, and management of B-Tree-based index files. This manager will be analogous to the `LogManager`.
-9.  **Integrate `IndexManager` into Write Path:**
-    *   Inject the `IndexManager` into the `LogManager`.
+5.  ~~**B-Tree Data Structures:** Create the necessary classes for the B-Tree (e.g., `BTreeNode`, `BTreeLeaf`, `BTreeInternalNode`), designed for efficient serialization to disk.~~
+6.  ~~**B-Tree Serializer:** Implement a `BTreeSerializer` to manage the conversion of B-Tree nodes to and from fixed-size byte arrays (pages) for persistent storage.~~
+7.  ~~**Core B-Tree Logic:** Develop the fundamental B-Tree operations: `Insert`, `Search`, and `Delete`. These will operate on the in-memory representation of nodes, using the serializer for disk interaction.~~
+8.  ~~**Create `IndexManager`:** Introduce a new `IndexManager` class within the `StorageEngine` to handle the creation, opening, and management of B-Tree-based index files. This manager will be analogous to the `LogManager`.~~
+9.  ~~**Integrate `IndexManager` into Write Path:**~~
+    ~~*   Inject the `IndexManager` into the `LogManager`.~~
     *   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.
 10. **Integrate `IndexManager` into Query Path:**
     *   Update the `QueryPlanner` to identify and utilize B-Tree indexes for accelerating queries with `WHERE` clauses on indexed columns, performing B-Tree searches instead of full table scans.

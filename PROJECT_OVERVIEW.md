@@ -40,12 +40,11 @@ Data persistence is handled by the `LogManager` and split into segments.
         -   Format: `[Length (4B)][LogId (8B)][IsDeleted (1B)][Date (8B)][TupleDataLength (4B)][TupleData (N bytes)]`.
     -   `TupleData` itself is a binary serialization of a `Row` (via `RowSerializer`).
 
--   **Index Segments (`.idx` files)**:
-    -   Store sparse indexes pointing to offsets in the corresponding `.dat` file.
-    -   **Header**: `IndexHeader` written at the start of the file.
-        -   Serialization: `IndexSerializer`. Format: `[Version (4B)][CellName (Str)][TableName (Str)][InstanceHash (Str)][SegmentNumber (4B)]`.
-    -   **Entries**: `SparseIndexEntry` written periodically (every 100 records).
-        -   Serialization: `IndexSerializer`. Format (20 bytes fixed): `[Version (4B)][Key/LogId (8B)][Offset (8B)]`.
+-   **Index Files (B+Tree)**:
+    -   Instead of sparse indexes, a persistent B+Tree implementation (`CSharpTest.Net.BPlusTree` NuGet package) is used for efficient indexing.
+    -   These index files (`.idx`) store `LogId`s (keys) mapped to `LogLocation`s (values).
+    -   **`LogLocation`**: A `record struct` containing `SegmentNumber` (int) and `Offset` (long) to precisely locate a log entry within its data segment.
+    -   **Serialization**: `LogLocation` is serialized using `LogLocationSerializer`.
 
 -   **Environment Files (`_env`)**:
     -   Store metadata for Cells and Databases.
@@ -57,35 +56,35 @@ Data persistence is handled by the `LogManager` and split into segments.
     1.  **Condensation**: Logs are condensed via `LogCondenser`. Tombstones (`IsDeleted=true`) are preserved to mask previous data, but intermediate updates for deleted keys within the batch are discarded.
     2.  **Serialization**: Condensed logs are serialized to binary.
     3.  **Persistence**:
-        -   Appropriate `.dat` and `.idx` files are identified or created (rollover at 1MB).
+        -   Appropriate `.dat` files are identified or created (rollover at 1MB).
         -   Persistent `FileStream`s are opened for the duration of the commit to minimize I/O overhead.
         -   Data is appended to the `.dat` stream.
-        -   Sparse index entries are appended to the `.idx` stream every 100 records.
+        -   The B+Tree index is updated with `LogId` and `LogLocation` for each committed log, ensuring efficient lookups.
 
 #### 3.2.3. Read Path
+-   **`FindLastestLog`**:
+    -   Uses the B+Tree index (`IndexManager.Search`) to directly find the `LogLocation` (segment number and offset) of a specific log entry.
+    -   Reads the log directly from the `.dat` file at the specified offset.
 -   **`GetAllLogs...`**:
-    -   To retrieve the latest state, logs are read in **reverse chronological order**:
-        1.  In-memory buffer is iterated in reverse.
-        2.  Disk segments are iterated from newest (highest segment number) to oldest.
-        3.  Logs within each segment are read fully and then reversed.
-    -   Deduplication logic ensures only the first encountered (i.e., latest) version of a Log ID is returned.
+    -   To retrieve the latest state for a cell or table instance, logs are read from the relevant data segments (either from in-memory buffer or disk `.dat` files).
+    -   Deduplication logic using a `HashSet` ensures only the first encountered (i.e., latest) version of a Log ID is returned based on `Log.Date`.
 
 ### 3.3. Server (`RosaDB.Library/Server`)
 
 -   **Communication**: Implements a `TcpListener` to accept incoming client connections.
--   **Dependency Injection**: Uses `LightInject` for managing dependencies (`LogManager` is Scoped per session).
+-   **Dependency Injection**: Uses `LightInject` for managing dependencies. Key managers (`LogManager`, `IndexManager`, `CellManager`, `DatabaseManager`, `RootManager`) are registered as Scoped per session, and interfaces (e.g., `IIndexManager`) are used for better abstraction.
 -   **Client Handling**: Each incoming client connection is handled by a `ClientSession` running in its own asynchronous task.
 
 ### 3.4. Querying (`RosaDB.Library/Query`)
 
 -   **Tokenization**: A `QueryTokenizer` class breaks down query strings into tokens.
--   **Mock Queries**: `RosaDB.Library/MoqQueries` contains hardcoded query implementations (e.g., `RandomDeleteLogsQuery`) used for testing and development.
+-   **Mock Queries**: `RosaDB.Library/MoqQueries` contains hardcoded query implementations (e.g., `RandomDeleteLogsQuery`) used for testing and development. These queries now typically return `Result` objects for consistent error handling.
 
 ### 3.5. Error Handling (`RosaDB.Library/Core`)
 
--   Uses a functional `Result<T>` monad pattern for explicit error handling, avoiding exceptions for control flow.
+-   Uses a functional `Result<T>` monad pattern for explicit error handling, avoiding exceptions for control flow. The `Result` and `Result<T>` classes are publicly accessible for broad use.
 
 ## 4. Client & Server Projects
 
--   **`RosaDB.Client`**: A TUI application (using `Terminal.Gui`) that talks to the server.
+-   **`RosaDB.Client`**: A Terminal User Interface (TUI) application (using `Terminal.Gui`) that talks to the server.
 -   **`RosaDB.Server`**: A standalone server entry point.
