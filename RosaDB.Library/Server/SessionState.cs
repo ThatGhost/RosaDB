@@ -4,5 +4,5 @@ namespace RosaDB.Library.Server;
 
 public class SessionState
 {
-    public Database? CurrentDatabase { get; set; }
+    public virtual Database? CurrentDatabase { get; set; }
 }
