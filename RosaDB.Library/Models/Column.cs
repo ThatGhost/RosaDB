@@ -8,10 +8,10 @@ public class Column
     public DataType DataType { get; private init; } = DataType.INT;
     public bool IsPrimaryKey { get; private init; }
     public bool IsIndex { get; private init; }
-    
+    public bool IsNullable { get; private init; } = true;
     public object? MetaData { get; private init; }
 
-    public static Result<Column> Create(string name, DataType dataType ,object? metadata = null, bool isPrimaryKey = false, bool isIndex = false)
+    public static Result<Column> Create(string name, DataType dataType, object? metadata = null, bool isPrimaryKey = false, bool isIndex = false, bool isNullable = true)
     {
         if (string.IsNullOrWhiteSpace(name))
             return new Error(ErrorPrefixes.DataError, "Column name cannot be empty.");
@@ -22,7 +22,8 @@ public class Column
             DataType = dataType,
             IsIndex = isIndex,
             MetaData = metadata,
-            IsPrimaryKey = isPrimaryKey
+            IsPrimaryKey = isPrimaryKey,
+            IsNullable = isNullable
         };
     }
 

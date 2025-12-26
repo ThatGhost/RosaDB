@@ -15,49 +15,47 @@ namespace RosaDB.Library.Query
 
                 List<string> tokens = new();
                 var currentToken = new StringBuilder();
+                bool inLiteral = false;
+                char literalChar = '\'';
+
+                var PushToken = () =>
+                {
+                    if (currentToken.Length > 0)
+                    {
+                        tokens.Add(currentToken.ToString());
+                        currentToken.Clear();
+                    }
+                };
 
                 foreach (char c in query)
                 {
-                    if (c == '(' || c == ')')
+                    if (inLiteral)
                     {
-                        if (currentToken.Length > 0)
+                        if (c == literalChar)
                         {
                             tokens.Add(currentToken.ToString());
                             currentToken.Clear();
+                            inLiteral = false;
                         }
-                        tokens.Add(c.ToString());
+                        else currentToken.Append(c);
+                        continue;
                     }
-                    else if (c == ';')
+
+                    if (c == '(' || c == ')' || c == ',' || c == ';' || char.IsWhiteSpace(c))
                     {
-                        if (currentToken.Length > 0)
-                        {
-                            tokens.Add(currentToken.ToString());
-                            currentToken.Clear();
-                        }
-                        tokens.Add(c.ToString());
+                        PushToken();
+                        if(!char.IsWhiteSpace(c)) tokens.Add(c.ToString());
                     }
-                    else if (c == ',')
+                    else if (c == '"' || c == '\'')
                     {
-                        if (currentToken.Length > 0)
-                        {
-                            tokens.Add(currentToken.ToString());
-                            currentToken.Clear();
-                        }
-                        tokens.Add(c.ToString());
-                    }
-                    else if (char.IsWhiteSpace(c))
-                    {
-                        if (currentToken.Length > 0)
-                        {
-                            tokens.Add(currentToken.ToString());
-                            currentToken.Clear();
-                        }
+                        PushToken(); 
+                        inLiteral = true;
+                        literalChar = c;
                     }
                     else currentToken.Append(c);
                 }
 
-                if (currentToken.Length > 0) tokens.Add(currentToken.ToString());
-
+                PushToken();
                 return tokens.Select(t => t.Trim()).ToArray();
             }
             catch { return new CriticalError(); }

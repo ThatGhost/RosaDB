@@ -9,7 +9,6 @@ namespace RosaDB.Library.Query;
 public class QueryPlanner(
     DatabaseManager databaseManager, 
     CellManager cellManager, 
-    LogManager logManager, 
     RootManager rootManager,
     SessionState sessionState
     )
@@ -20,7 +19,7 @@ public class QueryPlanner(
 
         switch (tokens[0].ToUpperInvariant())
         {
-            case "CREATE": return new CreateQuery(tokens, rootManager, databaseManager, cellManager);
+            case "CREATE": return new CreateQuery(tokens, rootManager, databaseManager);
             case "DROP": return new DropQuery(tokens, rootManager, databaseManager, cellManager);
             case "USE": return new UseQuery(tokens, sessionState);
             default: return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");

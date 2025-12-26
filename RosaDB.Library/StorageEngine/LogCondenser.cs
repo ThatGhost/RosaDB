@@ -4,7 +4,7 @@ namespace RosaDB.Library.StorageEngine
 {
     public class LogCondenser
     {
-        public List<Log> Condense(Queue<Log> logs)
+        public virtual List<Log> Condense(Queue<Log> logs)
         {
             var condensedLogs = new Dictionary<long, Log>();
             var deletedIds = new HashSet<long>();

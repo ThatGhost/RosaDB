@@ -8,8 +8,7 @@ namespace RosaDB.Library.Query.Queries;
 public class CreateQuery(
     string[] tokens,
     RootManager rootManager,
-    DatabaseManager databaseManager,
-    CellManager cellManager)
+    DatabaseManager databaseManager)
     : IQuery
 {
     public async Task<QueryResult> Execute()
