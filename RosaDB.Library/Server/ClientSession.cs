@@ -26,30 +26,30 @@ public class ClientSession(TcpClient client, Scope scope)
 
             DateTime init = DateTime.Now;
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            //await scope.GetInstance<InitializeDbQuery>().Execute();
-            //await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
-            //await scope.GetInstance<UseDatabaseQuery>().Execute("db");
-            //await scope.GetInstance<CreateCellQuery>().Execute("cell");
-            //await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
-            //await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
-            //await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell", "table", [1]);
-            //await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [1], "Updated: " + query);
-            //await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [1]);
-            //await scope.GetInstance<GetAllLogsQuery>().Execute("cell", "table");
+            await scope.GetInstance<InitializeDbQuery>().Execute();
+            await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
+            await scope.GetInstance<UseDatabaseQuery>().Execute("db");
+            await scope.GetInstance<CreateCellQuery>().Execute("cell");
+            await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
+            await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
+            await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell", "table", [1]);
+            await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [1], "Updated: " + query);
+            await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [1]);
+            await scope.GetInstance<GetAllLogsQuery>().Execute("cell", "table");
 
-            QueryResult result;
+            QueryResult result = new QueryResult("succes");
 
-            var tokens = queryTokenizer.TokenizeQuery(query);
-            if (tokens.IsFailure) result = tokens.Error;
-            else
-            {
-                var queryPlan = queryPlanner.CreateQueryPlanFromTokens(tokens.Value);
-                if (queryPlan.IsFailure) result = queryPlan.Error;
-                else
-                {
-                    result = await queryPlan.Value.Execute();
-                }
-            }
+            //var tokens = queryTokenizer.TokenizeQuery(query);
+            //if (tokens.IsFailure) result = tokens.Error;
+            //else
+            //{
+            //    var queryPlan = queryPlanner.CreateQueryPlanFromTokens(tokens.Value);
+            //    if (queryPlan.IsFailure) result = queryPlan.Error;
+            //    else
+            //    {
+            //        result = await queryPlan.Value.Execute();
+            //    }
+            //}
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;

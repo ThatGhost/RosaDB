@@ -5,9 +5,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>preview</LangVersion>
+        <NoWarn>NU1701</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="CSharpTest.Net.BPlusTree" Version="2.14.126.467" />
       <PackageReference Include="LightInject" Version="7.0.1" />
       <PackageReference Include="System.IO.Abstractions" Version="22.1.0" />
     </ItemGroup>

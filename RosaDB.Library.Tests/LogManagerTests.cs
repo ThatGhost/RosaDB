@@ -6,6 +6,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
+using RosaDB.Library.StorageEngine.Serializers;
 using System.Collections;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
@@ -20,6 +21,7 @@ namespace RosaDB.Library.Tests
         private Mock<SessionState> _mockSessionState;
         private MockFileSystem _mockFileSystem;
         private Mock<IFolderManager> _mockFolderManager;
+        private Mock<IIndexManager> _mockIndexManager;
         private LogManager _logManager;
 
         private string cellName = "TestCell";
@@ -32,28 +34,30 @@ namespace RosaDB.Library.Tests
             _mockSessionState = new Mock<SessionState>();
             _mockFileSystem = new MockFileSystem();
             _mockFolderManager = new Mock<IFolderManager>();
+            _mockIndexManager = new Mock<IIndexManager>();
 
-            // Setup mock database
             var mockDatabase = Database.Create("TestDb").Value;
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns(mockDatabase);
             _mockFolderManager.Setup(f => f.BasePath).Returns(@"C:\Test");
 
-            _logManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
+            _logManager = new LogManager(
+                _mockLogCondenser.Object, 
+                _mockSessionState.Object, 
+                _mockFileSystem, 
+                _mockFolderManager.Object,
+                _mockIndexManager.Object);
         }
 
         [Test]
         public async Task GetAllLogsForCellInstanceTable_ReturnsOnlyLogsForInstance()
         {
-            // Arrange
             var tableIndex1 = new object[] { 1 };
             var logId1 = 12345;
             var data1 = new byte[] { 1, 1, 1 };
-            var log1 = new Log { Id = logId1, TupleData = data1 };
 
             var tableIndex2 = new object[] { 2 };
             var logId2 = 54321;
             var data2 = new byte[] { 2, 2, 2 };
-            var log2 = new Log { Id = logId2, TupleData = data2 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
@@ -63,12 +67,9 @@ namespace RosaDB.Library.Tests
             _logManager.Put(cellName, tableName, tableIndex2, data2, logId2);
             await _logManager.Commit();
 
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-            await newLogManager.LoadIndexesAsync();
-
             // Act
             var allLogs = new List<Log>();
-            await foreach (var log in newLogManager.GetAllLogsForCellInstanceTable(cellName, tableName, tableIndex1))
+            await foreach (var log in _logManager.GetAllLogsForCellInstanceTable(cellName, tableName, tableIndex1))
             {
                 allLogs.Add(log);
             }
@@ -81,16 +82,13 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task GetAllLogsForCellTable_ReturnsAllLogsForTable()
         {
-            // Arrange
             var tableIndex1 = new object[] { 1 };
             var logId1 = 12345;
             var data1 = new byte[] { 1, 1, 1 };
-            var log1 = new Log { Id = logId1, TupleData = data1 };
 
             var tableIndex2 = new object[] { 2 };
             var logId2 = 54321;
             var data2 = new byte[] { 2, 2, 2 };
-            var log2 = new Log { Id = logId2, TupleData = data2 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
@@ -100,12 +98,9 @@ namespace RosaDB.Library.Tests
             _logManager.Put(cellName, tableName, tableIndex2, data2, logId2);
             await _logManager.Commit();
 
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-            await newLogManager.LoadIndexesAsync();
-
             // Act
             var allLogs = new List<Log>();
-            await foreach (var log in newLogManager.GetAllLogsForCellTable(cellName, tableName))
+            await foreach (var log in _logManager.GetAllLogsForCellTable(cellName, tableName))
             {
                 allLogs.Add(log);
             }
@@ -119,24 +114,30 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task FindLastestLog_FindsLogOnDisk()
         {
-            // Arrange
             var tableIndex = new object[] { 1 };
             var logId = 12345;
             var data = new byte[] { 1, 2, 3 };
             var log = new Log { Id = logId, TupleData = data };
-            var logs = new Queue<Log>();
-            logs.Enqueue(log);
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
+
+            // Setup the expected file path and content
+            var identifier = CreateIdentifier(cellName, tableName, tableIndex);
+            var segmentPath = GetExpectedSegmentFilePath(tableIndex, 0); 
+            _mockFileSystem.AddFile(segmentPath, new MockFileData(LogSerializer.Serialize(log)));
+
+            // Mock IndexManager.Search to return the location of the log
+            _mockIndexManager.Setup(im => im.Search(
+                It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
+                It.Is<string>(s => s == "LogId"),
+                It.Is<long>(l => l == logId)))
+                .Returns(new LogLocation(0, 0)); // Assuming segment 0, offset 0 for simplicity
 
             _logManager.Put(cellName, tableName, tableIndex, data, logId);
             await _logManager.Commit();
 
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-            await newLogManager.LoadIndexesAsync();
-
             // Act
-            var result = await newLogManager.FindLastestLog(cellName, tableName, tableIndex, logId);
+            var result = await _logManager.FindLastestLog(cellName, tableName, tableIndex, logId);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
@@ -147,89 +148,24 @@ namespace RosaDB.Library.Tests
         }
 
         [Test]
-        public async Task LoadIndexesAsync_HandlesEmptyIndexFiles()
-        {
-            // Arrange
-            var tableIndex = new object[] { 1 };
-            var expectedPath = GetExpectedSegmentFilePath(tableIndex, 0);
-            var expectedIndexPath = _mockFileSystem.Path.ChangeExtension(expectedPath, ".idx");
-            _mockFileSystem.AddFile(expectedIndexPath, new MockFileData(""));
-
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-
-            // Act
-            await newLogManager.LoadIndexesAsync();
-
-            // Assert
-            var sparseIndexCache = (IDictionary)typeof(LogManager)
-                .GetField("_sparseIndexCache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .GetValue(newLogManager);
-
-            Assert.That(sparseIndexCache.Count, Is.EqualTo(0));
-        }
-
-        [Test]
-        public async Task LoadIndexesAsync_DoesNothing_WhenDatabaseNotSet()
-        {
-            // Arrange
-            _mockSessionState.Setup(s => s.CurrentDatabase).Returns((Database)null);
-
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-
-            // Act
-            await newLogManager.LoadIndexesAsync();
-
-            // Assert
-            var sparseIndexCache = (IDictionary)typeof(LogManager)
-                .GetField("_sparseIndexCache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .GetValue(newLogManager);
-
-            Assert.That(sparseIndexCache.Count, Is.EqualTo(0));
-        }
-
-        [Test]
-        public async Task LoadIndexesAsync_LoadsIndexesFromDisk()
-        {
-            // Arrange
-            var tableIndex = new object[] { 1 };
-            var logId = 12345;
-            var data = new byte[] { 1, 2, 3 };
-            var log = new Log { Id = logId, TupleData = data };
-            var logs = new Queue<Log>();
-            logs.Enqueue(log);
-
-            _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
-
-            _logManager.Put(cellName, tableName, tableIndex, data, logId);
-            await _logManager.Commit();
-
-            var newLogManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
-
-            // Act
-            await newLogManager.LoadIndexesAsync();
-
-            // Assert
-            var sparseIndexCache = (IDictionary)typeof(LogManager)
-                .GetField("_sparseIndexCache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .GetValue(newLogManager);
-
-            Assert.That(sparseIndexCache.Count, Is.EqualTo(1));
-        }
-
-        [Test]
         public async Task Commit_WritesLogsToDisk()
         {
-            // Arrange
             var tableIndex = new object[] { 1 };
             var logId = 12345;
             var data = new byte[] { 1, 2, 3 };
             var log = new Log { Id = logId, TupleData = data };
-            var logs = new Queue<Log>();
-            logs.Enqueue(log);
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
 
             _logManager.Put(cellName, tableName, tableIndex, data, logId);
+
+            var identifier = CreateIdentifier(cellName, tableName, tableIndex);
+
+            _mockIndexManager.Setup(im => im.Insert(
+                It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
+                It.Is<string>(s => s == "LogId"),
+                It.Is<long>(l => l == logId),
+                It.IsAny<LogLocation>()));
 
             // Act
             var result = await _logManager.Commit();
@@ -243,7 +179,6 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task Commit_ReturnsError_WhenDatabaseNotSet()
         {
-            // Arrange
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns((Database)null);
 
             // Act
@@ -268,10 +203,16 @@ namespace RosaDB.Library.Tests
                 $"{hash}_{segmentNumber}.dat");
         }
 
+        private TableInstanceIdentifier CreateIdentifier(string cellName, string tableName, object[] indexValues)
+        {
+            var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
+            return new TableInstanceIdentifier(cellName, tableName, hash);
+        }
+
         [Test]
         public async Task Put_AddsLogToWriteAheadLog()
         {
-            // Arrange
             var tableIndex = new object[] { 1 };
             var data = new byte[] { 1, 2, 3 };
             var logId = 12345;
@@ -291,7 +232,6 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task Delete_AddsTombstoneLogToWriteAheadLog()
         {
-            // Arrange
             var tableIndex = new object[] { 1 };
             var logId = 54321;
 
@@ -309,7 +249,6 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task FindLastestLog_ReturnsLatestLog_WhenMultipleUpdates()
         {
-            // Arrange
             var tableIndex = new object[] { 1 };
             var logId = 67890;
             var data1 = new byte[] { 1, 1, 1 };

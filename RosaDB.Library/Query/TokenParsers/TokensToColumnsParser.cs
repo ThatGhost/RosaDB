@@ -50,7 +50,7 @@ public static class TokensToColumnsParser
         string typeName = columnTokens[1].ToUpperInvariant();
         int currentIndex = 2;
 
-        object parameters = null;
+        object parameters = new { };
         
         if (columnTokens.Length > 2 && columnTokens[2] == "(")
         {
@@ -74,10 +74,10 @@ public static class TokensToColumnsParser
     
     private static (Result<object> result, int newIndex) ParseParameters(string[] tokens, int start, string typeName)
     {
-        start++; // Move past "("
+        start++;
         if (start >= tokens.Length) return (new NoEndFound(typeName), -1);
 
-        if (tokens.Length > start + 2 && tokens[start + 1] == ",") // Double parameter
+        if (tokens.Length > start + 2 && tokens[start + 1] == ",") 
         {
             if (tokens.Length > start + 3 && tokens[start + 3] == ")")
             {
@@ -88,7 +88,7 @@ public static class TokensToColumnsParser
                 return (new { firstParse = p1, secondParse = p2 }, start + 4);
             }
         }
-        else if (tokens.Length > start + 1 && tokens[start + 1] == ")") // Single parameter
+        else if (tokens.Length > start + 1 && tokens[start + 1] == ")")
         {
             if (!int.TryParse(tokens[start], out int p1))
             {

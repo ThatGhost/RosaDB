@@ -91,7 +91,7 @@ namespace RosaDB.Library.Tests
             Assert.That(deserializedLog.Id, Is.EqualTo(originalLog.Id));
             Assert.That(deserializedLog.IsDeleted, Is.EqualTo(originalLog.IsDeleted));
             Assert.That(deserializedLog.Date.ToBinary(), Is.EqualTo(originalLog.Date.ToBinary()));
-            Assert.That(deserializedLog.TupleData, Is.EqualTo(deserializedLog.TupleData));
+            Assert.That(deserializedLog.TupleData, Is.EqualTo(originalLog.TupleData));
         }
 
         [Test]

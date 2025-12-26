@@ -19,6 +19,7 @@ public static class Installer
         container.Register<IFileSystem, FileSystem>();
         container.Register<IFolderManager, FolderManager>();
         container.RegisterScoped<LogManager>();
+        container.RegisterScoped<IIndexManager, IndexManager>();
         
         container.RegisterTransient<LogCondenser>();
         container.RegisterTransient<RootManager>();

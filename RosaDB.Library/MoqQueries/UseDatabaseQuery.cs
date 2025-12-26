@@ -4,7 +4,7 @@ using RosaDB.Library.StorageEngine;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState, LogManager logManager)
+public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState)
 {
     public async Task Execute(string dbName)
     {
@@ -16,7 +16,7 @@ public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState
             var database = Database.Create(dbName);
             if(database.IsFailure) return;
             sessionState.CurrentDatabase = database.Value;
-            await logManager.LoadIndexesAsync();
+
         }
     }
 }
