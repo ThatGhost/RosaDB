@@ -3,11 +3,15 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Serializers;
+using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class DatabaseManager(SessionState sessionState, CellManager cellManager)
+    public class DatabaseManager(SessionState sessionState, CellManager cellManager, IFileSystem fileSystem, IFolderManager folderManager)
     {
+        private readonly IFileSystem _fileSystem = fileSystem;
+        private readonly IFolderManager _folderManager = folderManager;
+
         public async Task<Result> CreateDatabaseEnvironment(Database database)
         {
             DatabaseEnvironment env = new DatabaseEnvironment();
@@ -33,7 +37,7 @@ namespace RosaDB.Library.StorageEngine
                 env.Value.Cells.Add(newCell.Value);
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
 
-                await FolderManager.CreateFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                await _folderManager.CreateFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
 
                 var cellEnvResult = await cellManager.CreateCellEnvironment(cellName, columns);
                 if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error;
@@ -55,10 +59,10 @@ namespace RosaDB.Library.StorageEngine
             var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
             if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
             
-            string folderPath = Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName);
-            string trashFolderPath = Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+cellName);
+            string folderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName);
+            string trashFolderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+cellName);
             
-            try { await FolderManager.RenameFolder(folderPath, trashFolderPath); }
+            try { await _folderManager.RenameFolder(folderPath, trashFolderPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare cell for deletion (Folder Rename Failed)."); }
             
             env.Value.Cells.Remove(cell);
@@ -69,14 +73,14 @@ namespace RosaDB.Library.StorageEngine
                 try
                 {
                     env.Value.Cells.Add(cell);
-                    await FolderManager.RenameFolder(trashFolderPath, folderPath);
+                    await _folderManager.RenameFolder(trashFolderPath, folderPath);
                 }
                 catch { return new CriticalError(); }
                 
                 return new Error(ErrorPrefixes.FileError, "Failed to update database definition. Deletion reverted.");
             }
 
-            try { await FolderManager.DeleteFolder(trashFolderPath); }
+            try { await _folderManager.DeleteFolder(trashFolderPath); }
             catch { return Result.Success(); } // TODO It is not integral to the database function that this is deleted. But need to add it to logging 
             
             return Result.Success();
@@ -94,7 +98,7 @@ namespace RosaDB.Library.StorageEngine
                 
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
                 
-                await FolderManager.DeleteFolder(Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                await _folderManager.DeleteFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
                 
                 return Result.Success();
             }
@@ -103,9 +107,9 @@ namespace RosaDB.Library.StorageEngine
 
         private async Task<Result<DatabaseEnvironment>> GetEnvironment(Database database)
         {
-            if (!File.Exists(GetDatabaseFilePath(database))) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
+            if (!_fileSystem.File.Exists(GetDatabaseFilePath(database))) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(GetDatabaseFilePath(database), CancellationToken.None);
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(_fileSystem, GetDatabaseFilePath(database), CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Database Environment does not exist");
             
             var env = ByteObjectConverter.ByteArrayToObject<DatabaseEnvironment>(bytes);
@@ -113,17 +117,17 @@ namespace RosaDB.Library.StorageEngine
             return env;
         }
 
-        private string GetDatabasePath(Database database) => Path.Combine(FolderManager.BasePath, database.Name);
+        private string GetDatabasePath(Database database) => _fileSystem.Path.Combine(_folderManager.BasePath, database.Name);
 
         private string GetDatabaseFilePath(Database database)
         {
-            return Path.Combine(GetDatabasePath(database), "_env");
+            return _fileSystem.Path.Combine(GetDatabasePath(database), "_env");
         }
         
         private async Task SaveEnvironment(DatabaseEnvironment env, Database database)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
-            await ByteReaderWriter.WriteBytesToFile(GetDatabaseFilePath(database), bytes, CancellationToken.None);
+            await ByteReaderWriter.WriteBytesToFile(_fileSystem, GetDatabaseFilePath(database), bytes, CancellationToken.None);
         }
     }
 }

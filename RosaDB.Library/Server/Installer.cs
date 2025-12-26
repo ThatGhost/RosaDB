@@ -5,6 +5,7 @@ using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Validation;
 using System.Net.Sockets;
 using RosaDB.Library.Query.Queries;
+using System.IO.Abstractions;
 
 namespace RosaDB.Library.Server;
 
@@ -14,6 +15,8 @@ public static class Installer
     {
         container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
         container.RegisterScoped<SessionState>();
+        container.Register<IFileSystem, FileSystem>();
+        container.Register<IFolderManager, FolderManager>();
         container.RegisterScoped<LogManager>();
         
         container.RegisterTransient<LogCondenser>();

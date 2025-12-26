@@ -1,54 +1,58 @@
+using System.IO.Abstractions;
+
 namespace RosaDB.Library.StorageEngine;
 
-public static class FolderManager
+public class FolderManager : IFolderManager
 {
-    public static string BasePath { get; }
+    private readonly IFileSystem _fileSystem;
+    public string BasePath { get; }
 
-    static FolderManager()
+    public FolderManager(IFileSystem fileSystem)
     {
+        _fileSystem = fileSystem;
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        BasePath = Path.Combine(localAppData, "RosaDB");
+        BasePath = _fileSystem.Path.Combine(localAppData, "RosaDB");
 
-        if (!Directory.Exists(BasePath))
+        if (!_fileSystem.Directory.Exists(BasePath))
         {
-            Directory.CreateDirectory(BasePath);
+            _fileSystem.Directory.CreateDirectory(BasePath);
         }
     }
 
-    public static Task CreateFolder(string folderName)
+    public Task CreateFolder(string folderName)
     {
-        var folderPath = Path.Combine(BasePath, folderName);
-        if (!Directory.Exists(folderPath))
+        var folderPath = _fileSystem.Path.Combine(BasePath, folderName);
+        if (!_fileSystem.Directory.Exists(folderPath))
         {
-            Directory.CreateDirectory(folderPath);
-        }
-        return Task.CompletedTask;
-    }
-
-    public static Task DeleteFolder(string folderName)
-    {
-        var folderPath = Path.Combine(BasePath, folderName);
-        if (Directory.Exists(folderPath))
-        {
-            Directory.Delete(folderPath, true);
+            _fileSystem.Directory.CreateDirectory(folderPath);
         }
         return Task.CompletedTask;
     }
 
-    public static Task<bool> DoesFolderExist(string folderName)
+    public Task DeleteFolder(string folderName)
     {
-        var folderPath = Path.Combine(BasePath, folderName);
-        return Task.FromResult(Directory.Exists(folderPath));
+        var folderPath = _fileSystem.Path.Combine(BasePath, folderName);
+        if (_fileSystem.Directory.Exists(folderPath))
+        {
+            _fileSystem.Directory.Delete(folderPath, true);
+        }
+        return Task.CompletedTask;
     }
 
-    public static Task RenameFolder(string oldName, string newName)
+    public Task<bool> DoesFolderExist(string folderName)
     {
-        var oldPath = Path.Combine(BasePath, oldName);
-        var newPath = Path.Combine(BasePath, newName);
+        var folderPath = _fileSystem.Path.Combine(BasePath, folderName);
+        return Task.FromResult(_fileSystem.Directory.Exists(folderPath));
+    }
 
-        if (Directory.Exists(oldPath))
+    public Task RenameFolder(string oldName, string newName)
+    {
+        var oldPath = _fileSystem.Path.Combine(BasePath, oldName);
+        var newPath = _fileSystem.Path.Combine(BasePath, newName);
+
+        if (_fileSystem.Directory.Exists(oldPath))
         {
-            Directory.Move(oldPath, newPath);
+            _fileSystem.Directory.Move(oldPath, newPath);
         }
         return Task.CompletedTask;
     }

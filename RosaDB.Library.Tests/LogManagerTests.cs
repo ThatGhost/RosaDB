@@ -3,6 +3,7 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace RosaDB.Library.Tests
 {
@@ -11,6 +12,8 @@ namespace RosaDB.Library.Tests
     {
         private Mock<LogCondenser> _mockLogCondenser;
         private Mock<SessionState> _mockSessionState;
+        private MockFileSystem _mockFileSystem;
+        private Mock<IFolderManager> _mockFolderManager;
         private LogManager _logManager;
 
         private string cellName = "TestCell";
@@ -21,12 +24,15 @@ namespace RosaDB.Library.Tests
         {
             _mockLogCondenser = new Mock<LogCondenser>();
             _mockSessionState = new Mock<SessionState>();
+            _mockFileSystem = new MockFileSystem();
+            _mockFolderManager = new Mock<IFolderManager>();
 
             // Setup mock database
             var mockDatabase = Database.Create("TestDb").Value;
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns(mockDatabase);
+            _mockFolderManager.Setup(f => f.BasePath).Returns("C:\\Test");
 
-            _logManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object);
+            _logManager = new LogManager(_mockLogCondenser.Object, _mockSessionState.Object, _mockFileSystem, _mockFolderManager.Object);
         }
 
         [Test]

@@ -1,3 +1,4 @@
+using System.IO.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
 using RosaDB.Library.Core;
@@ -7,7 +8,11 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine;
 
-public class LogManager(LogCondenser logCondenser, SessionState sessionState)
+public class LogManager(
+    LogCondenser logCondenser,
+    SessionState sessionState,
+    IFileSystem fileSystem,
+    IFolderManager folderManager)
 {
     private const long MaxSegmentSize = 1024 * 1024; // 1MB
     private const int SparseIndexFrequency = 100;
@@ -16,6 +21,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
     private readonly Dictionary<TableInstanceIdentifier, SegmentMetadata> _segmentMetadata = new();
     private readonly Dictionary<TableInstanceIdentifier, Dictionary<int, List<SparseIndexEntry>>> _sparseIndexCache = new();
 
+    // The return is ugly but otherwise the Commit function is too long
     private Result<(SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs)> GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
     {
         if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
@@ -40,17 +46,17 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         var indexFilePathResult = GetIndexFilePath(identifier, metadata.CurrentSegmentNumber);
         if (indexFilePathResult.IsFailure) return indexFilePathResult.Error;
 
-        var segmentDirectory = Path.GetDirectoryName(segmentFilePathResult.Value);
+        var segmentDirectory = fileSystem.Path.GetDirectoryName(segmentFilePathResult.Value);
         
-        if (!string.IsNullOrEmpty(segmentDirectory) && !Directory.Exists(segmentDirectory))
+        if (!string.IsNullOrEmpty(segmentDirectory) && !fileSystem.Directory.Exists(segmentDirectory))
         {
-            Directory.CreateDirectory(segmentDirectory);
+            fileSystem.Directory.CreateDirectory(segmentDirectory);
         }
 
         return (metadata, segmentFilePathResult.Value, indexFilePathResult.Value, serializedLogs);
     }
 
-    private async Task WriteSegmentHeaderIfNeeded(long currentOffset, IndexHeader header, FileStream indexStream)
+    private async Task WriteSegmentHeaderIfNeeded(long currentOffset, IndexHeader header, Stream indexStream)
     {
         if (currentOffset == 0)
         {
@@ -59,7 +65,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         }
     }
 
-    private async Task<long> WriteSerializedLogsAndSparseIndex(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, FileStream segmentStream, FileStream indexStream, long initialOffset)
+    private async Task<long> WriteSerializedLogsAndSparseIndex(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, Stream indexStream, long initialOffset)
     {
         long currentOffset = initialOffset;
         int recordCounter = 0;
@@ -100,14 +106,14 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         _sparseIndexCache.Clear();
         _segmentMetadata.Clear();
 
-        var dbPath = Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase.Name);
-        if (!Directory.Exists(dbPath)) return;
+        var dbPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name);
+        if (!fileSystem.Directory.Exists(dbPath)) return;
 
-        var indexFiles = Directory.GetFiles(dbPath, "*.idx", SearchOption.AllDirectories);
+        var indexFiles = fileSystem.Directory.GetFiles(dbPath, "*.idx", SearchOption.AllDirectories);
 
         foreach (var indexFile in indexFiles)
         {
-            var indexBytes = await ByteReaderWriter.ReadBytesFromFile(indexFile, CancellationToken.None);
+            var indexBytes = await ByteReaderWriter.ReadBytesFromFile(fileSystem, indexFile, CancellationToken.None);
             if (indexBytes.Length == 0) continue;
 
             using var stream = new MemoryStream(indexBytes);
@@ -129,9 +135,9 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
 
             var segmentFilePath = GetSegmentFilePath(identifier, header.Value.SegmentNumber);
             if (segmentFilePath.IsFailure) return;
-            if (File.Exists(segmentFilePath.Value))
+            if (fileSystem.File.Exists(segmentFilePath.Value))
             {
-                var segmentInfo = new FileInfo(segmentFilePath.Value);
+                var segmentInfo = fileSystem.FileInfo.New(segmentFilePath.Value);
                 _segmentMetadata[identifier] = new SegmentMetadata(header.Value.SegmentNumber, segmentInfo.Length);
             }
         }
@@ -154,8 +160,8 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             Result<(SegmentMetadata metadata, string segmentFilePath, string indexFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             if (result.IsFailure) return result.Error;
             
-            await using var segmentStream = new FileStream(result.Value.segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
-            await using var indexStream = new FileStream(result.Value.indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
+            await using var segmentStream = fileSystem.FileStream.New(result.Value.segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
+            await using var indexStream = fileSystem.FileStream.New(result.Value.indexFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
 
             var header = new IndexHeader(identifier.CellName, identifier.TableName, identifier.InstanceHash, result.Value.metadata.CurrentSegmentNumber);
             await WriteSegmentHeaderIfNeeded(result.Value.metadata.CurrentSegmentSize, header, indexStream);
@@ -222,8 +228,8 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             ? identifier.InstanceHash.Substring(0, 2) 
             : "xy"; // Fallback for unexpected short hashes
 
-        return Path.Combine(
-            FolderManager.BasePath, sessionState.CurrentDatabase.Name, 
+        return fileSystem.Path.Combine(
+            folderManager.BasePath, sessionState.CurrentDatabase.Name, 
             identifier.CellName, identifier.TableName, 
             hashPrefix,
             $"{identifier.InstanceHash}_{segmentNumber}.dat");
@@ -234,7 +240,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
         var segmentPathResult = GetSegmentFilePath(identifier, segmentNumber);
         if (segmentPathResult.IsFailure) return segmentPathResult.Error;
 
-        return Path.ChangeExtension(segmentPathResult.Value, ".idx");
+        return fileSystem.Path.ChangeExtension(segmentPathResult.Value, ".idx");
     }
 
     private async Task<Result<Log>> FindOnDisk(TableInstanceIdentifier identifier, long logId)
@@ -257,7 +263,7 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             if (segmentFilePath.IsFailure) return segmentFilePath.Error;
             int readLength = endOffset != -1 ? (int)(endOffset - startOffset) : -1;
 
-            var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(segmentFilePath.Value, startOffset, readLength, CancellationToken.None);
+            var bytesBlock = await ByteReaderWriter.ReadBytesFromFile(fileSystem, segmentFilePath.Value, startOffset, readLength, CancellationToken.None);
             if(bytesBlock.Length == 0) continue;
 
             using var stream = new MemoryStream(bytesBlock);
@@ -297,10 +303,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
                 foreach (var segmentNumber in segmentIndexes.Keys.OrderByDescending(k => k)) // Order by segment number descending
                 {
                     var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
-                    if (segmentFilePath.IsFailure || !File.Exists(segmentFilePath.Value)) continue;
+                    if (segmentFilePath.IsFailure || !fileSystem.File.Exists(segmentFilePath.Value)) continue;
 
                     var segmentLogs = new List<Log>();
-                    await using var stream = new FileStream(segmentFilePath.Value, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                    await using var stream = fileSystem.FileStream.New(segmentFilePath.Value, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
                     while (stream.Position < stream.Length)
                     {
                         var log = await LogSerializer.DeserializeAsync(stream);
@@ -345,10 +351,10 @@ public class LogManager(LogCondenser logCondenser, SessionState sessionState)
             foreach (var segmentNumber in segmentIndexes.Keys.OrderByDescending(k => k))
             {
                 var segmentFilePath = GetSegmentFilePath(identifier, segmentNumber);
-                if (segmentFilePath.IsFailure || !File.Exists(segmentFilePath.Value)) continue;
+                if (segmentFilePath.IsFailure || !fileSystem.File.Exists(segmentFilePath.Value)) continue;
 
                 var segmentLogs = new List<Log>();
-                await using var stream = new FileStream(segmentFilePath.Value, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                await using var stream = fileSystem.FileStream.New(segmentFilePath.Value, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
                 while (stream.Position < stream.Length)
                 {
                     var log = await LogSerializer.DeserializeAsync(stream);

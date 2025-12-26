@@ -13,6 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RosaDB.Library.Tests", "Ros
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8E36EB71-8D2C-4FFE-9DE9-619F8255423C}"
 	ProjectSection(SolutionItems) = preProject
+		PROJECT_OVERVIEW.md = PROJECT_OVERVIEW.md
 		TODO.md = TODO.md
 	EndProjectSection
 EndProject

@@ -11,7 +11,7 @@ RosaDB is an in-development database solution written in C# targeting .NET 10.
 The solution is composed of three main projects:
 -   **`RosaDB.Library`**: The core database engine and server logic.
 -   **`RosaDB.Client`**: A Terminal User Interface (TUI) client application.
--   **`RosaDB.Server`**: (Intended) a standalone server application.
+-   **`RosaDB.Server`**: A standalone server application.
 
 ## 3. `RosaDB.Library` - The Core Database Engine
 
@@ -22,11 +22,10 @@ This project encapsulates all the fundamental logic for the database.
 The database's logical structure follows a hierarchical model:
 
 -   **`Database`**: The top-level container for a specific database instance.
--   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It appears to be analogous to a partition.
+-   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It is to be analogous to a partition but with metadata attached.
 -   **`Table`**: Standard relational concept, containing `Column` definitions.
 -   **`Column`**: Defines the name and `DataType` for data within a `Table`.
 -   **`Row`**: Represents a single record within a `Table`.
--   **`DataType`**: Supported types include `INT`, `BIGINT`, `VARCHAR`, and `BOOLEAN`.
 
 ### 3.2. Storage Engine (`RosaDB.Library/StorageEngine`)
 

@@ -3,11 +3,14 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Serializers;
+using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class CellManager(SessionState sessionState)
+    public class CellManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager)
     {
+        private readonly IFileSystem _fileSystem = fileSystem;
+        private readonly IFolderManager _folderManager = folderManager;
         private Dictionary<string,CellEnvironment> _cachedEnvironment = new(); 
 
         public async Task<Result> CreateCellEnvironment(string cellName, List<Column> columns)
@@ -41,10 +44,10 @@ namespace RosaDB.Library.StorageEngine
             var tableToDelete = envResult.Value.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
             if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in cell '{cellName}'.");
 
-            string tablePath = Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
-            string trashPath = Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
+            string tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
+            string trashPath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
 
-            try { await FolderManager.RenameFolder(tablePath, trashPath); }
+            try { await _folderManager.RenameFolder(tablePath, trashPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."); }
 
             envResult.Value.Tables = envResult.Value.Tables.Where(t => t != tableToDelete).ToArray();
@@ -54,7 +57,7 @@ namespace RosaDB.Library.StorageEngine
             {
                 try
                 {
-                    await FolderManager.RenameFolder(trashPath, tablePath);
+                    await _folderManager.RenameFolder(trashPath, tablePath);
                     envResult.Value.Tables = envResult.Value.Tables.Append(tableToDelete).ToArray();
                 }
                 catch{ return new CriticalError(); }
@@ -62,7 +65,7 @@ namespace RosaDB.Library.StorageEngine
                 return new Error(ErrorPrefixes.FileError, "Failed to update cell definition. Deletion reverted.");
             }
 
-            try { await FolderManager.DeleteFolder(trashPath); }
+            try { await _folderManager.DeleteFolder(trashPath); }
             catch { return Result.Success(); }
 
             return Result.Success();
@@ -75,9 +78,9 @@ namespace RosaDB.Library.StorageEngine
 
             if (_cachedEnvironment.TryGetValue(cellName, out var env)) return env;
 
-            if (!File.Exists(GetCellFilePath(cellName))) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            if (!_fileSystem.File.Exists(GetCellFilePath(cellName))) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(GetCellFilePath(cellName), CancellationToken.None);
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(_fileSystem, GetCellFilePath(cellName), CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
             
             env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
@@ -89,13 +92,13 @@ namespace RosaDB.Library.StorageEngine
 
         private string GetCellFilePath(string cellName)
         {
-            return Path.Combine(FolderManager.BasePath, sessionState.CurrentDatabase!.Name, cellName, "_env");
+            return _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase!.Name, cellName, "_env");
         }
         
         private async Task SaveEnvironment(CellEnvironment env, string cellName)
         {
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
-            await ByteReaderWriter.WriteBytesToFile(GetCellFilePath(cellName), bytes, CancellationToken.None);
+            await ByteReaderWriter.WriteBytesToFile(_fileSystem, GetCellFilePath(cellName), bytes, CancellationToken.None);
             _cachedEnvironment[cellName] = env;
         }
         
