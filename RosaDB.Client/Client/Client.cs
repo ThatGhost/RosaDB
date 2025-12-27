@@ -1,8 +1,19 @@
+using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace RosaDB.Client.Client;
+
+public class ClientResponse
+{
+    public string Message { get; set; } = "";
+    public int RowsAffected { get; set; }
+    public List<Dictionary<string, object?>>? Rows { get; set; }
+    public double DurationMs { get; set; }
+}
 
 public class Client
 {
@@ -15,13 +26,43 @@ public class Client
         _stream = _client.GetStream();
     }
 
-    public async Task<string> SendQueryAsync(string query)
+    public async Task<ClientResponse?> SendQueryAsync(string query)
     {
-        var buffer = Encoding.UTF8.GetBytes(query);
-        await _stream.WriteAsync(buffer, 0, buffer.Length);
+        try
+        {
+            // Send query with length prefix
+            var queryBytes = Encoding.UTF8.GetBytes(query);
+            var lengthBytes = BitConverter.GetBytes(queryBytes.Length);
+            await _stream.WriteAsync(lengthBytes);
+            await _stream.WriteAsync(queryBytes);
 
-        buffer = new byte[1024];
-        var bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
-        return Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            // Read response with length prefix
+            var responseLengthBuffer = new byte[4];
+            var bytesRead = await _stream.ReadAsync(responseLengthBuffer, 0, 4);
+            if (bytesRead < 4) return null; // Or throw an exception
+
+            var responseLength = BitConverter.ToInt32(responseLengthBuffer, 0);
+            var responseBuffer = new byte[responseLength];
+            var totalBytesRead = 0;
+            while(totalBytesRead < responseLength)
+            {
+                bytesRead = await _stream.ReadAsync(responseBuffer, totalBytesRead, responseLength - totalBytesRead);
+                if (bytesRead == 0) return null; // Connection closed prematurely
+                totalBytesRead += bytesRead;
+            }
+
+            var jsonResponse = Encoding.UTF8.GetString(responseBuffer, 0, responseLength);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            return JsonSerializer.Deserialize<ClientResponse>(jsonResponse, options);
+        }
+        catch (Exception)
+        {
+            // Handle exceptions (e.g., connection lost)
+            return null;
+        }
     }
 }
