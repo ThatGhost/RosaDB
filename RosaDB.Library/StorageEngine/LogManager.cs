@@ -14,7 +14,8 @@ public class LogManager(
     SessionState sessionState,
     IFileSystem fileSystem,
     IFolderManager folderManager,
-    IIndexManager indexManager)
+    IIndexManager indexManager,
+    ICellManager cellManager)
 {
     private const long MaxSegmentSize = 1024 * 1024;
 
@@ -52,7 +53,7 @@ public class LogManager(
         return (metadata, segmentFilePathResult.Value, serializedLogs);
     }
 
-    private async Task<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset)
+    private async Task<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset, Column[] columns)
     {
         long currentOffset = initialOffset;
 
@@ -60,7 +61,23 @@ public class LogManager(
         {
             await segmentStream.WriteAsync(bytes, CancellationToken.None);
             
-            indexManager.Insert(identifier, "LogId", log.Id, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+            indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+            
+            Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+            if (rowResult.IsFailure) return -1;
+
+            Row row = rowResult.Value;
+            for (int i = 0; i < row.Columns.Length; i++)
+            {
+                Column col = row.Columns[i];
+                object? val = row.Values[i];
+
+                if (col.IsPrimaryKey || col.IsIndex)
+                {
+                    byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
+                    indexManager.Insert(identifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+                }
+            }
             
             currentOffset += bytes.Length;
         }
@@ -79,15 +96,23 @@ public class LogManager(
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
+            Result<Column[]> columnsResult = await cellManager.GetColumnsFromTable(identifier.CellName, identifier.TableName);
+            if (columnsResult.IsFailure) return columnsResult.Error;
+            Column[] columns = columnsResult.Value;
+
             Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             if (result.IsFailure) return result.Error;
             
             await using var segmentStream = fileSystem.FileStream.New(result.Value.segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
 
-            var finalOffset = await WriteSerializedLogs(identifier, result.Value.metadata, result.Value.serializedLogs, segmentStream, result.Value.metadata.CurrentSegmentSize);
+            var finalOffset = await WriteSerializedLogs(identifier, result.Value.metadata, result.Value.serializedLogs, segmentStream, result.Value.metadata.CurrentSegmentSize, columns);
             
+            if (finalOffset == -1) return new Error(ErrorPrefixes.DataError, "Failed to write serialized logs and update indexes.");
+
             _segmentMetadata[identifier] = result.Value.metadata with { CurrentSegmentSize = finalOffset };
         }
+        
+        indexManager.CloseAllIndexes();
         return Result.Success();
     }
     
@@ -154,7 +179,7 @@ public class LogManager(
 
     private async Task<Result<Log>> FindOnDisk(TableInstanceIdentifier identifier, long logId)
     {
-        var logLocationResult = indexManager.Search(identifier, "LogId", logId);
+        var logLocationResult = indexManager.Search(identifier, "LogId", IndexKeyConverter.ToByteArray(logId));
         if (logLocationResult.IsFailure) return logLocationResult.Error;
 
         var logLocation = logLocationResult.Value;

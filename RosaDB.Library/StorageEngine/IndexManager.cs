@@ -12,7 +12,7 @@ public class IndexManager(
     IFileSystem fileSystem,
     IFolderManager folderManager) : IIndexManager
 {
-    private readonly Dictionary<string, BPlusTree<long, LogLocation>> _activeIndexes = new();
+    private readonly Dictionary<string, BPlusTree<byte[], LogLocation>> _activeIndexes = new();
 
     private string GetIndexPath(TableInstanceIdentifier identifier, string columnName)
     {
@@ -29,7 +29,7 @@ public class IndexManager(
             $"{identifier.InstanceHash}_{columnName}.idx");
     }
 
-    public BPlusTree<long, LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
+    public BPlusTree<byte[], LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
     {
         var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
 
@@ -46,7 +46,7 @@ public class IndexManager(
             fileSystem.Directory.CreateDirectory(indexDirectory);
         }
         
-        var options = new BPlusTree<long, LogLocation>.OptionsV2(PrimitiveSerializer.Int64, new LogLocationSerializer())
+        var options = new BPlusTree<byte[], LogLocation>.OptionsV2(PrimitiveSerializer.Bytes, new LogLocationSerializer())
         {
             CreateFile = CreatePolicy.IfNeeded,
             FileName = indexPath,
@@ -54,18 +54,18 @@ public class IndexManager(
         };
         options.CalcBTreeOrder(8, 12);
 
-        btree = new BPlusTree<long, LogLocation>(options);
+        btree = new BPlusTree<byte[], LogLocation>(options);
         _activeIndexes[indexKey] = btree;
         return btree;
     }
 
-    public void Insert(TableInstanceIdentifier identifier, string columnName, long key, LogLocation value)
+    public void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value)
     {
         var btree = GetOrCreateBPlusTree(identifier, columnName);
         btree[key] = value;
     }
 
-    public Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, long key)
+    public Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, byte[] key)
     {
         var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
 

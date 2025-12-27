@@ -20,7 +20,12 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 8.  ~~**Create `IndexManager`:** Introduce a new `IndexManager` class within the `StorageEngine` to handle the creation, opening, and management of B-Tree-based index files. This manager will be analogous to the `LogManager`.~~
 9.  ~~**Integrate `IndexManager` into Write Path:**~~
     ~~*   Inject the `IndexManager` into the `LogManager`.~~
-    *   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.
+    ~~*   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.~~
+
+## Phase 2.5: Implement SELECT and Insert queries
+9.5. **Implement Basic SELECT Queries:**
+    *   Extend `QueryTokenizer` and `QueryPlanner` to support basic `SELECT ... FROM ... WHERE ...` syntax.
+    *   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).
 10. **Integrate `IndexManager` into Query Path:**
     *   Update the `QueryPlanner` to identify and utilize B-Tree indexes for accelerating queries with `WHERE` clauses on indexed columns, performing B-Tree searches instead of full table scans.
 

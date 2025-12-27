@@ -23,6 +23,7 @@ namespace RosaDB.Library.Tests
         private MockFileSystem _mockFileSystem;
         private Mock<IFolderManager> _mockFolderManager;
         private Mock<IIndexManager> _mockIndexManager;
+        private Mock<ICellManager> _mockCellManager; 
         private LogManager _logManager;
 
         private string cellName = "TestCell";
@@ -36,17 +37,29 @@ namespace RosaDB.Library.Tests
             _mockFileSystem = new MockFileSystem();
             _mockFolderManager = new Mock<IFolderManager>();
             _mockIndexManager = new Mock<IIndexManager>();
+            _mockCellManager = new Mock<ICellManager>(); 
 
             var mockDatabase = Database.Create("TestDb").Value;
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns(mockDatabase);
             _mockFolderManager.Setup(f => f.BasePath).Returns(@"C:\Test");
+
+            // Setup a default mock for GetColumnsFromTable for most tests
+            _mockCellManager.Setup(cm => cm.GetColumnsFromTable(
+                It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(Result<Column[]>.Success(
+                    new Column[] { 
+                        Column.Create("LogId", DataType.BIGINT, isPrimaryKey: true).Value,
+                        Column.Create("data", DataType.VARCHAR).Value
+                    }
+                ));
 
             _logManager = new LogManager(
                 _mockLogCondenser.Object, 
                 _mockSessionState.Object, 
                 _mockFileSystem, 
                 _mockFolderManager.Object,
-                _mockIndexManager.Object);
+                _mockIndexManager.Object,
+                _mockCellManager.Object);
         }
 
         // This goes through a whole flow 
@@ -70,30 +83,30 @@ namespace RosaDB.Library.Tests
             Mock<IIndexManager> mockIndexManager = new Mock<IIndexManager>();
             IIndexManager indexManager = mockIndexManager.Object;
 
-            ICellManager cellManager = new CellManager(sessionState, fileSystem, folderManager);
-            IDatabaseManager databaseManager = new DatabaseManager(sessionState, cellManager, fileSystem, folderManager);
+            ICellManager realCellManager = new CellManager(sessionState, fileSystem, folderManager);
+            IDatabaseManager databaseManager = new DatabaseManager(sessionState, realCellManager, fileSystem, folderManager);
             var rootManager = new RootManager(databaseManager, sessionState, fileSystem, folderManager);
-            var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager);
+            var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager, realCellManager);
             
             var createDbQuery = new CreateDatabaseQuery(rootManager);
             var useDbQuery = new UseDatabaseQuery(rootManager, sessionState);
             var createCellQuery = new CreateCellQuery(databaseManager);
-            var createTableQuery = new CreateTableDefinition(cellManager);
-            var writeQuery = new WriteLogAndCommitQuery(logManager, cellManager);
-            var updateQuery = new UpdateCellLogsQuery(logManager, cellManager);
-            var getQuery = new GetCellLogsQuery(logManager, cellManager);
+            var createTableQuery = new CreateTableDefinition(realCellManager);
+            var writeQuery = new WriteLogAndCommitQuery(logManager, realCellManager);
+            var updateQuery = new UpdateCellLogsQuery(logManager, realCellManager);
+            var getQuery = new GetCellLogsQuery(logManager, realCellManager);
 
             mockIndexManager.Setup(im => im.Insert(
                 It.IsAny<TableInstanceIdentifier>(),
                 It.IsAny<string>(),
-                It.IsAny<long>(),
+                It.IsAny<byte[]>(),
                 It.IsAny<LogLocation>()));
             
             mockIndexManager.Setup(im => im.Search(
                 It.IsAny<TableInstanceIdentifier>(),
                 It.IsAny<string>(),
-                It.IsAny<long>()))
-                .Returns(new Error(ErrorPrefixes.DataError, "Log not found in mocked index."));
+                It.IsAny<byte[]>()))
+                .Returns(Result<LogLocation>.Success(new LogLocation(0,0)));
 
             try
             {
@@ -218,8 +231,8 @@ namespace RosaDB.Library.Tests
             _mockIndexManager.Setup(im => im.Search(
                 It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
                 It.Is<string>(s => s == "LogId"),
-                It.Is<long>(l => l == logId)))
-                .Returns(new LogLocation(0, 0)); // Assuming segment 0, offset 0 for simplicity
+                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId))))) // Fixed to byte[]
+                .Returns(Result<LogLocation>.Success(new LogLocation(0, 0))); // Fixed return type
 
             _logManager.Put(cellName, tableName, tableIndex, data, logId);
             await _logManager.Commit();
@@ -252,7 +265,7 @@ namespace RosaDB.Library.Tests
             _mockIndexManager.Setup(im => im.Insert(
                 It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
                 It.Is<string>(s => s == "LogId"),
-                It.Is<long>(l => l == logId),
+                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId))), // Changed to byte[]
                 It.IsAny<LogLocation>()));
 
             // Act
