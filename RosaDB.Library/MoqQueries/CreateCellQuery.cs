@@ -10,10 +10,10 @@ public class CreateCellQuery(IDatabaseManager databaseManager)
     {
         if (columns == null)
         {
-            var column = Column.Create("Id", DataType.BIGINT, isPrimaryKey: true, isIndex: true);
-            if(column.IsFailure) return column.Error;
-            columns = [column.Value];
+            var columnResult = Column.Create("Id", DataType.BIGINT, isPrimaryKey: true, isIndex: true);
+            if(!columnResult.TryGetValue(out var column)) return columnResult.Error;
+            columns = [column];
         }
-        return await databaseManager.CreateCell(cellName, columns);
+        return await databaseManager.CreateCell(cellName, columns.ToArray());
     }
 }

@@ -62,7 +62,7 @@ namespace RosaDB.Library.Tests
         public async Task CreateCellEnvironment_HappyPath_CreatesEnvFile()
         {
             // Arrange
-            var columns = new List<Column> { Column.Create("Id", DataType.INT).Value };
+            var columns = new Column[] { Column.Create("Id", DataType.INT).Value };
             if (!_mockFileSystem.Directory.Exists(_cellPath))
                 _mockFileSystem.AddDirectory(_cellPath);
 

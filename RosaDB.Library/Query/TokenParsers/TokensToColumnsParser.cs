@@ -30,16 +30,20 @@ public static class TokensToColumnsParser
         }
         tokensPerColumn.Add(currentColumn);
 
-        List<Column> columns = [];
+        Column[] columns = new Column[tokensPerColumn.Count];
+        int i = 0;
         foreach (var tokensInColumn in tokensPerColumn)
         {
             if (tokensInColumn.Count == 0) continue;
+
             var columnResult = TokensToColumn(tokensInColumn.ToArray());
             if (columnResult.IsFailure) return columnResult.Error;
-            columns.Add(columnResult.Value);
+
+            columns[i] = columnResult.Value;
+            i++;
         }
 
-        return columns.ToArray();
+        return columns;
     }
 
     public static Result<Column> TokensToColumn(string[] columnTokens)
@@ -61,15 +65,12 @@ public static class TokensToColumnsParser
         }
 
         var switchesResult = TokensToSwitches(columnTokens, currentIndex);
-        if (switchesResult.IsFailure) return switchesResult.Error;
-        var (isPrimaryKey, isIndex, isNullable) = switchesResult.Value;
+        if (!switchesResult.TryGetValue(out var switches)) return switchesResult.Error;
 
         if (!Enum.TryParse<DataType>(typeName, true, out var dataType))
-        {
             return new Error(ErrorPrefixes.QueryParsingError, $"Datatype '{typeName}' is unknown");
-        }
 
-        return Column.Create(columnName, dataType, parameters, isPrimaryKey, isIndex, isNullable);
+        return Column.Create(columnName, dataType, parameters, switches.isPrimaryKey, switches.isIndex, switches.isNullable);
     }
     
     private static (Result<object> result, int newIndex) ParseParameters(string[] tokens, int start, string typeName)
@@ -133,16 +134,15 @@ public static class TokensToColumnsParser
             }
         }
         
-        if (isPrimaryKey && isNullable) return new Error(ErrorPrefixes.QueryParsingError, "PRIMARY KEY constraint requires a column to be NOT NULL.");
+        if (isPrimaryKey && isNullable) 
+            return new Error(ErrorPrefixes.QueryParsingError, "PRIMARY KEY constraint requires a column to be NOT NULL.");
 
         return (isPrimaryKey, isIndex, isNullable);
     }
     
 #pragma warning disable CS9113
-    private record NoBeginningFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"No beginning '(' found for {Type} type");
     private record NoEndFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"No end ')' found for {Type} type");
     private record CouldNotParse(string Value, string Type) : Error(ErrorPrefixes.QueryParsingError, $"Could not parse {Value} for {Type} type");
-    private record NoCommaFound(string Type) : Error(ErrorPrefixes.QueryParsingError, $"Could not find comma separator for {Type} type");
 #pragma warning restore CS9113
     
 }

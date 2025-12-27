@@ -1,9 +1,7 @@
 using System.Net.Sockets;
 using System.Text;
 using LightInject;
-using RosaDB.Library.Core;
 using RosaDB.Library.Models;
-using RosaDB.Library.MoqQueries;
 using RosaDB.Library.Query;
 
 namespace RosaDB.Library.Server;
@@ -26,30 +24,18 @@ public class ClientSession(TcpClient client, Scope scope)
 
             DateTime init = DateTime.Now;
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            await scope.GetInstance<InitializeDbQuery>().Execute();
-            await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
-            await scope.GetInstance<UseDatabaseQuery>().Execute("db");
-            await scope.GetInstance<CreateCellQuery>().Execute("cell");
-            await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
-            await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
+            //await scope.GetInstance<InitializeDbQuery>().Execute();
+            //await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
+            //await scope.GetInstance<UseDatabaseQuery>().Execute("db");
+            //await scope.GetInstance<CreateCellQuery>().Execute("cell");
+            //await scope.GetInstance<CreateTableDefinition>().Execute("cell", "table");
+            //await scope.GetInstance<WriteLogAndCommitQuery>().Execute("cell", "table", query);
             //await scope.GetInstance<RandomDeleteLogsQuery>().Execute("cell", "table", [1]);
-            await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [2], "Updated: " + query);
-            await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [2]);
+            //await scope.GetInstance<UpdateCellLogsQuery>().Execute("cell", "table", [2], "Updated: " + query);
+            //await scope.GetInstance<GetCellLogsQuery>().Execute("cell", "table", [2]);
             //await scope.GetInstance<GetAllLogsQuery>().Execute("cell", "table");
 
-            QueryResult result = new QueryResult("succes");
-
-            //var tokens = queryTokenizer.TokenizeQuery(query);
-            //if (tokens.IsFailure) result = tokens.Error;
-            //else
-            //{
-            //    var queryPlan = queryPlanner.CreateQueryPlanFromTokens(tokens.Value);
-            //    if (queryPlan.IsFailure) result = queryPlan.Error;
-            //    else
-            //    {
-            //        result = await queryPlan.Value.Execute();
-            //    }
-            //}
+            QueryResult result = await TokensToQueryExecution(query, queryTokenizer, queryPlanner);
 
             DateTime end = DateTime.Now;
             TimeSpan duration = end - init;
@@ -60,5 +46,16 @@ public class ClientSession(TcpClient client, Scope scope)
             var responseBuffer = Encoding.UTF8.GetBytes(response);
             await stream.WriteAsync(responseBuffer, 0, responseBuffer.Length);
         }
+    }
+
+    private async Task<QueryResult> TokensToQueryExecution(string query, QueryTokenizer queryTokenizer, QueryPlanner queryPlanner)
+    {
+        var tokensResult = queryTokenizer.TokenizeQuery(query);
+        if (!tokensResult.TryGetValue(out var tokens)) return tokensResult.Error;
+
+        var queryPlanResult = queryPlanner.CreateQueryPlanFromTokens(tokens);
+        if (!queryPlanResult.TryGetValue(out var queryPlan)) return queryPlanResult.Error;
+
+        return await queryPlan.Execute();
     }
 }

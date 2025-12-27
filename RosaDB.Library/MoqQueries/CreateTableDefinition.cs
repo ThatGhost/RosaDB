@@ -18,8 +18,6 @@ public class CreateTableDefinition(ICellManager cellManager)
         if (tableResult.IsFailure) return tableResult.Error;
         
         var addTableResult = await cellManager.AddTables(cellName, new[] { tableResult.Value });
-        if (addTableResult.IsFailure) return addTableResult.Error;
-        
-        return Result.Success();
+        return addTableResult;
     }
 }

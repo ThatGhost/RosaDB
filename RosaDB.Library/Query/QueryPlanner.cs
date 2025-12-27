@@ -23,7 +23,8 @@ public class QueryPlanner(
             case "CREATE": return new CreateQuery(tokens, rootManager, databaseManager);
             case "DROP": return new DropQuery(tokens, rootManager, databaseManager, cellManager);
             case "USE": return new UseQuery(tokens, sessionState);
-            default: return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");
+            default: 
+                return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");
         }
     }
 }

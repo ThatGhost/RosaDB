@@ -20,9 +20,9 @@ public class CreateQuery(
         {
             case "DATABASE": return await CREATE_DATABASE(tokens[2]);
             case "CELL": return await CREATE_CELL(tokens[2], tokens[3..]);
+            default: 
+                return new Error(ErrorPrefixes.QueryParsingError, $"Unknown CREATE target: {tokens[1]}");
         }
-        
-        return new CriticalError();
     }
 
     private async Task<QueryResult> CREATE_DATABASE(string databaseName)
@@ -36,9 +36,9 @@ public class CreateQuery(
     private async Task<QueryResult> CREATE_CELL(string cellName, string[] columnTokens)
     {
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
-        if (columnResult.IsFailure) return columnResult.Error;
+        if (!columnResult.TryGetValue(out var column)) return columnResult.Error;
         
-        var result = await databaseManager.CreateCell(cellName, columnResult.Value.ToList());
+        var result = await databaseManager.CreateCell(cellName, column);
         if (result.IsFailure) return result.Error;
         
         return new QueryResult($"Successfully created cell: {cellName}");

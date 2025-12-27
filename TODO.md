@@ -45,3 +45,13 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 16. **TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.
 
 ## Phase 5: Start research about replication and scaling
+
+17. **Research Replication Strategies:** Investigate various replication methods (e.g., master-slave, multi-master) suitable for RosaDB's architecture. Document findings and propose a replication model.
+18. **Research Scaling Techniques:** Explore scaling strategies, including sharding and partitioning
+
+## Phase 6: Optimization
+19. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
+20. **Optimize Data Structures:** Refine data structures and algorithms based on profiling results to enhance performance.
+21. **Index Optimization:** Analyze and optimize B-Tree index structures for faster lookups and reduced storage overhead.
+22. **Caching Mechanisms:** Implement caching strategies for frequently accessed data to reduce disk I/O and improve response times.
+23. **Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.

@@ -2,32 +2,33 @@ using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.StorageEngine.Interfaces;
+using RosaDB.Library.Core;
 
 namespace RosaDB.Library.MoqQueries;
 
 public class WriteLogAndCommitQuery(LogManager logManager, ICellManager cellManager)
 {
-    public async Task Execute(string cell, string table, string data)
+    public async Task<Result> Execute(string cell, string table, string data)
     {
-        var columns = await cellManager.GetColumnsFromTable(cell, table);
-        if (columns.IsFailure) return;
+        var columnsResult = await cellManager.GetColumnsFromTable(cell, table);
+        if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
         var random = new Random();
 
         for (int i = 0; i < 10000; i++)
         {
             object?[] rowValues = [i, $"{data}", random.Next(10, 100)];
-            var row = Row.Create(rowValues, columns.Value);
-            if(row.IsFailure) return;
+            var rowResult = Row.Create(rowValues, columns);
+            if(!rowResult.TryGetValue(out var row)) return rowResult.Error;
             
-            var bytes = RowSerializer.Serialize(row.Value);
-            if(bytes.IsFailure) return;
+            var bytesResult = RowSerializer.Serialize(row);
+            if(!bytesResult.TryGetValue(out var bytes)) return bytesResult.Error;
             
-            logManager.Put(cell, table, [random.Next(0,4)], bytes.Value);
+            logManager.Put(cell, table, [random.Next(0,4)], bytes);
         }
 
-        // Commit the log
         await logManager.Commit();
+        return Result.Success();
     }
 }
 

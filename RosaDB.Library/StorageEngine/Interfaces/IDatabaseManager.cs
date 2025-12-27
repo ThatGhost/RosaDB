@@ -8,7 +8,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
     public interface IDatabaseManager
     {
         Task<Result> CreateDatabaseEnvironment(Database database);
-        Task<Result> CreateCell(string cellName, List<Column> columns);
+        Task<Result> CreateCell(string cellName, Column[] columns);
         Task<Result> DeleteCell(string cellName);
     }
 }

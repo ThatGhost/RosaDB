@@ -21,24 +21,25 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
         
-        public async Task<Result> CreateCell(string cellName, List<Column> columns)
+        public async Task<Result> CreateCell(string cellName, Column[] columns)
         {
             try
             {
                 if (sessionState.CurrentDatabase is null)
                     return new Error(ErrorPrefixes.StateError, "Database not set");
 
-                var env = await GetEnvironment(sessionState.CurrentDatabase);
-                if (env.IsFailure) return env.Error;
-                if (env.Value.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
+                var envResult = await GetEnvironment(sessionState.CurrentDatabase);
+                if (!envResult.TryGetValue(out var env)) return envResult.Error;
+                if (env.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
                     return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
                 var newCell = Cell.Create(cellName);
                 if (newCell.IsFailure) return newCell.Error;
-                env.Value.Cells.Add(newCell.Value);
-                await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
 
-                await _folderManager.CreateFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                env.Cells.Add(newCell.Value);
+                await SaveEnvironment(env, sessionState.CurrentDatabase);
+
+                _folderManager.CreateFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
 
                 var cellEnvResult = await cellManager.CreateCellEnvironment(cellName, columns);
                 if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error;
@@ -54,34 +55,34 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result> DeleteCell(string cellName)
         {
             if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
-            var env = await GetEnvironment(sessionState.CurrentDatabase);
-            if (env.IsFailure) return env.Error;
+            var envResult = await GetEnvironment(sessionState.CurrentDatabase);
+            if (!envResult.TryGetValue(out var env)) return envResult.Error;
             
-            var cell = env.Value.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
+            var cell = env.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
             if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
             
             string folderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName);
             string trashFolderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+cellName);
             
-            try { await _folderManager.RenameFolder(folderPath, trashFolderPath); }
+            try { _folderManager.RenameFolder(folderPath, trashFolderPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare cell for deletion (Folder Rename Failed)."); }
             
-            env.Value.Cells.Remove(cell);
+            env.Cells.Remove(cell);
             
-            try { await SaveEnvironment(env.Value, sessionState.CurrentDatabase); }
+            try { await SaveEnvironment(env, sessionState.CurrentDatabase); }
             catch 
             { 
                 try
                 {
-                    env.Value.Cells.Add(cell);
-                    await _folderManager.RenameFolder(trashFolderPath, folderPath);
+                    env.Cells.Add(cell);
+                    _folderManager.RenameFolder(trashFolderPath, folderPath);
                 }
                 catch { return new CriticalError(); }
                 
                 return new Error(ErrorPrefixes.FileError, "Failed to update database definition. Deletion reverted.");
             }
 
-            try { await _folderManager.DeleteFolder(trashFolderPath); }
+            try { _folderManager.DeleteFolder(trashFolderPath); }
             catch { return Result.Success(); } // TODO It is not integral to the database function that this is deleted. But need to add it to logging 
             
             return Result.Success();
@@ -99,7 +100,7 @@ namespace RosaDB.Library.StorageEngine
                 
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
                 
-                await _folderManager.DeleteFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                _folderManager.DeleteFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
                 
                 return Result.Success();
             }

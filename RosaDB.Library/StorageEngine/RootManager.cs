@@ -20,16 +20,17 @@ namespace RosaDB.Library.StorageEngine
         {
             try
             {
-                var env = await GetEnvironment();
-                if (env.IsFailure) return new Error(ErrorPrefixes.FileError, "RosaDb not setup correctly");
-                if (env.Value.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.FileError, $"Database '{databaseName}' already exists.");
+                var rootEnvResult = await GetEnvironment();
+                if (!rootEnvResult.TryGetValue(out var rootEnv)) return rootEnvResult.Error;
+                if (rootEnv.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.FileError, $"Database '{databaseName}' already exists.");
 
-                env.Value.DatabaseNames.Add(databaseName);
-                await SaveEnvironment(env.Value);
+                rootEnv.DatabaseNames.Add(databaseName);
+                await SaveEnvironment(rootEnv);
+
                 var database = Database.Create(databaseName);
                 if (database.IsFailure) return database.Error;
                     
-                await _folderManager.CreateFolder(databaseName);
+                _folderManager.CreateFolder(databaseName);
                 var envResult = await databaseManager.CreateDatabaseEnvironment(database.Value);
                 if (envResult.IsFailure)
                 {
@@ -48,10 +49,8 @@ namespace RosaDB.Library.StorageEngine
         {
             var result = await GetEnvironment();
             if (result.IsSuccess)
-            {
                 return new Error(ErrorPrefixes.StateError, "Root already setup");
-            }
-            
+
             RootEnvironment env = new RootEnvironment();
             await SaveEnvironment(env);
             
@@ -68,7 +67,7 @@ namespace RosaDB.Library.StorageEngine
                 env.Value.DatabaseNames.Remove(databaseName);
                 await SaveEnvironment(env.Value);
             
-                await _folderManager.DeleteFolder(databaseName);
+                _folderManager.DeleteFolder(databaseName);
             
                 return Result.Success();
             }
@@ -78,25 +77,25 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result> DeleteDatabase(string databaseName)
         {
             var envResult = await GetEnvironment();
-            if (envResult.IsFailure) return envResult.Error;
+            if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
-            if (!envResult.Value.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.DataError, $"Database '{databaseName}' not found.");
+            if (!env.DatabaseNames.Contains(databaseName)) return new Error(ErrorPrefixes.DataError, $"Database '{databaseName}' not found.");
 
             string folderPath = _fileSystem.Path.Combine(_folderManager.BasePath, databaseName);
             string trashFolderPath = _fileSystem.Path.Combine(_folderManager.BasePath, "trash_" + databaseName);
 
-            try { await _folderManager.RenameFolder(folderPath, trashFolderPath); }
+            try { _folderManager.RenameFolder(folderPath, trashFolderPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare database for deletion (Folder Rename Failed)."); }
 
-            envResult.Value.DatabaseNames.Remove(databaseName);
+            env.DatabaseNames.Remove(databaseName);
 
-            try { await SaveEnvironment(envResult.Value); }
+            try { await SaveEnvironment(env); }
             catch
             {
                 try
                 {
-                    await _folderManager.RenameFolder(trashFolderPath, folderPath);
-                    envResult.Value.DatabaseNames.Add(databaseName); 
+                    _folderManager.RenameFolder(trashFolderPath, folderPath);
+                    env.DatabaseNames.Add(databaseName); 
                 }
                 catch { return new CriticalError(); }
                 
@@ -106,7 +105,7 @@ namespace RosaDB.Library.StorageEngine
             if (sessionState.CurrentDatabase is not null && sessionState.CurrentDatabase.Name == databaseName)
                 sessionState.CurrentDatabase = null;
 
-            try { await _folderManager.DeleteFolder(trashFolderPath); }
+            try { _folderManager.DeleteFolder(trashFolderPath); }
             catch { return Result.Success(); }
 
             return Result.Success();
@@ -115,7 +114,7 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result<List<string>>> GetDatabaseNames()
         {
             var env = await GetEnvironment();
-            return env.IsSuccess ? env.Value.DatabaseNames : new Error(ErrorPrefixes.FileError, "Databases not found.");
+            return env.IsSuccess ? env.Value.DatabaseNames : env.Error;
         }
 
         private async Task<Result<RootEnvironment>> GetEnvironment()

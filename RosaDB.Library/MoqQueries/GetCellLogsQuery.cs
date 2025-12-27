@@ -16,9 +16,9 @@ public class GetCellLogsQuery(LogManager logManager, ICellManager cellManager)
         List<string> data = new List<string>();
         await foreach (var log in logs)
         {
-            var row = RowSerializer.Deserialize(log.TupleData, cellFromDb.Value);
-            if(row.IsFailure) continue;
-            if (row.Value.Values[1] is string strValue)
+            var rowResult = RowSerializer.Deserialize(log.TupleData, cellFromDb.Value);
+            if(!rowResult.TryGetValue(out var row)) continue;
+            if (row.Values[1] is string strValue)
             {
                 data.Add(strValue);
             }

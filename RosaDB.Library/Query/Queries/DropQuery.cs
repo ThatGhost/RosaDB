@@ -19,7 +19,8 @@ public class DropQuery(
             case "DATABASE": return await DROP_DATABASE(tokens[2]);
             case "CELL": return await DROP_CELL(tokens[2]);
             case "TABLE": return await DROP_TABLE(tokens[2..]);
-            default: return new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported");
+            default: 
+                return new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported");
         }
     }
 

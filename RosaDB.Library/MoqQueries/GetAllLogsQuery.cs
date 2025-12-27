@@ -10,18 +10,18 @@ public class GetAllLogsQuery(LogManager logManager, ICellManager cellManager)
 {
     public async Task<Result<List<string>>> Execute(string cellName, string tableName)
     {
-        var columns = await cellManager.GetColumnsFromTable(cellName, tableName);
-        if (columns.IsFailure) return columns.Error;
+        var columnsResult = await cellManager.GetColumnsFromTable(cellName, tableName);
+        if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
         
         var logs = logManager.GetAllLogsForCellTable(cellName, tableName);
         
         List<string> result = new();
         await foreach (var log in logs)
         {
-            var deserializerResult = RowSerializer.Deserialize(log.TupleData, columns.Value);
-            if(deserializerResult.IsFailure || deserializerResult.Value.Values.Length == 0) continue;
+            var deserializerResult = RowSerializer.Deserialize(log.TupleData, columns);
+            if(!deserializerResult.TryGetValue(out var deserializedRow) || deserializedRow.Values.Length == 0) continue;
             
-            result.Add(((string)deserializerResult.Value.Values[1]!)!);
+            result.Add(((string)deserializedRow.Values[1]!));
         }
         
         return result;

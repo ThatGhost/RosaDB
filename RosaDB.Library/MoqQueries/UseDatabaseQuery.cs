@@ -9,10 +9,10 @@ public class UseDatabaseQuery(RootManager rootManager, SessionState sessionState
 {
     public async Task<Result> Execute(string dbName)
     {
-        var existingDbs = await rootManager.GetDatabaseNames();
-        if (existingDbs.IsFailure) return existingDbs.Error;
+        var existingDbsResult = await rootManager.GetDatabaseNames();
+        if (!existingDbsResult.TryGetValue(out var existingDbs)) return existingDbsResult.Error;
         
-        if (existingDbs.Value.Contains(dbName))
+        if (existingDbs.Contains(dbName))
         {
             var database = Database.Create(dbName);
             if(database.IsFailure) return database.Error;

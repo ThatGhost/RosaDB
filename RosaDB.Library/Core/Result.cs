@@ -50,6 +50,14 @@ public sealed class Result<T>
             ? await onSuccess(Value)
             : await onFailure(Error);
     }
+
+    [MemberNotNullWhen(false, nameof(Error))]
+    [MemberNotNullWhen(true, nameof(Value))]
+    public bool TryGetValue([NotNullWhen(true)] out T? value)
+    {
+        value = _value;
+        return IsSuccess;
+    }
 }
 
 public sealed class Result

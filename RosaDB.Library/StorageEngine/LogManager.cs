@@ -159,14 +159,12 @@ public class LogManager(
 
         var logLocation = logLocationResult.Value;
         var segmentFilePathResult = GetSegmentFilePath(identifier, logLocation.SegmentNumber);
-        if (segmentFilePathResult.IsFailure) return segmentFilePathResult.Error;
+        if (!segmentFilePathResult.TryGetValue(out var segmentFilePath)) return segmentFilePathResult.Error;
 
-        if (!fileSystem.File.Exists(segmentFilePathResult.Value))
-        {
+        if (!fileSystem.File.Exists(segmentFilePath))
             return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
-        }
 
-        await using var stream = fileSystem.FileStream.New(segmentFilePathResult.Value, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         stream.Seek(logLocation.Offset, SeekOrigin.Begin);
         
         var log = await LogSerializer.DeserializeAsync(stream);

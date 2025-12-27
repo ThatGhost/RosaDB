@@ -14,7 +14,7 @@ namespace RosaDB.Library.StorageEngine
         private readonly IFolderManager _folderManager = folderManager;
         private Dictionary<string,CellEnvironment> _cachedEnvironment = new(); 
 
-        public async Task<Result> CreateCellEnvironment(string cellName, List<Column> columns)
+        public async Task<Result> CreateCellEnvironment(string cellName, Column[] columns)
         {
             CellEnvironment env = new CellEnvironment
             {
@@ -28,10 +28,10 @@ namespace RosaDB.Library.StorageEngine
         public async Task<Result> AddTables(string cellName, Table[] tables)
         {
             var env = await GetEnvironment(cellName);
-            if (env.IsFailure) return env.Error;
-            
-            env.Value.Tables = env.Value.Tables.Concat(tables.ToArray()).ToArray();
-            await SaveEnvironment(env.Value, cellName);
+            if (!env.TryGetValue(out var cellEnviroument)) return env.Error;
+
+            cellEnviroument.Tables = cellEnviroument.Tables.Concat(tables.ToArray()).ToArray();
+            await SaveEnvironment(cellEnviroument, cellName);
 
             if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
 
@@ -58,25 +58,25 @@ namespace RosaDB.Library.StorageEngine
             if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
 
             var envResult = await GetEnvironment(cellName);
-            if (envResult.IsFailure) return envResult.Error;
+            if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
-            var tableToDelete = envResult.Value.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+            var tableToDelete = env.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
             if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in cell '{cellName}'.");
 
             string tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
             string trashPath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
 
-            try { await _folderManager.RenameFolder(tablePath, trashPath); }
+            try { _folderManager.RenameFolder(tablePath, trashPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."); }
 
-            envResult.Value.Tables = envResult.Value.Tables.Where(t => t != tableToDelete).ToArray();
+            env.Tables = env.Tables.Where(t => t != tableToDelete).ToArray();
 
-            try { await SaveEnvironment(envResult.Value, cellName); }
+            try { await SaveEnvironment(env, cellName); }
             catch
             {
                 try
                 {
-                    await _folderManager.RenameFolder(trashPath, tablePath);
+                    _folderManager.RenameFolder(trashPath, tablePath);
                     envResult.Value.Tables = envResult.Value.Tables.Append(tableToDelete).ToArray();
                 }
                 catch{ return new CriticalError(); }
@@ -84,7 +84,7 @@ namespace RosaDB.Library.StorageEngine
                 return new Error(ErrorPrefixes.FileError, "Failed to update cell definition. Deletion reverted.");
             }
 
-            try { await _folderManager.DeleteFolder(trashPath); }
+            try { _folderManager.DeleteFolder(trashPath); }
             catch { return Result.Success(); }
 
             return Result.Success();
@@ -129,8 +129,7 @@ namespace RosaDB.Library.StorageEngine
             var table = env.Value.Tables.FirstOrDefault(t => t.Name == tableName);
             if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in cell environment");
 
-            return table.Columns
-                .ToArray();
+            return table.Columns.ToArray();
         }
     }
 }
