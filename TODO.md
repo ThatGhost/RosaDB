@@ -12,7 +12,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   ~~Set the existing `IsPrimaryKey` and `IsIndex` flags on the `Column` model (`Column.cs`).~~
     *   ~~Add an `IsNullable` property to `Column.cs` and implement parsing for `NOT NULL` constraints.~~
 
-## Phase 2: B-Tree Indexing Implementation
+## ~~Phase 2: B-Tree Indexing Implementation~~
 
 5.  ~~**B-Tree Data Structures:** Create the necessary classes for the B-Tree (e.g., `BTreeNode`, `BTreeLeaf`, `BTreeInternalNode`), designed for efficient serialization to disk.~~
 6.  ~~**B-Tree Serializer:** Implement a `BTreeSerializer` to manage the conversion of B-Tree nodes to and from fixed-size byte arrays (pages) for persistent storage.~~
@@ -23,11 +23,14 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.~~
 
 ## Phase 2.5: Implement SELECT and Insert queries
-9.5. **Implement Basic SELECT Queries:**
-    *   Extend `QueryTokenizer` and `QueryPlanner` to support basic `SELECT ... FROM ... WHERE ...` syntax.
-    *   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).
-10. **Integrate `IndexManager` into Query Path:**
-    *   Update the `QueryPlanner` to identify and utilize B-Tree indexes for accelerating queries with `WHERE` clauses on indexed columns, performing B-Tree searches instead of full table scans.
+9.5. ~~**Implement Basic SELECT Queries~:**~
+    ~~*   Extend `QueryTokenizer` and `QueryPlanner` to support basic `SELECT ... FROM ... WHERE ...` syntax.~~
+    ~~*   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).~~
+10. ~~**Integrate `IndexManager` into Query Path:**~~
+    ~~*   Update the `QueryPlanner` to identify and utilize B-Tree indexes for accelerating queries with `WHERE` clauses on indexed columns, performing B-Tree searches instead of full table scans.~~
+10.5. **Implement Basic INSERT Queries:**~~
+    *   Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.
+    *   Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.
 
 ## Phase 3: Feature Development
 
