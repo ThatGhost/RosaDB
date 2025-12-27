@@ -19,4 +19,9 @@ public class QueryResult
     {
         Message = message;
     }
+
+    public QueryResult(List<Row> rows)
+    {
+        Message = "Query executed successfully.";
+    }
 }

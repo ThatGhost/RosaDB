@@ -11,7 +11,9 @@ public class QueryPlanner(
     IDatabaseManager databaseManager, 
     ICellManager cellManager, 
     RootManager rootManager,
-    SessionState sessionState
+    SessionState sessionState,
+    LogManager logManager,
+    IIndexManager indexManager
     )
 {
     public Result<IQuery> CreateQueryPlanFromTokens(string[] tokens)
@@ -23,6 +25,7 @@ public class QueryPlanner(
             case "CREATE": return new CreateQuery(tokens, rootManager, databaseManager);
             case "DROP": return new DropQuery(tokens, rootManager, databaseManager, cellManager);
             case "USE": return new UseQuery(tokens, sessionState);
+            case "SELECT": return new SelectQuery(tokens, logManager, cellManager, indexManager);
             default: 
                 return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");
         }

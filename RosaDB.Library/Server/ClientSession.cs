@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using LightInject;
 using RosaDB.Library.Models;
+using RosaDB.Library.MoqQueries;
 using RosaDB.Library.Query;
 
 namespace RosaDB.Library.Server;
@@ -24,7 +25,7 @@ public class ClientSession(TcpClient client, Scope scope)
 
             DateTime init = DateTime.Now;
             var query = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            //await scope.GetInstance<InitializeDbQuery>().Execute();
+            await scope.GetInstance<InitializeDbQuery>().Execute();
             //await scope.GetInstance<CreateDatabaseQuery>().Execute("db");
             //await scope.GetInstance<UseDatabaseQuery>().Execute("db");
             //await scope.GetInstance<CreateCellQuery>().Execute("cell");

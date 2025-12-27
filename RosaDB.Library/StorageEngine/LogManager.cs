@@ -75,7 +75,19 @@ public class LogManager(
                 if (col.IsPrimaryKey || col.IsIndex)
                 {
                     byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
-                    indexManager.Insert(identifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+                    TableInstanceIdentifier indexIdentifier;
+
+                    // Use a table-wide identifier for secondary indexes, and instance-specific for primary keys.
+                    if (col.IsIndex && !col.IsPrimaryKey)
+                    {
+                        indexIdentifier = new TableInstanceIdentifier(identifier.CellName, identifier.TableName, "_TABLE_");
+                    }
+                    else // This is a primary key
+                    {
+                        indexIdentifier = identifier;
+                    }
+                    
+                    indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
                 }
             }
             
@@ -97,8 +109,7 @@ public class LogManager(
             if (condensedLogs.Count == 0) continue;
 
             Result<Column[]> columnsResult = await cellManager.GetColumnsFromTable(identifier.CellName, identifier.TableName);
-            if (columnsResult.IsFailure) return columnsResult.Error;
-            Column[] columns = columnsResult.Value;
+            if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
             Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             if (result.IsFailure) return result.Error;
@@ -187,6 +198,32 @@ public class LogManager(
         if (!segmentFilePathResult.TryGetValue(out var segmentFilePath)) return segmentFilePathResult.Error;
 
         if (!fileSystem.File.Exists(segmentFilePath))
+            return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
+
+        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        stream.Seek(logLocation.Offset, SeekOrigin.Begin);
+        
+        var log = await LogSerializer.DeserializeAsync(stream);
+        if (log is null) return new Error(ErrorPrefixes.FileError, "Failed to deserialize log from disk.");
+        
+        return log;
+    }
+
+    // needs refactoring to where LogLocation gives a hash to the segment file
+    public async Task<Result<Log>> GetLogAtLocation(LogLocation logLocation)
+    {
+        if (sessionState.CurrentDatabase is null)
+        {
+            return new Error(ErrorPrefixes.StateError, "Database not set");
+        }
+
+        var dbPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name);
+        var allSegmentFiles = fileSystem.Directory.GetFiles(dbPath, "*.dat", SearchOption.AllDirectories);
+
+        string segmentFileName = $"_{logLocation.SegmentNumber}.dat";
+        var segmentFilePath = allSegmentFiles.FirstOrDefault(f => f.EndsWith(segmentFileName));
+
+        if (segmentFilePath == null || !fileSystem.File.Exists(segmentFilePath))
             return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
 
         await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);

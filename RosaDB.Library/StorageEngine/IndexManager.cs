@@ -4,7 +4,6 @@ using CSharpTest.Net.Serialization;
 using RosaDB.Library.Core;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
-using RosaDB.Library.StorageEngine;
 
 namespace RosaDB.Library.StorageEngine;
 
@@ -16,17 +15,32 @@ public class IndexManager(
 
     private string GetIndexPath(TableInstanceIdentifier identifier, string columnName)
     {
-        var hashPrefix = identifier.InstanceHash.Length >= 2 
-            ? identifier.InstanceHash.Substring(0, 2) 
-            : "xy"; 
+        string path;
+        if (identifier.InstanceHash == "_TABLE_")
+        {
+            path = fileSystem.Path.Combine(
+                folderManager.BasePath,
+                "indexes",
+                identifier.CellName,
+                identifier.TableName,
+                "_TABLE_", // Special folder for table-wide indexes
+                $"{columnName}.idx"); // Simpler file name for table-wide indexes
+        }
+        else
+        {
+            var hashPrefix = identifier.InstanceHash.Length >= 2 
+                ? identifier.InstanceHash.Substring(0, 2) 
+                : "xy"; 
 
-        return fileSystem.Path.Combine(
-            folderManager.BasePath,
-            "indexes",
-            identifier.CellName,
-            identifier.TableName,
-            hashPrefix,
-            $"{identifier.InstanceHash}_{columnName}.idx");
+            path = fileSystem.Path.Combine(
+                folderManager.BasePath,
+                "indexes",
+                identifier.CellName,
+                identifier.TableName,
+                hashPrefix,
+                $"{identifier.InstanceHash}_{columnName}.idx");
+        }
+        return path;
     }
 
     public BPlusTree<byte[], LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
