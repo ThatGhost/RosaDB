@@ -18,15 +18,31 @@ namespace RosaDB.Client.TUI
 
             _queries = new List<(string, string)>
             {
-                ("Select All", "SELECT * FROM sales.transactions;"),
+                // Metadata
+                ("Show Cell Groups", "SHOW CELL GROUPS;"),
+                ("Show Tables in Group", "SHOW TABLES IN sales;"),
+
+                // DDL
+                ("Create Database", "CREATE DATABASE my_db;"),
+                ("Use Database", "USE DATABASE my_db;"),
+                ("Create Cell Group", "CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);"),
+                ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);"),
+                
+                // Cell Instance Management
+                ("Insert Cell Instance", "INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');"),
+                ("Update Cell Instance", "UPDATE CELL sales USING name = 'q4' SET is_active = FALSE;"),
+                ("Delete Cell Instance", "DELETE CELL sales USING name = 'q4';"),
+
+                // DML
+                ("Select All from Group", "SELECT * FROM sales.transactions;"), // Cross-cell query
                 ("Select with Data Filter", "SELECT * FROM sales.transactions WHERE amount > 100;"),
                 ("Select with Cell Filter", "SELECT * FROM sales.transactions USING name = 'q4';"),
                 ("Select with Both Filters", "SELECT * FROM sales.transactions USING name = 'q4' WHERE amount > 100;"),
                 ("Insert Data", "INSERT INTO sales.transactions USING name = 'q4' (id, product, amount) VALUES (1, 'item', 50);"),
-                ("Create Database", "CREATE DATABASE my_db;"),
-                ("Use Database", "USE DATABASE my_db;"),
-                ("Create Cell Group", "CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);"),
-                ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);")
+
+                // Subscriptions
+                ("Subscribe to Cell", "SUBSCRIBE TO sales USING name = 'q4';"),
+                ("Unsubscribe from Cell", "UNSUBSCRIBE FROM sales USING name = 'q4';")
             };
 
             _listView = new ListView(_queries.ConvertAll(q => q.Name))

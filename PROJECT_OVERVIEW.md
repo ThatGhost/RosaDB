@@ -1,10 +1,25 @@
 # RosaDB Project Overview
 
 This document provides a technical overview of the RosaDB project's current architecture and key components.
+It is both intended for new contributors to understand the system and for existing developers to have a reference guide.
 
 ## 1. Project Goal
 
-RosaDB is an in-development database solution written in C# targeting .NET 10.
+RosaDB is an in-development database solution written in C# targeting .NET 10, designed as a reactive, partitioned datastore ideal for real-time applications.
+
+## 1.1. Key Features
+
+-   **Cell-based Architecture**: Data is partitioned into logical groups called "Cells," allowing for fine-grained organization and querying.
+-   **Real-time Subscriptions**: Clients can subscribe to changes (INSERT, UPDATE, DELETE) within a specific cell instance via WebSockets, enabling reactive, real-time application development.
+-   **Log-Structured Storage**: An append-only storage engine inspired by LSM-trees provides efficient writes and clear data lineage.
+
+## 1.2. Typical Use Cases
+
+The unique architecture of RosaDB makes it an ideal backend for:
+-   **Multi-Tenant SaaS Applications**: Each customer tenant can be represented by a `CellInstance`, providing strong data isolation while allowing administrators to run analytics across all tenants.
+-   **Real-Time IoT Platforms**: Each IoT device can be a `CellInstance`, allowing for high-volume data ingestion and live monitoring of specific devices via subscriptions.
+-   **Collaborative Applications (e.g., Figma, Google Docs)**: Each document or session can be a `CellInstance`, with the database handling the real-time broadcasting of changes to all subscribed users.
+-   **MMO & Online Gaming**: Each game match or player inventory can be a `CellInstance`, with player actions pushed to subscribed clients in real-time.
 
 ## 2. Core Components
 
@@ -22,8 +37,9 @@ This project encapsulates all the fundamental logic for the database.
 The database's logical structure follows a hierarchical model:
 
 -   **`Database`**: The top-level container for a specific database instance.
--   **`Cell`**: A unique logical grouping within a `Database`. A `Cell` can contain multiple `Table` definitions and is a key organizational unit. It is to be analogous to a partition but with metadata attached.
--   **`Table`**: Standard relational concept, containing `Column` definitions.
+-   **`CellGroup`**: A logical category of cells, defined by a `CREATE CELL` statement, which specifies the schema for cell instance properties.
+-   **`CellInstance`**: A specific partition within a `CellGroup`, created with `INSERT CELL`.
+-   **`Table`**: Standard relational concept. Table schemas are defined at the `CellGroup` level.
 -   **`Column`**: Defines the name and `DataType` for data within a `Table`.
 -   **`Row`**: Represents a single record within a `Table`.
 
@@ -34,58 +50,33 @@ The storage mechanism is inspired by log-structured merge-trees (LSM-trees), emp
 #### 3.2.1. Persistence & File Formats
 Data persistence is handled by the `LogManager` and split into segments.
 
--   **Data Segments (`.dat` files)**:
-    -   Store actual data records as `Log` entries.
-    -   **Serialization**: Custom binary format via `LogSerializer`.
-        -   Format: `[Length (4B)][LogId (8B)][IsDeleted (1B)][Date (8B)][TupleDataLength (4B)][TupleData (N bytes)]`.
-    -   `TupleData` itself is a binary serialization of a `Row` (via `RowSerializer`).
-
--   **Index Files (B+Tree)**:
-    -   Instead of sparse indexes, a persistent B+Tree implementation (`CSharpTest.Net.BPlusTree` NuGet package) is used for efficient indexing.
-    -   These index files (`.idx`) store `LogId`s (keys) mapped to `LogLocation`s (values).
-    -   **`LogLocation`**: A `record struct` containing `SegmentNumber` (int) and `Offset` (long) to precisely locate a log entry within its data segment.
-    -   **Serialization**: `LogLocation` is serialized using `LogLocationSerializer`.
-
--   **Environment Files (`_env`)**:
-    -   Store metadata for Cells and Databases.
-    -   **Serialization**: Length-prefixed JSON via `ByteObjectConverter` (retained for readability/debuggability).
+-   **Data Segments (`.dat` files)**: Store actual data records as `Log` entries.
+-   **Index Files (B+Tree)**: A persistent B+Tree (`CSharpTest.Net.BPlusTree`) is used for indexing `LogId`s to their `LogLocation` (segment and offset).
+-   **Environment Files (`_env`)**: Store metadata for Cells and Databases using length-prefixed JSON.
 
 #### 3.2.2. Write Path (`Commit`)
--   Modifications (`Put`/`Delete`) are buffered in an in-memory `_writeAheadLogs` queue.
+-   Modifications are buffered in-memory.
 -   **`Commit` Process**:
-    1.  **Condensation**: Logs are condensed via `LogCondenser`. Tombstones (`IsDeleted=true`) are preserved to mask previous data, but intermediate updates for deleted keys within the batch are discarded.
-    2.  **Serialization**: Condensed logs are serialized to binary.
-    3.  **Persistence**:
-        -   Appropriate `.dat` files are identified or created (rollover at 1MB).
-        -   Persistent `FileStream`s are opened for the duration of the commit to minimize I/O overhead.
-        -   Data is appended to the `.dat` stream.
-        -   The B+Tree index is updated with `LogId` and `LogLocation` for each committed log, ensuring efficient lookups.
+    1.  Logs are condensed and serialized.
+    2.  Data is appended to the current data segment.
+    3.  The B+Tree index is updated with the new log locations.
+    4.  **Notify Subscribers**: After a successful commit, the `LogManager` notifies a `SubscriptionManager`, which then pushes changes to clients subscribed to the affected cell instance.
 
-#### 3.2.3. Read Path
--   **`FindLastestLog`**:
-    -   Uses the B+Tree index (`IndexManager.Search`) to directly find the `LogLocation` (segment number and offset) of a specific log entry.
-    -   Reads the log directly from the `.dat` file at the specified offset.
--   **`GetAllLogs...`**:
-    -   To retrieve the latest state for a cell or table instance, logs are read from the relevant data segments (either from in-memory buffer or disk `.dat` files).
-    -   Deduplication logic using a `HashSet` ensures only the first encountered (i.e., latest) version of a Log ID is returned based on `Log.Date`.
+#### 3.2.3. Read Path & Consistency
+-   Reads on a specific cell instance are strongly consistent.
+-   For cross-cell queries (`SELECT` without `USING`), read consistency is on a per-cell-read basis. The query does not operate on a single, global snapshot of the entire database, prioritizing availability and performance.
 
 ### 3.3. Server (`RosaDB.Library/Server`)
 
--   **Communication**: Implements a `TcpListener` to accept incoming client connections.
--   **Dependency Injection**: Uses `LightInject` for managing dependencies. Key managers (`LogManager`, `IndexManager`, `CellManager`, `DatabaseManager`, `RootManager`) are registered as Scoped per session, and interfaces (e.g., `IIndexManager`) are used for better abstraction.
+-   **Communication**: Implements a `TcpListener` for standard queries and a WebSocket listener for managing real-time subscriptions.
+-   **Dependency Injection**: Uses `LightInject` for managing dependencies.
 -   **Client Handling**: Each incoming client connection is handled by a `ClientSession` running in its own asynchronous task.
 
 ### 3.4. Querying (`RosaDB.Library/Query`)
 
--   **Tokenization**: A `QueryTokenizer` class breaks down query strings into tokens.
--   **Mock Queries**: `RosaDB.Library/MoqQueries` contains hardcoded query implementations (e.g., `RandomDeleteLogsQuery`) used for testing and development. These queries now typically return `Result` objects for consistent error handling.
+#### 3.4.1. Custom Query Syntax
 
-### 3.4.1. Custom Query Syntax
-
-To reflect the unique, cell-based architecture of RosaDB, DML operations (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) use a custom syntax that makes the 'Cell' a first-class citizen.
-
-The general structure is:
-
+The general structure for DML queries is:
 ```sql
 SELECT ...
 FROM <CellGroup>.<TableName>
@@ -93,55 +84,51 @@ FROM <CellGroup>.<TableName>
 [WHERE <table_data_filter>];
 ```
 
-#### Components:
-
+**Components:**
 1.  **`FROM <CellGroup>.<TableName>`** (Mandatory)
-    *   This clause specifies the primary target for the query.
-    *   **`<CellGroup>`**: The logical grouping of cells being targeted (e.g., `sales`, `logs`, `users`).
-    *   **`<TableName>`**: The name of the table within the cell group.
-
+    *   Specifies the primary target.
+    *   If `USING` is omitted, the query operates across *all* cell instances in the group.
 2.  **`USING <cell_filter>`** (Optional)
-    *   This provides a dedicated clause to filter and select a specific cell instance from the `CellGroup`.
-    *   The filter typically applies to the cell's indexed properties, such as its name. For example: `USING name = 'q4'`.
-
+    *   Selects a specific cell instance based on its indexed properties (e.g., `USING name = 'q4'`).
 3.  **`WHERE <table_data_filter>`** (Optional)
-    *   This is the standard SQL `WHERE` clause for filtering the rows of data *within* the selected table.
+    *   Standard SQL `WHERE` clause for filtering data rows within the table(s).
 
-#### DDL Statements:
+#### 3.4.2. DDL, Cell Management & Schema Evolution
 
-The custom syntax extends to Data Definition Language (DDL) operations for defining cell structures and tables.
+The custom syntax extends to DDL for managing the lifecycle of database objects.
 
-1.  **`CREATE CELL <CellGroup> (<cell_property_definitions>);`**
-    *   This statement defines a new `CellGroup` and specifies the schema for the properties of individual cell instances within that group.
-    *   **`<CellGroup>`**: The name of the cell group being created (e.g., `sales`).
-    *   **`<cell_property_definitions>`**: A comma-separated list of property names and their data types (e.g., `name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN`). One property must be designated as `PRIMARY KEY` to uniquely identify cell instances within the group.
+-   **`CREATE CELL <CellGroup> (<props>);`**: Defines a new cell group and the schema for its instances.
+    *   *Example:* `CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT);`
+-   **`INSERT CELL <CellGroup> (<props>) VALUES (<vals>);`**: Creates a new instance of a cell.
+    *   *Example:* `INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');`
+-   **`UPDATE CELL <CellGroup> USING <filter> SET ...;`**: Updates properties of a cell instance.
+-   **`DELETE CELL <CellGroup> USING <filter>;`**: Deletes a cell instance and all its data.
+-   **`CREATE TABLE <CellGroup>.<TableName> (<cols>);`**: Defines a table schema for an entire cell group.
+    *   *Example:* `CREATE TABLE sales.transactions (id INT PRIMARY KEY, amount INT);`
+-   **`ALTER TABLE...` / `ALTER CELL...`**: Syntax for schema evolution is planned but will follow industry-standard approaches, which may involve downtime or data migration.
 
-    *Example:*
-    `CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);`
+#### 3.4.3. Metadata & Discoverability
 
-2.  **`CREATE TABLE <CellGroup>.<TableName> (<column_definitions>);`**
-    *   This statement defines a new table schema for an entire `CellGroup`. All cell instances within that group will share this table definition.
-    *   **`<CellGroup>.<TableName>`**: Specifies the target `CellGroup` and the name of the new table.
-    *   **`<column_definitions>`**: A comma-separated list of column names, their data types, and any constraints (e.g., `id INT PRIMARY KEY, product TEXT, amount INT`).
+The following commands are available for discovering the database schema:
+-   **`SHOW CELL GROUPS;`**: Lists all defined cell groups.
+-   **`SHOW TABLES IN <CellGroup>;`**: Lists all table schemas defined for a specific cell group.
+-   Queryable metadata tables (e.g., `system.cells`) are planned for more advanced introspection.
 
-    *Example:*
-    `CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);`
+#### 3.4.4. JOINs
 
-#### Examples:
-
-*   **Select all data from a table within a specific cell:**
-    `SELECT * FROM sales.transactions USING name = 'q4';`
-
-*   **Insert data into a specific cell and table:**
-    `INSERT INTO sales.transactions USING name = 'q4' (id, amount) VALUES (1, 100);`
-
-This syntax provides a clear and expressive way to interact with RosaDB's partitioned data model.
+-   **Scope**: `JOIN`s are supported but are restricted to tables within the *same* `CellGroup` and (if specified) the *same* `CellInstance`. Cross-group joins are not supported.
+-   *Example:* `SELECT t.*, r.region_name FROM sales.transactions AS t JOIN sales.regions AS r ON t.region_id = r.id;`
 
 ### 3.5. Error Handling (`RosaDB.Library/Core`)
 
--   Uses a functional `Result<T>` monad pattern for explicit error handling, avoiding exceptions for control flow. The `Result` and `Result<T>` classes are publicly accessible for broad use.
+-   Uses a functional `Result<T>` monad pattern for explicit error handling.
+
+### 3.6. Authentication and Authorization
+
+-   **Current Scope**: The core database engine does not have a built-in user or role system.
+-   **Implementation Strategy**: Authorization is delegated to the implementor. The server will provide a WebSocket endpoint for connection events. An external service can listen to these events and determine a connection's permissions by issuing `GRANT`/`REVOKE` commands (planned for a future release) on its behalf.
 
 ## 4. Client & Server Projects
 
--   **`RosaDB.Client`**: A Terminal User Interface (TUI) application (using `Terminal.Gui`) that talks to the server.
+-   **`RosaDB.Client`**: A Terminal User Interface (TUI) application. The primary focus is on making this as powerful as possible, as standard SQL tools are not compatible with the custom syntax.
 -   **`RosaDB.Server`**: A standalone server entry point.
