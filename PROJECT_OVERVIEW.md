@@ -80,6 +80,63 @@ Data persistence is handled by the `LogManager` and split into segments.
 -   **Tokenization**: A `QueryTokenizer` class breaks down query strings into tokens.
 -   **Mock Queries**: `RosaDB.Library/MoqQueries` contains hardcoded query implementations (e.g., `RandomDeleteLogsQuery`) used for testing and development. These queries now typically return `Result` objects for consistent error handling.
 
+### 3.4.1. Custom Query Syntax
+
+To reflect the unique, cell-based architecture of RosaDB, DML operations (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) use a custom syntax that makes the 'Cell' a first-class citizen.
+
+The general structure is:
+
+```sql
+SELECT ...
+FROM <CellGroup>.<TableName>
+[USING <cell_filter>]
+[WHERE <table_data_filter>];
+```
+
+#### Components:
+
+1.  **`FROM <CellGroup>.<TableName>`** (Mandatory)
+    *   This clause specifies the primary target for the query.
+    *   **`<CellGroup>`**: The logical grouping of cells being targeted (e.g., `sales`, `logs`, `users`).
+    *   **`<TableName>`**: The name of the table within the cell group.
+
+2.  **`USING <cell_filter>`** (Optional)
+    *   This provides a dedicated clause to filter and select a specific cell instance from the `CellGroup`.
+    *   The filter typically applies to the cell's indexed properties, such as its name. For example: `USING name = 'q4'`.
+
+3.  **`WHERE <table_data_filter>`** (Optional)
+    *   This is the standard SQL `WHERE` clause for filtering the rows of data *within* the selected table.
+
+#### DDL Statements:
+
+The custom syntax extends to Data Definition Language (DDL) operations for defining cell structures and tables.
+
+1.  **`CREATE CELL <CellGroup> (<cell_property_definitions>);`**
+    *   This statement defines a new `CellGroup` and specifies the schema for the properties of individual cell instances within that group.
+    *   **`<CellGroup>`**: The name of the cell group being created (e.g., `sales`).
+    *   **`<cell_property_definitions>`**: A comma-separated list of property names and their data types (e.g., `name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN`). One property must be designated as `PRIMARY KEY` to uniquely identify cell instances within the group.
+
+    *Example:*
+    `CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);`
+
+2.  **`CREATE TABLE <CellGroup>.<TableName> (<column_definitions>);`**
+    *   This statement defines a new table schema for an entire `CellGroup`. All cell instances within that group will share this table definition.
+    *   **`<CellGroup>.<TableName>`**: Specifies the target `CellGroup` and the name of the new table.
+    *   **`<column_definitions>`**: A comma-separated list of column names, their data types, and any constraints (e.g., `id INT PRIMARY KEY, product TEXT, amount INT`).
+
+    *Example:*
+    `CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);`
+
+#### Examples:
+
+*   **Select all data from a table within a specific cell:**
+    `SELECT * FROM sales.transactions USING name = 'q4';`
+
+*   **Insert data into a specific cell and table:**
+    `INSERT INTO sales.transactions USING name = 'q4' (id, amount) VALUES (1, 100);`
+
+This syntax provides a clear and expressive way to interact with RosaDB's partitioned data model.
+
 ### 3.5. Error Handling (`RosaDB.Library/Core`)
 
 -   Uses a functional `Result<T>` monad pattern for explicit error handling, avoiding exceptions for control flow. The `Result` and `Result<T>` classes are publicly accessible for broad use.

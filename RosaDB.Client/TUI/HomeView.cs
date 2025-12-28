@@ -23,12 +23,6 @@ public class HomeView : View
             Y = Pos.Center(),
         };
 
-        var startServerButton = new Button("Stop Server")
-        {
-            X = Pos.Center(),
-            Y = Pos.Bottom(artLabel) + 2
-        };
-
-        Add(artLabel, startServerButton);
+        Add(artLabel);
     }
 }

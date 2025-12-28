@@ -9,11 +9,18 @@ public class QueryView : View
 {
     private readonly Label _statusLabel;
     private readonly TableView _tableView;
+    private readonly DefaultQueriesView _defaultQueriesView;
 
     public QueryView()
     {
         Width = Dim.Fill();
         Height = Dim.Fill();
+
+        var leftPane = new View()
+        {
+            Width = Dim.Percent(70),
+            Height = Dim.Fill()
+        };
 
         var queryLabel = new Label("Query:")
         {
@@ -62,6 +69,26 @@ public class QueryView : View
         {
             X = Pos.Center(),
             Y = Pos.Bottom(sendButton) + 1
+        };
+
+        leftPane.Add(queryLabel, queryTextView, resultLabel, _statusLabel, _tableView, sendButton, newClientButton);
+
+        var separator = new LineView(Terminal.Gui.Graphs.Orientation.Vertical)
+        {
+            X = Pos.Right(leftPane),
+            Height = Dim.Fill()
+        };
+
+        _defaultQueriesView = new DefaultQueriesView()
+        {
+            X = Pos.Right(separator),
+            Width = Dim.Fill(),
+            Height = Dim.Fill()
+        };
+
+        _defaultQueriesView.OnQuerySelected += (query) =>
+        {
+            queryTextView.Text = query;
         };
         
         newClientButton.Clicked += () =>
@@ -126,6 +153,6 @@ public class QueryView : View
             }
         };
 
-        Add(queryLabel, queryTextView, resultLabel, _statusLabel, _tableView, sendButton, newClientButton);
+        Add(leftPane, separator, _defaultQueriesView);
     }
 }
