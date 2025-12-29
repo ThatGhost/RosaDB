@@ -187,7 +187,7 @@ public class InsertQuery(
         if (!propsResult.TryGetValue(out var props))
             return propsResult.Error;
 
-        var valuesIndex = Array.IndexOf(tokens, "VALUES", propsEnd);
+        var valuesIndex = FindKeywordIndex("VALUES", propsEnd);
         if (valuesIndex == -1)
             return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
 
@@ -241,7 +241,7 @@ public class InsertQuery(
 
     private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)
     {
-        var usingIndex = Array.IndexOf(tokens, "USING", startIndex);
+        var usingIndex = FindKeywordIndex("USING", startIndex);
         if (usingIndex == -1)
             return new Error(ErrorPrefixes.QueryParsingError, "Missing USING clause in INSERT INTO.");
         
@@ -263,7 +263,7 @@ public class InsertQuery(
 
     private Result<(string[] Values, int NextIndex)> ParseValuesPart(int startIndex)
     {
-        var valuesIndex = Array.IndexOf(tokens, "VALUES", startIndex);
+        var valuesIndex = FindKeywordIndex("VALUES", startIndex);
         if (valuesIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
 
         var valuesResult = ParseParenthesizedList(valuesIndex + 1, out int valuesEnd);
@@ -304,5 +304,17 @@ public class InsertQuery(
         endIndex = closeParenIndex;
         var listTokens = tokens[(openParenIndex + 1)..closeParenIndex].Where(t => t != ",").ToArray();
         return listTokens;
+    }
+
+    private int FindKeywordIndex(string keyword, int startIndex = 0)
+    {
+        for (int i = startIndex; i < tokens.Length; i++)
+        {
+            if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 }
