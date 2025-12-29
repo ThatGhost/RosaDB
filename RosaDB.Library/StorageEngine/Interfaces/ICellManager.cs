@@ -12,5 +12,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
         Task<Result> DeleteTable(string cellName, string tableName);
         Task<Result<CellEnvironment>> GetEnvironment(string cellName);
         Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName);
+        Task<Result> CreateCellInstance(string cellGroupName, string instanceHash, Row instanceData, Column[] schema);
+        Task<Result<Row>> GetCellInstance(string cellGroupName, string instanceHash);
     }
 }

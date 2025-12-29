@@ -5,6 +5,8 @@ using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using System.IO.Abstractions;
+using CSharpTest.Net.Collections;
+using CSharpTest.Net.Serialization;
 
 namespace RosaDB.Library.StorageEngine
 {
@@ -12,7 +14,9 @@ namespace RosaDB.Library.StorageEngine
     {
         private readonly IFileSystem _fileSystem = fileSystem;
         private readonly IFolderManager _folderManager = folderManager;
-        private Dictionary<string,CellEnvironment> _cachedEnvironment = new(); 
+        private readonly Dictionary<string,CellEnvironment> _cachedEnvironment = new();
+        private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellInstanceStores = new();
+        private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellPropertyIndexes = new();
 
         public async Task<Result> CreateCellEnvironment(string cellName, Column[] columns)
         {
@@ -25,6 +29,56 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
+        public async Task<Result> CreateCellInstance(string cellGroupName, string instanceHash, Row instanceData, Column[] schema)
+        {
+            // 1. Save main data
+            var mainStoreResult = GetOrCreateInstanceStore(cellGroupName);
+            if (!mainStoreResult.TryGetValue(out var mainStore)) return mainStoreResult.Error;
+
+            var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
+
+            var rowBytesResult = RowSerializer.Serialize(instanceData);
+            if (!rowBytesResult.TryGetValue(out var rowBytes))
+                return rowBytesResult.Error;
+
+            mainStore[hashBytes] = rowBytes;
+            mainStore.Commit();
+
+            // 2. Update property indexes
+            foreach (var col in schema.Where(c => c.IsIndex || c.IsPrimaryKey))
+            {
+                var value = instanceData[col.Name];
+                if (value != null)
+                {
+                    var propIndexResult = GetOrCreatePropertyIndex(cellGroupName, col.Name);
+                    if (!propIndexResult.TryGetValue(out var propIndex)) return propIndexResult.Error;
+                    var keyBytes = IndexKeyConverter.ToByteArray(value);
+                    propIndex[keyBytes] = hashBytes;
+                    propIndex.Commit();
+                }
+            }
+            return Result.Success();
+        }
+
+        public async Task<Result<Row>> GetCellInstance(string cellGroupName, string instanceHash)
+        {
+            var mainStoreResult = GetOrCreateInstanceStore(cellGroupName);
+            if (!mainStoreResult.TryGetValue(out var mainStore)) return mainStoreResult.Error;
+
+            var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
+
+            if (mainStore.TryGetValue(hashBytes, out var rowBytes))
+            {
+                var envResult = await GetEnvironment(cellGroupName);
+                if (!envResult.TryGetValue(out var env)) return envResult.Error;
+
+                var rowResult = RowSerializer.Deserialize(rowBytes, env.Columns);
+                return rowResult;
+            }
+
+            return new Error(ErrorPrefixes.DataError, "Cell instance not found.");
+        }
+
         public async Task<Result> AddTables(string cellName, Table[] tables)
         {
             var env = await GetEnvironment(cellName);
@@ -33,9 +87,9 @@ namespace RosaDB.Library.StorageEngine
             cellEnviroument.Tables = cellEnviroument.Tables.Concat(tables.ToArray()).ToArray();
             await SaveEnvironment(cellEnviroument, cellName);
 
-            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            foreach(var table in tables)
+            foreach (var table in tables)
             {
                 var tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
                 try
@@ -55,7 +109,7 @@ namespace RosaDB.Library.StorageEngine
 
         public async Task<Result> DeleteTable(string cellName, string tableName)
         {
-            if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
             var envResult = await GetEnvironment(cellName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
@@ -92,14 +146,15 @@ namespace RosaDB.Library.StorageEngine
 
         public async Task<Result<CellEnvironment>> GetEnvironment(string cellName)
         {
-            if (sessionState.CurrentDatabase is null)
-                return new Error(ErrorPrefixes.StateError, "Database not set");
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
             if (_cachedEnvironment.TryGetValue(cellName, out var env)) return env;
 
-            if (!_fileSystem.File.Exists(GetCellFilePath(cellName))) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            var filePathResult = GetCellFilePath(cellName, "_env");
+            if(filePathResult.IsFailure) return filePathResult.Error;
+            if (!_fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(_fileSystem, GetCellFilePath(cellName), CancellationToken.None);
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(_fileSystem, filePathResult.Value, CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
             
             env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
@@ -109,16 +164,62 @@ namespace RosaDB.Library.StorageEngine
             return env;
         }
 
-        private string GetCellFilePath(string cellName)
+        private Result<BPlusTree<byte[], byte[]>> GetOrCreateInstanceStore(string cellGroupName)
         {
-            return _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase!.Name, cellName, "_env");
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+
+            var key = $"{sessionState.CurrentDatabase.Name}_{cellGroupName}";
+            if (_activeCellInstanceStores.TryGetValue(key, out var tree)) return tree;
+
+            var filePath = GetCellFilePath(cellGroupName, "_idx");
+            if(filePath.IsFailure) return filePath.Error;
+
+            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes)
+            {
+                CreateFile = CreatePolicy.IfNeeded,
+                FileName = filePath.Value
+            };
+            var newTree = new BPlusTree<byte[], byte[]>(options);
+            _activeCellInstanceStores[key] = newTree;
+            return newTree;
         }
         
-        private async Task SaveEnvironment(CellEnvironment env, string cellName)
+        private Result<BPlusTree<byte[], byte[]>> GetOrCreatePropertyIndex(string cellGroupName, string propertyName)
         {
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+
+            var key = $"{sessionState.CurrentDatabase!.Name}_{cellGroupName}_{propertyName}";
+            if (_activeCellPropertyIndexes.TryGetValue(key, out var tree)) return tree;
+
+            var filePath = GetCellFilePath(cellGroupName, $"_pidx_{propertyName}");
+            if(filePath.IsFailure) return filePath.Error;
+
+            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes)
+            {
+                CreateFile = CreatePolicy.IfNeeded,
+                FileName = filePath.Value
+            };
+            var newTree = new BPlusTree<byte[], byte[]>(options);
+            _activeCellPropertyIndexes[key] = newTree;
+            return newTree;
+        }
+
+        private Result<string> GetCellFilePath(string cellName, string fileName)
+        {
+            if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+            return _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, fileName);
+        }
+        
+        private async Task<Result> SaveEnvironment(CellEnvironment env, string cellName)
+        {
+            var filePath = GetCellFilePath(cellName, "_env");
+            if(filePath.IsFailure) return filePath.Error;
+
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
-            await ByteReaderWriter.WriteBytesToFile(_fileSystem, GetCellFilePath(cellName), bytes, CancellationToken.None);
+
+            await ByteReaderWriter.WriteBytesToFile(_fileSystem, filePath.Value, bytes, CancellationToken.None);
             _cachedEnvironment[cellName] = env;
+            return Result.Success();
         }
         
         public async Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName)
@@ -130,6 +231,16 @@ namespace RosaDB.Library.StorageEngine
             if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in cell environment");
 
             return table.Columns.ToArray();
+        }
+
+        public void CloseAll()
+        {
+            foreach (var tree in _activeCellInstanceStores.Values)
+                tree.Dispose();
+            foreach (var tree in _activeCellPropertyIndexes.Values)
+                tree.Dispose();
+            _activeCellInstanceStores.Clear();
+            _activeCellPropertyIndexes.Clear();
         }
     }
 }

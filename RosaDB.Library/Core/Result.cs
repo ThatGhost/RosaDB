@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace RosaDB.Library.Core;
 
 public record Error(ErrorPrefixes Prefix, string Message);
+public record DatabaseNotSetError() : Error(ErrorPrefixes.StateError, "Database not set");
 public record CriticalError() : Error(ErrorPrefixes.CriticalError, "Something went wrong");
 public sealed class Result<T>
 {

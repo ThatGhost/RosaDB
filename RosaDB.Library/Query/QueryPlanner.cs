@@ -26,6 +26,7 @@ public class QueryPlanner(
             case "DROP": return new DropQuery(tokens, rootManager, databaseManager, cellManager);
             case "USE": return new UseQuery(tokens, sessionState);
             case "SELECT": return new SelectQuery(tokens, logManager, cellManager, indexManager);
+            case "INSERT": return new InsertQuery(tokens, cellManager);
             default: 
                 return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");
         }

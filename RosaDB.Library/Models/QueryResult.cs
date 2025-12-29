@@ -20,6 +20,13 @@ public class QueryResult
         Message = message;
     }
 
+    public QueryResult(string message, int rowsAffected)
+    {
+        Message = message;
+        RowsAffected = rowsAffected;
+    }
+
+
     public QueryResult(List<Row> rows)
     {
         Message = "Query executed successfully.";
