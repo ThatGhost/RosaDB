@@ -2,8 +2,12 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.Validation;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace RosaDB.Library.Query.Queries;
 
@@ -18,16 +22,12 @@ public class InsertQuery(
             return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT statement."));
         }
 
-        switch (tokens[1].ToUpperInvariant())
+        return tokens[1].ToUpperInvariant() switch
         {
-            case "CELL":
-                return InsertCellAsync();
-            case "INTO":
-                // To be implemented
-                return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "INSERT INTO not yet implemented."));
-            default:
-                return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}"));
-        }
+            "CELL" => InsertCellAsync(),
+            "INTO" => Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "INSERT INTO not yet implemented.")),
+            _ => Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}")),
+        };
     }
 
     private async Task<QueryResult> InsertCellAsync()
@@ -42,45 +42,58 @@ public class InsertQuery(
         if (!envResult.TryGetValue(out var env))
             return envResult.Error;
 
-        // Combines the properties and their corresponding schema columns
-        Dictionary<string, string> valueMap = parsed.Props.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
+        var schemaColumns = env.Columns;
+        var valueMap = parsed.Props.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
 
-        var rowValues = new object?[env.Columns.Length];
-        var pkValues = new List<string>();
+        var rowValues = new object?[schemaColumns.Length];
+        var indexValues = new Dictionary<string, string>();
 
-        for (int i = 0; i < env.Columns.Length; i++)
+        for (int i = 0; i < schemaColumns.Length; i++)
         {
-            Column col = env.Columns[i];
+            var col = schemaColumns[i];
             if (valueMap.TryGetValue(col.Name, out var stringVal))
             {
-                Result<object> parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
+                var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
                 if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
 
-                Result validationResult = DataValidator.Validate(typedVal, col);
+                var validationResult = DataValidator.Validate(typedVal, col);
                 if (validationResult.IsFailure) return validationResult.Error;
 
                 rowValues[i] = typedVal;
-                if (col.IsPrimaryKey) pkValues.Add(stringVal);
+                if (col.IsIndex)
+                {
+                    indexValues[col.Name] = stringVal;
+                }
             }
-            else if (!col.IsNullable) 
-                return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
+            else if (!col.IsNullable) return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
         }
         
-        if (pkValues.Count == 0)
-            return new Error(ErrorPrefixes.DataError, "INSERT CELL requires at least one primary key property.");
+        var requiredIndexCols = schemaColumns.Where(c => c.IsIndex).ToList();
+        if (indexValues.Count != requiredIndexCols.Count)
+        {
+             var missingCols = string.Join(", ", requiredIndexCols.Select(c => c.Name).Except(indexValues.Keys));
+             return new Error(ErrorPrefixes.DataError, $"INSERT CELL requires values for all indexed columns. Missing: {missingCols}");
+        }
 
         // 3. GENERATE HASH
-        var pkCombined = string.Join("::", pkValues.OrderBy(v => v));
-        var instanceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(pkCombined)));
+        var instanceHash = GenerateInstanceHash(schemaColumns, indexValues);
 
         // 4. CREATE ROW and SAVE
-        var rowCreateResult = Row.Create(rowValues, env.Columns);
-        if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
+        var rowCreateResult = Row.Create(rowValues, schemaColumns);
+        if (!rowCreateResult.TryGetValue(out var row))
+            return rowCreateResult.Error;
 
-        var saveResult = await cellManager.CreateCellInstance(parsed.CellGroupName, instanceHash, row, env.Columns);
-        if (saveResult.IsFailure) return saveResult.Error;
+        var saveResult = await cellManager.CreateCellInstance(parsed.CellGroupName, instanceHash, row, schemaColumns);
+        if (saveResult.IsFailure)
+            return saveResult.Error;
 
         return new QueryResult("1 cell instance inserted successfully.", 1);
+    }
+
+    private string GenerateInstanceHash(IEnumerable<Column> schemaColumns, IReadOnlyDictionary<string, string> indexValues)
+    {
+        var combinedIndex = string.Join("::", indexValues.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(combinedIndex)));
     }
 
     private Result<(string CellGroupName, string[] Props, string[] Values)> ParseInsertCell()
