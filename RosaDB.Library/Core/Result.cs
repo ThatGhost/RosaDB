@@ -16,7 +16,7 @@ public sealed class Result<T>
         IsSuccess = true;
     }
 
-    private Result(Error error)
+    public Result(Error error)
     {
         IsSuccess = false;
         Error = error;
@@ -59,6 +59,11 @@ public sealed class Result<T>
         value = _value;
         return IsSuccess;
     }
+
+    public Result<U> Then<U>(Func<T, Result<U>> func)
+    {
+        return IsSuccess ? func(Value!) : new Result<U>(Error!);
+    }
 }
 
 public sealed class Result
@@ -96,5 +101,10 @@ public sealed class Result
         return IsSuccess
             ? await onSuccess()
             : await onFailure(Error);
+    }
+
+    public Result<T> Then<T>(Func<Result<T>> func)
+    {
+        return IsSuccess ? func() : new Result<T>(Error!);
     }
 }

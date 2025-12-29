@@ -16,31 +16,37 @@ public class CreateQuery(
     {
         if (tokens[0].ToUpperInvariant() != "CREATE") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
 
-        switch (tokens[1].ToUpperInvariant())
+        return tokens[1].ToUpperInvariant() switch
         {
-            case "DATABASE": return await CREATE_DATABASE(tokens[2]);
-            case "CELL": return await CREATE_CELL(tokens[2], tokens[3..]);
-            default: 
-                return new Error(ErrorPrefixes.QueryParsingError, $"Unknown CREATE target: {tokens[1]}");
-        }
+            "DATABASE" => await CREATE_DATABASE(tokens[2]),
+            "CELL" => await CREATE_CELL(tokens[2], tokens[3..]),
+            _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown CREATE target: {tokens[1]}")
+        };
     }
 
     private async Task<QueryResult> CREATE_DATABASE(string databaseName)
     {
         var result = await rootManager.CreateDatabase(databaseName);
-        if (result.IsFailure) return result.Error;
-
-        return new QueryResult($"Successfully created database: {databaseName}");
+        return result.Match(
+            () => new QueryResult($"Successfully created database: {databaseName}"),
+            error => error
+        );
     }
 
     private async Task<QueryResult> CREATE_CELL(string cellName, string[] columnTokens)
     {
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
-        if (!columnResult.TryGetValue(out var column)) return columnResult.Error;
         
-        var result = await databaseManager.CreateCell(cellName, column);
-        if (result.IsFailure) return result.Error;
-        
-        return new QueryResult($"Successfully created cell: {cellName}");
+        return await columnResult.MatchAsync<QueryResult>(
+            async columns =>
+            {
+                var result = await databaseManager.CreateCell(cellName, columns);
+                return result.Match(
+                    () => new QueryResult($"Successfully created cell: {cellName}"),
+                    error => error
+                );
+            },
+            async error => error
+        );
     }
 }

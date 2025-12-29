@@ -4,20 +4,15 @@ using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.Validation;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace RosaDB.Library.Query.Queries;
 
 public class InsertQuery(
     string[] tokens,
     ICellManager cellManager,
-    LogManager logManager,
-    IIndexManager indexManager) : IQuery
+    LogManager logManager) : IQuery
 {
     public Task<QueryResult> Execute()
     {
@@ -210,39 +205,72 @@ public class InsertQuery(
     {
         // INSERT INTO <cellGroupName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
         if (tokens.Length < 10)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax.");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <cell>.<table> USING (...) (...) VALUES (...)");
 
-        var fullTableName = tokens[2].Split('.');
+        return Result.Success()
+            .Then(() => ParseTableNamePart(3))
+            .Then(parsedTableName => ParseUsingClausePart(parsedTableName.NextIndex)
+            .Then(parsedUsing => ParseColumnsPart(parsedUsing.NextIndex)
+            .Then(parsedColumns => ParseValuesPart(parsedColumns.NextIndex)
+            .Then<(string CellGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)>(parsedValues =>
+            {
+                if (parsedColumns.Columns.Length != parsedValues.Values.Length)
+                    return new Error(ErrorPrefixes.QueryParsingError, "Column count does not match value count.");
+
+                return (
+                    parsedTableName.CellGroupName,
+                    parsedTableName.TableName,
+                    parsedUsing.UsingProperties,
+                    parsedColumns.Columns,
+                    parsedValues.Values
+                );
+            }))));
+    }
+
+    private Result<(string CellGroupName, string TableName, int NextIndex)> ParseTableNamePart(int startIndex)
+    {
+        var fullTableName = tokens[startIndex -1].Split('.');
         if (fullTableName.Length != 2)
             return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <cellName>.<tableName>");
         
         var cellGroupName = fullTableName[0];
         var tableName = fullTableName[1];
 
-        var usingIndex = Array.IndexOf(tokens, "USING", 3);
+        return (cellGroupName, tableName, startIndex);
+    }
+
+    private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)
+    {
+        var usingIndex = Array.IndexOf(tokens, "USING", startIndex);
         if (usingIndex == -1)
             return new Error(ErrorPrefixes.QueryParsingError, "Missing USING clause in INSERT INTO.");
-
+        
         var usingResult = ParseUsingClause(usingIndex + 1, out int usingPropsEnd);
         if (!usingResult.TryGetValue(out var usingProperties))
             return usingResult.Error;
 
-        var columnsResult = ParseParenthesizedList(usingPropsEnd, out int columnsEnd);
+        return (usingProperties, usingPropsEnd);
+    }
+    
+    private Result<(string[] Columns, int NextIndex)> ParseColumnsPart(int startIndex)
+    {
+        var columnsResult = ParseParenthesizedList(startIndex, out int columnsEnd);
         if(!columnsResult.TryGetValue(out var columns))
             return columnsResult.Error;
 
-        var valuesIndex = Array.IndexOf(tokens, "VALUES", columnsEnd);
-        if (valuesIndex == -1)
-            return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
+        return (columns, columnsEnd);
+    }
 
-        var valuesResult = ParseParenthesizedList(valuesIndex + 1, out _);
+    private Result<(string[] Values, int NextIndex)> ParseValuesPart(int startIndex)
+    {
+        var valuesIndex = Array.IndexOf(tokens, "VALUES", startIndex);
+        if (valuesIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
+
+        var valuesResult = ParseParenthesizedList(valuesIndex + 1, out int valuesEnd);
         if(!valuesResult.TryGetValue(out var values))
             return valuesResult.Error;
 
-        if (columns.Length != values.Length)
-            return new Error(ErrorPrefixes.QueryParsingError, "Column count does not match value count.");
-
-        return (cellGroupName, tableName, usingProperties, columns, values);
+        return (values, valuesEnd);
     }
 
     private Result<Dictionary<string, string>> ParseUsingClause(int startIndex, out int endIndex)
@@ -265,16 +293,13 @@ public class InsertQuery(
     private Result<string[]> ParseParenthesizedList(int startIndex, out int endIndex)
     {
         endIndex = -1;
-        if (startIndex >= tokens.Length)
-            return new Error(ErrorPrefixes.QueryParsingError, "Unexpected end of query.");
+        if (startIndex >= tokens.Length) return new Error(ErrorPrefixes.QueryParsingError, "Unexpected end of query.");
 
         var openParenIndex = Array.IndexOf(tokens, "(", startIndex);
-        if (openParenIndex == -1)
-            return new Error(ErrorPrefixes.QueryParsingError, "Missing opening parenthesis.");
+        if (openParenIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing opening parenthesis.");
 
         var closeParenIndex = Array.IndexOf(tokens, ")", openParenIndex);
-        if (closeParenIndex == -1)
-            return new Error(ErrorPrefixes.QueryParsingError, "Missing closing parenthesis.");
+        if (closeParenIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing closing parenthesis.");
 
         endIndex = closeParenIndex;
         var listTokens = tokens[(openParenIndex + 1)..closeParenIndex].Where(t => t != ",").ToArray();

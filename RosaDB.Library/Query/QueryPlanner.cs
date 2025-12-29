@@ -20,15 +20,14 @@ public class QueryPlanner(
     {
         if (tokens.Length <= 1) return new Error(ErrorPrefixes.QueryParsingError, "Empty query");
 
-        switch (tokens[0].ToUpperInvariant())
+        return tokens[0].ToUpperInvariant() switch
         {
-            case "CREATE": return new CreateQuery(tokens, rootManager, databaseManager);
-            case "DROP": return new DropQuery(tokens, rootManager, databaseManager, cellManager);
-            case "USE": return new UseQuery(tokens, sessionState);
-            case "SELECT": return new SelectQuery(tokens, logManager, cellManager, indexManager);
-            case "INSERT": return new InsertQuery(tokens, cellManager, logManager, indexManager);
-            default: 
-                return new Error(ErrorPrefixes.QueryParsingError, "Unknown query type");
-        }
+            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager),
+            "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
+            "USE" => new UseQuery(tokens, sessionState),
+            "SELECT" => new SelectQuery(tokens, logManager, cellManager, indexManager),
+            "INSERT" => new InsertQuery(tokens, cellManager, logManager),
+            _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
+        };
     }
 }

@@ -14,14 +14,13 @@ public class DropQuery(
     {
         if (tokens[0].ToUpperInvariant() != "DROP") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
 
-        switch (tokens[1].ToUpperInvariant())
+        return tokens[1].ToUpperInvariant() switch
         {
-            case "DATABASE": return await DROP_DATABASE(tokens[2]);
-            case "CELL": return await DROP_CELL(tokens[2]);
-            case "TABLE": return await DROP_TABLE(tokens[2..]);
-            default: 
-                return new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported");
-        }
+            "DATABASE" => await DROP_DATABASE(tokens[2]),
+            "CELL" => await DROP_CELL(tokens[2]),
+            "TABLE" => await DROP_TABLE(tokens[2..]),
+            _ => new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported"),
+        };
     }
 
     private async Task<QueryResult> DROP_DATABASE(string name)
