@@ -23,7 +23,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.~~
 
 ## Phase 2.5: Implement SELECT and Insert queries
-1. ~~**Implement Basic SELECT Queries~:**~
+1. ~~**Implement Basic SELECT Queries:**~~
     ~~*   Extend `QueryTokenizer` and `QueryPlanner` to support basic `SELECT ... FROM ... WHERE ...` syntax.~~
     ~~*   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).~~
 2. ~~**Integrate `IndexManager` into Query Path:**~~
@@ -31,6 +31,9 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. ~~**Implement Basic INSERT Queries:**~~
     *   ~~Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.~~
     *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
+4. **Implement USING in SELECT Queries:**
+    *   Add the `USING` keywork to select queries to be able to search on Cell instances. 
+    *   Use indexes for the indexed properties of the cell
 
 ## Phase 3: Feature Development
 

@@ -139,10 +139,7 @@ public class InsertQuery(
                 if (validationResult.IsFailure) return validationResult.Error;
 
                 rowValues[i] = typedVal;
-                if (col.IsIndex)
-                {
-                    indexValues[col.Name] = stringVal;
-                }
+                if (col.IsIndex) indexValues[col.Name] = stringVal;
             }
             else if (!col.IsNullable) return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
         }
