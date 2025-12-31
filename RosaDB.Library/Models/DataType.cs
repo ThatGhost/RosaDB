@@ -10,6 +10,7 @@ public enum DataType
     NUMBER,
     DECIMAL,
     NUMERIC,
+    TEXT,
     BIGINT,
     LONG,
     VARCHAR,

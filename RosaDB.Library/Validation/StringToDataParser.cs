@@ -32,6 +32,8 @@ namespace RosaDB.Library.Validation
                     return new DataTypeError(DataType.INT, value);
                 case DataType.VARCHAR:
                     return value;
+                case DataType.TEXT:
+                    return value;
                 case DataType.CHAR:
                     if (char.TryParse(value, out char charValue)) return charValue;
                     return new DataTypeError(DataType.CHAR, value);

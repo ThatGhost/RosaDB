@@ -23,8 +23,9 @@ namespace RosaDB.Client.TUI
                 ("Show Tables in Group", "SHOW TABLES IN sales;"),
 
                 // DDL
+                ("Initialize RosaDB", "INITIALIZE;"),
                 ("Create Database", "CREATE DATABASE my_db;"),
-                ("Use Database", "USE DATABASE my_db;"),
+                ("Use Database", "USE my_db;"),
                 ("Create Cell Group", "CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);"),
                 ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);"),
                 

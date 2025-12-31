@@ -27,6 +27,7 @@ public class QueryPlanner(
             "USE" => new UseQuery(tokens, sessionState),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager, indexManager),
             "INSERT" => new InsertQuery(tokens, cellManager, logManager),
+            "INITIALIZE" => new InitializeQuery(rootManager),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
         };
     }

@@ -10,6 +10,7 @@ public class UseQuery(string[] tokens, SessionState sessionState) : IQuery
     {
         if (tokens[0].ToUpperInvariant() != "USE") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
         if (tokens.Length < 2) return new Error(ErrorPrefixes.QueryParsingError, "Not enough arguments for USE query");
+        if (tokens.Length > 3) return new Error(ErrorPrefixes.QueryParsingError, "Too many arguments for USE query");
 
         string databaseName = tokens[1];
         var database = Database.Create(databaseName);
