@@ -10,7 +10,6 @@ using RosaDB.Library.StorageEngine.Serializers;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
 using System.Text;
-using System.IO.Abstractions;
 using RosaDB.Library.MoqQueries;
 
 namespace RosaDB.Library.Tests
@@ -29,7 +28,7 @@ namespace RosaDB.Library.Tests
         private const string cellName = "TestCell";
         private const string tableName = "TestTable";
 
-        private Column[] tableColumns =
+        private readonly Column[] tableColumns =
         [
             Column.Create("LogId", DataType.BIGINT, isPrimaryKey: true).Value,
             Column.Create("data", DataType.VARCHAR).Value
@@ -135,11 +134,11 @@ namespace RosaDB.Library.Tests
                 var files = _mockFileSystem.Directory.GetFiles(Path.Combine(tempDirectory, "db", "cell", "table"), "*.dat", SearchOption.AllDirectories);
                 Assert.That(files, Is.Not.Empty, "Data files should be created after write query.");
 
-                var initialResult = await getQuery.Execute("cell", "table", new object[] { 2 });
+                var initialResult = await getQuery.Execute("cell", "table", [2]);
                 Assert.That(initialResult, Is.Not.Empty, "GetCellLogsQuery should return results before update.");
 
-                await updateQuery.Execute("cell", "table", new object[] { 2 }, "updated data");
-                var result = await getQuery.Execute("cell", "table", new object[] { 2 });
+                await updateQuery.Execute("cell", "table", [2], "updated data");
+                var result = await getQuery.Execute("cell", "table", [2]);
 
                 Assert.That(result, Is.Not.Empty, "GetCellLogsQuery should return results after update.");
                 Assert.That(result.All(r => r.Contains("updated data")), Is.True, "All results should contain 'updated data'.");
@@ -219,7 +218,7 @@ namespace RosaDB.Library.Tests
             long logId = 12345;
             var log = new Log { Id = logId, TupleData = fakeData1 };
 
-            _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
+            _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns([log]);
 
             // Set up the expected file path and content
             var identifier = CreateIdentifier(cellIndex);
@@ -254,7 +253,7 @@ namespace RosaDB.Library.Tests
             var logId = 12345;
             var log = new Log { Id = logId, TupleData = fakeData1 };
 
-            _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
+            _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns([log]);
 
             _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
 
@@ -263,7 +262,7 @@ namespace RosaDB.Library.Tests
             _mockIndexManager.Setup(im => im.Insert(
                 It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
                 It.Is<string>(s => s == "LogId"),
-                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId))), // Changed to byte[]
+                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId))),
                 It.IsAny<LogLocation>()));
 
             // Act
@@ -285,7 +284,7 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result.IsFailure, Is.True);
-            Assert.That(result.Error.Message, Is.EqualTo("Database is not set"));
+            Assert.That(result.Error!.Message, Is.EqualTo("Database is not set"));
         }
 
         private string GetExpectedSegmentFilePath(object[] indexValues, int segmentNumber)
@@ -295,7 +294,7 @@ namespace RosaDB.Library.Tests
             var hashPrefix = hash.Substring(0, 2);
             return _mockFileSystem.Path.Combine(
                 _mockFolderManager.Object.BasePath, 
-                _mockSessionState.Object.CurrentDatabase.Name, 
+                _mockSessionState.Object.CurrentDatabase!.Name, 
                 cellName, 
                 tableName, 
                 hashPrefix,
