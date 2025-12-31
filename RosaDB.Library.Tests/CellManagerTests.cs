@@ -21,7 +21,7 @@ namespace RosaDB.Library.Tests
 
         private const string TestDbName = "TestDB";
         private const string TestCellName = "TestCell";
-        private string _basePath = @"C:\rosadb";
+        private const string _basePath = @"C:\rosadb";
         private string _cellPath;
         private string _envFilePath;
 

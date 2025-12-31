@@ -28,9 +28,9 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).~~
 2. ~~**Integrate `IndexManager` into Query Path:**~~
     ~~*   Update the `QueryPlanner` to identify and utilize B-Tree indexes for accelerating queries with `WHERE` clauses on indexed columns, performing B-Tree searches instead of full table scans.~~
-3. **Implement Basic INSERT Queries:**~~
-    *   Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.
-    *   Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.
+3. ~~**Implement Basic INSERT Queries:**~~
+    *   ~~Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.~~
+    *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
 
 ## Phase 3: Feature Development
 

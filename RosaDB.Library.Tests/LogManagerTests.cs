@@ -26,9 +26,18 @@ namespace RosaDB.Library.Tests
         private Mock<ICellManager> _mockCellManager; 
         private LogManager _logManager;
 
-        private string cellName = "TestCell";
-        private string tableName = "TestTable";
+        private const string cellName = "TestCell";
+        private const string tableName = "TestTable";
 
+        private Column[] tableColumns =
+        [
+            Column.Create("LogId", DataType.BIGINT, isPrimaryKey: true).Value,
+            Column.Create("data", DataType.VARCHAR).Value
+        ];
+
+        private byte[] fakeData1;
+        private byte[] fakeData2;
+        
         [SetUp]
         public void Setup()
         {
@@ -43,16 +52,11 @@ namespace RosaDB.Library.Tests
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns(mockDatabase);
             _mockFolderManager.Setup(f => f.BasePath).Returns(@"C:\Test");
 
-            // Setup a default mock for GetColumnsFromTable for most tests
-            _mockCellManager.Setup(cm => cm.GetColumnsFromTable(
-                It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(Result<Column[]>.Success(
-                    new Column[] { 
-                        Column.Create("LogId", DataType.BIGINT, isPrimaryKey: true).Value,
-                        Column.Create("data", DataType.VARCHAR).Value
-                    }
-                ));
-
+            _mockCellManager.Setup(cm => cm.GetColumnsFromTable(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(tableColumns);
+            
+            fakeData1 = RowSerializer.Serialize(Row.Create([(long)1, "data1"], tableColumns).Value).Value;
+            fakeData2 = RowSerializer.Serialize(Row.Create([(long)2, "data2"], tableColumns).Value).Value;
+            
             _logManager = new LogManager(
                 _mockLogCondenser.Object, 
                 _mockSessionState.Object, 
@@ -152,25 +156,23 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task GetAllLogsForCellInstanceTable_ReturnsOnlyLogsForInstance()
         {
-            var tableIndex1 = new object[] { 1 };
+            var cellIndex1 = new object[] { 1 };
             var logId1 = 12345;
-            var data1 = new byte[] { 1, 1, 1 };
 
-            var tableIndex2 = new object[] { 2 };
+            var cellIndex2 = new object[] { 2 };
             var logId2 = 54321;
-            var data2 = new byte[] { 2, 2, 2 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
 
-            _logManager.Put(cellName, tableName, tableIndex1, data1, logId1);
+            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId1);
             await _logManager.Commit();
-            _logManager.Put(cellName, tableName, tableIndex2, data2, logId2);
+            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId2);
             await _logManager.Commit();
 
             // Act
             var allLogs = new List<Log>();
-            await foreach (var log in _logManager.GetAllLogsForCellInstanceTable(cellName, tableName, tableIndex1))
+            await foreach (var log in _logManager.GetAllLogsForCellInstanceTable(cellName, tableName, cellIndex1))
             {
                 allLogs.Add(log);
             }
@@ -183,20 +185,18 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task GetAllLogsForCellTable_ReturnsAllLogsForTable()
         {
-            var tableIndex1 = new object[] { 1 };
+            var cellIndex1 = new object[] { 1 };
             var logId1 = 12345;
-            var data1 = new byte[] { 1, 1, 1 };
 
-            var tableIndex2 = new object[] { 2 };
+            var cellIndex2 = new object[] { 2 };
             var logId2 = 54321;
-            var data2 = new byte[] { 2, 2, 2 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
 
-            _logManager.Put(cellName, tableName, tableIndex1, data1, logId1);
+            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId1);
             await _logManager.Commit();
-            _logManager.Put(cellName, tableName, tableIndex2, data2, logId2);
+            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId2);
             await _logManager.Commit();
 
             // Act
@@ -215,52 +215,50 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task FindLastestLog_FindsLogOnDisk()
         {
-            var tableIndex = new object[] { 1 };
-            var logId = 12345;
-            var data = new byte[] { 1, 2, 3 };
-            var log = new Log { Id = logId, TupleData = data };
+            var cellIndex = new object[] { 1 };
+            long logId = 12345;
+            var log = new Log { Id = logId, TupleData = fakeData1 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
 
-            // Setup the expected file path and content
-            var identifier = CreateIdentifier(cellName, tableName, tableIndex);
-            var segmentPath = GetExpectedSegmentFilePath(tableIndex, 0); 
+            // Set up the expected file path and content
+            var identifier = CreateIdentifier(cellIndex);
+            var segmentPath = GetExpectedSegmentFilePath(cellIndex, 0); 
             _mockFileSystem.AddFile(segmentPath, new MockFileData(LogSerializer.Serialize(log)));
 
             // Mock IndexManager.Search to return the location of the log
             _mockIndexManager.Setup(im => im.Search(
-                It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
+                It.Is<TableInstanceIdentifier>(i => i.InstanceHash.Equals(identifier.InstanceHash)),
                 It.Is<string>(s => s == "LogId"),
-                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId))))) // Fixed to byte[]
-                .Returns(Result<LogLocation>.Success(new LogLocation(0, 0))); // Fixed return type
+                It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId)))))
+                .Returns(new LogLocation(0, 0));
 
-            _logManager.Put(cellName, tableName, tableIndex, data, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
             await _logManager.Commit();
 
             // Act
-            var result = await _logManager.FindLastestLog(cellName, tableName, tableIndex, logId);
+            var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             Assert.That(result.Value, Is.Not.Null);
             Assert.That(result.Value.Id, Is.EqualTo(logId));
-            Assert.That(result.Value.TupleData, Is.EqualTo(data));
+            Assert.That(result.Value.TupleData, Is.EqualTo(fakeData1));
             Assert.That(result.Value.IsDeleted, Is.False);
         }
 
         [Test]
         public async Task Commit_WritesLogsToDisk()
         {
-            var tableIndex = new object[] { 1 };
+            var cellIndex = new object[] { 1 };
             var logId = 12345;
-            var data = new byte[] { 1, 2, 3 };
-            var log = new Log { Id = logId, TupleData = data };
+            var log = new Log { Id = logId, TupleData = fakeData1 };
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns(new List<Log> { log });
 
-            _logManager.Put(cellName, tableName, tableIndex, data, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
 
-            var identifier = CreateIdentifier(cellName, tableName, tableIndex);
+            var identifier = CreateIdentifier(cellIndex);
 
             _mockIndexManager.Setup(im => im.Insert(
                 It.Is<TableInstanceIdentifier>(i => i.Equals(identifier)),
@@ -273,7 +271,7 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
-            var expectedPath = GetExpectedSegmentFilePath(tableIndex, 0);
+            var expectedPath = GetExpectedSegmentFilePath(cellIndex, 0);
             Assert.That(_mockFileSystem.File.Exists(expectedPath), Is.True);
         }
 
@@ -304,7 +302,7 @@ namespace RosaDB.Library.Tests
                 $"{hash}_{segmentNumber}.dat");
         }
 
-        private TableInstanceIdentifier CreateIdentifier(string cellName, string tableName, object[] indexValues)
+        private TableInstanceIdentifier CreateIdentifier(object[] indexValues)
         {
             var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
@@ -314,31 +312,30 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task Put_AddsLogToWriteAheadLog()
         {
-            var tableIndex = new object[] { 1 };
-            var data = new byte[] { 1, 2, 3 };
+            var cellIndex = new object[] { 1 };
             var logId = 12345;
 
             // Act
-            _logManager.Put(cellName, tableName, tableIndex, data, logId);
-            var result = await _logManager.FindLastestLog(cellName, tableName, tableIndex, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
+            var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             Assert.That(result.Value, Is.Not.Null);
             Assert.That(result.Value.Id, Is.EqualTo(logId));
-            Assert.That(result.Value.TupleData, Is.EqualTo(data));
+            Assert.That(result.Value.TupleData, Is.EqualTo(fakeData1));
             Assert.That(result.Value.IsDeleted, Is.False);
         }
 
         [Test]
         public async Task Delete_AddsTombstoneLogToWriteAheadLog()
         {
-            var tableIndex = new object[] { 1 };
+            var cellIndex = new object[] { 1 };
             var logId = 54321;
 
             // Act
-            _logManager.Delete(cellName, tableName, tableIndex, logId);
-            var result = await _logManager.FindLastestLog(cellName, tableName, tableIndex, logId);
+            _logManager.Delete(cellName, tableName, cellIndex, logId);
+            var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
@@ -350,20 +347,18 @@ namespace RosaDB.Library.Tests
         [Test]
         public async Task FindLastestLog_ReturnsLatestLog_WhenMultipleUpdates()
         {
-            var tableIndex = new object[] { 1 };
+            var cellIndex = new object[] { 1 };
             var logId = 67890;
-            var data1 = new byte[] { 1, 1, 1 };
-            var data2 = new byte[] { 2, 2, 2 };
 
             // Act
-            _logManager.Put(cellName, tableName, tableIndex, data1, logId);
-            _logManager.Put(cellName, tableName, tableIndex, data2, logId);
-            var result = await _logManager.FindLastestLog(cellName, tableName, tableIndex, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData2, logId);
+            var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             Assert.That(result.Value, Is.Not.Null);
-            Assert.That(result.Value.TupleData, Is.EqualTo(data2));
+            Assert.That(result.Value.TupleData, Is.EqualTo(fakeData2));
         }
     }
 }

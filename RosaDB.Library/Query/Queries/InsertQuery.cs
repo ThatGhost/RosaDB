@@ -36,7 +36,7 @@ public class InsertQuery(
         if (!parseResult.TryGetValue(out var parsed))
             return parseResult.Error;
 
-        // 2. FIND CELLINSTANCE HASH FROM USING CLAUSE
+        // 2. FIND CELL-INSTANCE HASH FROM USING CLAUSE
         var cellEnvResult = await cellManager.GetEnvironment(parsed.CellGroupName);
         if (!cellEnvResult.TryGetValue(out var cellEnv))
             return cellEnvResult.Error;
@@ -55,10 +55,10 @@ public class InsertQuery(
             usingIndexValues[col.Name] = kvp.Value;
         }
 
-        if (usingIndexValues.Count != cellSchemaColumns.Where(c => c.IsIndex).Count())
+        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex))
             return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
 
-        var cellInstanceHash = GenerateInstanceHash(cellSchemaColumns, usingIndexValues);
+        var cellInstanceHash = GenerateInstanceHash(usingIndexValues);
 
         var getCellInstanceResult = await cellManager.GetCellInstance(parsed.CellGroupName, cellInstanceHash);
         if (getCellInstanceResult.IsFailure) return getCellInstanceResult.Error;
@@ -84,7 +84,7 @@ public class InsertQuery(
                 if (validationResult.IsFailure) return validationResult.Error;
 
                 tableRowValues[i] = typedVal;
-                if (col.IsPrimaryKey) tablePkValues.Add(typedVal!);
+                if (col.IsPrimaryKey) tablePkValues.Add(typedVal);
             }
             else if (!col.IsNullable)
                 return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided for table '{parsed.TableName}'.");
@@ -155,7 +155,7 @@ public class InsertQuery(
         }
 
         // 3. GENERATE HASH
-        var instanceHash = GenerateInstanceHash(schemaColumns, indexValues);
+        var instanceHash = GenerateInstanceHash(indexValues);
 
         // 4. CREATE ROW and SAVE
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
@@ -169,7 +169,7 @@ public class InsertQuery(
         return new QueryResult("1 cell instance inserted successfully.", 1);
     }
 
-    private string GenerateInstanceHash(IEnumerable<Column> schemaColumns, IReadOnlyDictionary<string, string> indexValues)
+    private string GenerateInstanceHash(IReadOnlyDictionary<string, string> indexValues)
     {
         var combinedIndex = string.Join("::", indexValues.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(combinedIndex)));
@@ -178,8 +178,7 @@ public class InsertQuery(
     private Result<(string CellGroupName, string[] Props, string[] Values)> ParseInsertCell()
     {
         // INSERT CELL <CellGroup> (<props>) VALUES (<vals>)
-        if (tokens.Length < 6)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CELL syntax.");
+        if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CELL syntax.");
 
         var cellGroupName = tokens[2];
 
@@ -188,15 +187,12 @@ public class InsertQuery(
             return propsResult.Error;
 
         var valuesIndex = FindKeywordIndex("VALUES", propsEnd);
-        if (valuesIndex == -1)
-            return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
+        if (valuesIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
 
         var valuesResult = ParseParenthesizedList(valuesIndex + 1, out _);
-        if (!valuesResult.TryGetValue(out var values))
-            return valuesResult.Error;
+        if (!valuesResult.TryGetValue(out var values)) return valuesResult.Error;
 
-        if (props.Length != values.Length)
-            return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
+        if (props.Length != values.Length) return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
 
         return (cellGroupName, props, values);
     }
@@ -309,12 +305,7 @@ public class InsertQuery(
     private int FindKeywordIndex(string keyword, int startIndex = 0)
     {
         for (int i = startIndex; i < tokens.Length; i++)
-        {
-            if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase))
-            {
-                return i;
-            }
-        }
+            if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase)) return i;
         return -1;
     }
 }
