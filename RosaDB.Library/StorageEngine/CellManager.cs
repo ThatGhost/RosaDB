@@ -12,8 +12,6 @@ namespace RosaDB.Library.StorageEngine
 {
     public class CellManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager) : ICellManager
     {
-        private readonly IFileSystem _fileSystem = fileSystem;
-        private readonly IFolderManager _folderManager = folderManager;
         private readonly Dictionary<string,CellEnvironment> _cachedEnvironment = new();
         private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellInstanceStores = new();
         private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellPropertyIndexes = new();
@@ -41,6 +39,8 @@ namespace RosaDB.Library.StorageEngine
             if (!rowBytesResult.TryGetValue(out var rowBytes))
                 return rowBytesResult.Error;
 
+            if(mainStore[hashBytes] is not null) return new Error(ErrorPrefixes.DataError, "Cell instance already exists");
+            
             mainStore[hashBytes] = rowBytes;
             mainStore.Commit();
 
@@ -91,10 +91,10 @@ namespace RosaDB.Library.StorageEngine
 
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            var tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
+            var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
             try
             {
-                if(!_fileSystem.Directory.Exists(tablePath)) _fileSystem.Directory.CreateDirectory(tablePath);
+                if(!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath);
             }
             catch (Exception ex)
             {
@@ -113,10 +113,10 @@ namespace RosaDB.Library.StorageEngine
             var tableToDelete = env.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
             if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in cell '{cellName}'.");
 
-            string tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
-            string trashPath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
+            string tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
+            string trashPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
 
-            try { _folderManager.RenameFolder(tablePath, trashPath); }
+            try { folderManager.RenameFolder(tablePath, trashPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."); }
 
             env.Tables = env.Tables.Where(t => t != tableToDelete).ToArray();
@@ -126,7 +126,7 @@ namespace RosaDB.Library.StorageEngine
             {
                 try
                 {
-                    _folderManager.RenameFolder(trashPath, tablePath);
+                    folderManager.RenameFolder(trashPath, tablePath);
                     envResult.Value.Tables = envResult.Value.Tables.Append(tableToDelete).ToArray();
                 }
                 catch{ return new CriticalError(); }
@@ -134,7 +134,7 @@ namespace RosaDB.Library.StorageEngine
                 return new Error(ErrorPrefixes.FileError, "Failed to update cell definition. Deletion reverted.");
             }
 
-            try { _folderManager.DeleteFolder(trashPath); }
+            try { folderManager.DeleteFolder(trashPath); }
             catch { return Result.Success(); }
 
             return Result.Success();
@@ -148,9 +148,9 @@ namespace RosaDB.Library.StorageEngine
 
             var filePathResult = GetCellFilePath(cellName, "_env");
             if(filePathResult.IsFailure) return filePathResult.Error;
-            if (!_fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            if (!fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
 
-            var bytes = await ByteReaderWriter.ReadBytesFromFile(_fileSystem, filePathResult.Value, CancellationToken.None);
+            var bytes = await ByteReaderWriter.ReadBytesFromFile(fileSystem, filePathResult.Value, CancellationToken.None);
             if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
             
             env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
@@ -170,7 +170,7 @@ namespace RosaDB.Library.StorageEngine
             var filePath = GetCellFilePath(cellGroupName, "_idx");
             if(filePath.IsFailure) return filePath.Error;
 
-            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes)
+            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
             {
                 CreateFile = CreatePolicy.IfNeeded,
                 FileName = filePath.Value
@@ -190,7 +190,7 @@ namespace RosaDB.Library.StorageEngine
             var filePath = GetCellFilePath(cellGroupName, $"_pidx_{propertyName}");
             if(filePath.IsFailure) return filePath.Error;
 
-            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes)
+            var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
             {
                 CreateFile = CreatePolicy.IfNeeded,
                 FileName = filePath.Value
@@ -203,7 +203,7 @@ namespace RosaDB.Library.StorageEngine
         private Result<string> GetCellFilePath(string cellName, string fileName)
         {
             if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
-            return _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, fileName);
+            return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, fileName);
         }
         
         private async Task<Result> SaveEnvironment(CellEnvironment env, string cellName)
@@ -213,7 +213,7 @@ namespace RosaDB.Library.StorageEngine
 
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
 
-            await ByteReaderWriter.WriteBytesToFile(_fileSystem, filePath.Value, bytes, CancellationToken.None);
+            await ByteReaderWriter.WriteBytesToFile(fileSystem, filePath.Value, bytes, CancellationToken.None);
             _cachedEnvironment[cellName] = env;
             return Result.Success();
         }

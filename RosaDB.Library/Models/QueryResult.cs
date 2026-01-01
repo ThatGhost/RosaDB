@@ -10,7 +10,7 @@ public class QueryResult(string message, int rowsAffected = 0)
 
     public static implicit operator QueryResult(Error error) => new(error);
 
-    private QueryResult(Error error) : this(error.Prefix + error.Message) { }
+    private QueryResult(Error error) : this(error.Prefix.Prefix + error.Message) { }
 
     public QueryResult(List<Row> rows) : this("Query executed successfully.")
     {

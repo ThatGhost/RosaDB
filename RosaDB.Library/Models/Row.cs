@@ -8,8 +8,7 @@ public class Row
     
     public static Result<Row> Create(object?[] values, Column[] columns)
     {
-        if (values.Length != columns.Length)
-            return new Error(ErrorPrefixes.DataError, "Value count must match column count.");
+        if (values.Length != columns.Length) return new Error(ErrorPrefixes.DataError, "Value count must match column count.");
 
         Row row = new Row()
         {

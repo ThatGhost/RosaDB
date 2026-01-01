@@ -60,7 +60,7 @@ public class IndexManager(
             fileSystem.Directory.CreateDirectory(indexDirectory);
         }
         
-        var options = new BPlusTree<byte[], LogLocation>.OptionsV2(PrimitiveSerializer.Bytes, new LogLocationSerializer())
+        var options = new BPlusTree<byte[], LogLocation>.OptionsV2(PrimitiveSerializer.Bytes, new LogLocationSerializer(), new ByteArrayComparer())
         {
             CreateFile = CreatePolicy.IfNeeded,
             FileName = indexPath,

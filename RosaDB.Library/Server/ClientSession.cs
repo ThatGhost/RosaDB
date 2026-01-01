@@ -4,6 +4,7 @@ using LightInject;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query;
 using System.Text.Json;
+using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Server;
 
@@ -54,11 +55,11 @@ public class ClientSession(TcpClient client, Scope scope)
             }
             catch (IOException)
             {
-                break;
+                await SendResponseAsync(stream, new CriticalError(), TimeSpan.FromSeconds(1));
             }
             catch (Exception)
             {
-                break;
+                await SendResponseAsync(stream, new CriticalError(), TimeSpan.FromSeconds(1));
             }
         }
     }

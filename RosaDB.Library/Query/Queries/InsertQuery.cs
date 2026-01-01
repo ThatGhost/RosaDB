@@ -83,8 +83,7 @@ public class InsertQuery(
 
         // 4. CREATE ROW and SAVE
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
-        if (!rowCreateResult.TryGetValue(out var row))
-            return rowCreateResult.Error;
+        if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
 
         var saveResult = await cellManager.CreateCellInstance(parsed.CellGroupName, instanceHash, row, schemaColumns);
         if (saveResult.IsFailure) return saveResult.Error;

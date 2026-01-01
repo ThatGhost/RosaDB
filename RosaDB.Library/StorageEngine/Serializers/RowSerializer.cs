@@ -14,22 +14,38 @@ public static class RowSerializer
         var columns = row.Columns;
         var values = row.Values;
 
+        // 1. Write Null Bitmap
+        int bitmapLen = (columns.Length + 7) / 8;
+        byte[] nullBitmap = new byte[bitmapLen];
         for (int i = 0; i < columns.Length; i++)
         {
-            var type = columns[i].DataType;
+            if (values[i] == null)
+            {
+                nullBitmap[i / 8] |= (byte)(1 << (i % 8));
+            }
+        }
+        writer.Write(nullBitmap);
+
+        // 2. Write Values
+        for (int i = 0; i < columns.Length; i++)
+        {
             var value = values[i];
             
+            // Skip nulls as they are already marked in the bitmap
+            if (value == null) continue;
+
+            var type = columns[i].DataType;
             switch (type)
             {
                 case DataType.INT:
-                    writer.Write((int)value!);
+                    writer.Write((int)value);
                     break;
                 case DataType.BIGINT:
-                    writer.Write((long)value!);
+                    writer.Write((long)value);
                     break;
                 case DataType.VARCHAR:
                 {
-                    var str = (string)value!;
+                    var str = (string)value;
                     var bytes = Encoding.UTF8.GetBytes(str);
                     writer.Write(bytes.Length);
                     writer.Write(bytes);
@@ -37,14 +53,14 @@ public static class RowSerializer
                 }
                 case DataType.TEXT:
                 {
-                    var str = (string)value!;
+                    var str = (string)value;
                     var bytes = Encoding.UTF8.GetBytes(str);
                     writer.Write(bytes.Length);
                     writer.Write(bytes);
                     break;
                 }
                 case DataType.BOOLEAN:
-                    writer.Write((bool)value!);
+                    writer.Write((bool)value);
                     break;
                 default:
                     return new Error(ErrorPrefixes.DataError, $"Data type {type} is not supported for serialization.");
@@ -63,8 +79,24 @@ public static class RowSerializer
 
             var values = new object?[columns.Length];
 
+            // 1. Read Null Bitmap
+            int bitmapLen = (columns.Length + 7) / 8;
+            byte[] nullBitmap = reader.ReadBytes(bitmapLen);
+            
+            if (nullBitmap.Length != bitmapLen)
+                return new Error(ErrorPrefixes.DataError, "Serialized data is too short for the expected schema (missing null bitmap).");
+
             for (int i = 0; i < columns.Length; i++)
             {
+                // Check if the value is null based on the bitmap
+                bool isNull = (nullBitmap[i / 8] & (1 << (i % 8))) != 0;
+                
+                if (isNull)
+                {
+                    values[i] = null;
+                    continue;
+                }
+
                 var type = columns[i].DataType;
 
                 switch (type)
@@ -77,7 +109,6 @@ public static class RowSerializer
                         break;
                     case DataType.VARCHAR:
                     {
-                        
                         var length = reader.ReadInt32();
                         var bytes = reader.ReadBytes(length);
                         values[i] = Encoding.UTF8.GetString(bytes);
@@ -85,7 +116,6 @@ public static class RowSerializer
                     }
                     case DataType.TEXT:
                     {
-                        
                         var length = reader.ReadInt32();
                         var bytes = reader.ReadBytes(length);
                         values[i] = Encoding.UTF8.GetString(bytes);
@@ -95,15 +125,16 @@ public static class RowSerializer
                         values[i] = reader.ReadBoolean();
                         break;
                     default:
-                        return new Error(ErrorPrefixes.DataError, "Unknown data type");
+                        return new Error(ErrorPrefixes.DataError, $"Unknown or unsupported data type: {type}");
                 }
             }
             
             if(values.Length != columns.Length)
-                return new Error(ErrorPrefixes.DataError, "Column count mismatch");
+                return new Error(ErrorPrefixes.DataError, "Column count mismatch after deserialization.");
             
             return Row.Create(values, columns);
         }
-        catch { return new CriticalError(); }
+        catch (EndOfStreamException) { return new Error(ErrorPrefixes.DataError, "Unexpected end of stream while deserializing row."); }
+        catch (Exception) { return new CriticalError(); }
     }
 }
