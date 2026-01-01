@@ -8,42 +8,10 @@ public static class TokensToColumnsParser
     public static Result<Column[]> TokensToColumns(string[] columnTokens)
     {
         if (columnTokens.Length == 0) return new Error(ErrorPrefixes.QueryParsingError, "No columns specified");
-
-        var tokens = columnTokens.ToList();
-        if (tokens[0] == "(") tokens.RemoveAt(0);
-        if (tokens.Count > 0 && tokens[^1] == ";") tokens.RemoveAt(tokens.Count - 1);
-        if (tokens.Count > 0 && tokens[^1] == ")") tokens.RemoveAt(tokens.Count - 1);
-
-        List<List<string>> tokensPerColumn = [];
-        List<string> currentColumn = [];
-        foreach (var token in tokens)
-        {
-            if (token == ",")
-            {
-                tokensPerColumn.Add(currentColumn);
-                currentColumn = [];
-            }
-            else
-            {
-                currentColumn.Add(token);
-            }
-        }
-        tokensPerColumn.Add(currentColumn);
-
-        Column[] columns = new Column[tokensPerColumn.Count];
-        int i = 0;
-        foreach (var tokensInColumn in tokensPerColumn)
-        {
-            if (tokensInColumn.Count == 0) continue;
-
-            var columnResult = TokensToColumn(tokensInColumn.ToArray());
-            if (columnResult.IsFailure) return columnResult.Error;
-
-            columns[i] = columnResult.Value;
-            i++;
-        }
-
-        return columns;
+        
+        var tokens = CleanTokenArray(columnTokens);
+        var tokensPerColumn = GetTokensPerColumn(tokens);
+        return GetColumnsFromTokens(tokensPerColumn);
     }
 
     public static Result<Column> TokensToColumn(string[] columnTokens)
@@ -52,8 +20,9 @@ public static class TokensToColumnsParser
         
         string columnName = columnTokens[0];
         string typeName = columnTokens[1].ToUpperInvariant();
+        if (!Enum.TryParse<DataType>(typeName, true, out var dataType)) return new Error(ErrorPrefixes.QueryParsingError, $"Datatype '{typeName}' is unknown");
+        
         int currentIndex = 2;
-
         object parameters = new { };
         
         if (columnTokens.Length > 2 && columnTokens[2] == "(")
@@ -64,13 +33,10 @@ public static class TokensToColumnsParser
             currentIndex = newIndex;
         }
 
-        var switchesResult = TokensToSwitches(columnTokens, currentIndex);
-        if (!switchesResult.TryGetValue(out var switches)) return switchesResult.Error;
-
-        if (!Enum.TryParse<DataType>(typeName, true, out var dataType))
-            return new Error(ErrorPrefixes.QueryParsingError, $"Datatype '{typeName}' is unknown");
-
-        return Column.Create(columnName, dataType, parameters, switches.isPrimaryKey, switches.isIndex, switches.isNullable);
+        var metadataResult = TokensToColumnMetadata(columnTokens, currentIndex);
+        if (!metadataResult.TryGetValue(out var metadata)) return metadataResult.Error;
+        
+        return Column.Create(columnName, dataType, parameters, metadata.isPrimaryKey, metadata.isIndex, metadata.isNullable);
     }
     
     private static (Result<object> result, int newIndex) ParseParameters(string[] tokens, int start, string typeName)
@@ -101,7 +67,7 @@ public static class TokensToColumnsParser
         return (new NoEndFound(typeName), -1);
     }
 
-    private static Result<(bool isPrimaryKey, bool isIndex, bool isNullable)> TokensToSwitches(string[] tokens, int start)
+    private static Result<(bool isPrimaryKey, bool isIndex, bool isNullable)> TokensToColumnMetadata(string[] tokens, int start)
     {
         bool isPrimaryKey = false;
         bool isIndex = false;
@@ -138,6 +104,51 @@ public static class TokensToColumnsParser
             return new Error(ErrorPrefixes.QueryParsingError, "PRIMARY KEY constraint requires a column to be NOT NULL.");
 
         return (isPrimaryKey, isIndex, isNullable);
+    }
+
+    private static string[] CleanTokenArray(string[] columnTokens)
+    {
+        var tokens = columnTokens.ToList();
+        if (tokens[0] == "(") tokens.RemoveAt(0);
+        if (tokens.Count > 0 && tokens[^1] == ";") tokens.RemoveAt(tokens.Count - 1);
+        if (tokens.Count > 0 && tokens[^1] == ")") tokens.RemoveAt(tokens.Count - 1);
+        return tokens.ToArray();
+    }
+
+    private static List<List<string>> GetTokensPerColumn(string[] allTokens)
+    {
+        List<List<string>> tokensPerColumn = [];
+        List<string> currentColumn = [];
+        foreach (var token in allTokens)
+        {
+            if (token == ",")
+            {
+                tokensPerColumn.Add(currentColumn);
+                currentColumn = [];
+            }
+            else currentColumn.Add(token);
+        }
+        tokensPerColumn.Add(currentColumn);
+        return tokensPerColumn;
+    }
+
+    private static Result<Column[]> GetColumnsFromTokens(List<List<string>> tokens)
+    {
+        Column[] columns = new Column[tokens.Count];
+        
+        int i = 0;
+        foreach (var tokensInColumn in tokens)
+        {
+            if (tokensInColumn.Count == 0) continue;
+
+            var columnResult = TokensToColumn(tokensInColumn.ToArray());
+            if (columnResult.IsFailure) return columnResult.Error;
+
+            columns[i] = columnResult.Value;
+            i++;
+        }
+
+        return columns;
     }
     
 #pragma warning disable CS9113

@@ -8,6 +8,7 @@ using System.Text;
 
 namespace RosaDB.Library.Query.Queries
 {
+    // TODO refactor after adding the USING clause to SELECT
     public class SelectQuery(string[] tokens, LogManager logManager, ICellManager cellManager, IIndexManager indexManager) : IQuery
     {
         public async Task<QueryResult> Execute()

@@ -3,17 +3,17 @@ using System.Text;
 using LightInject;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query;
-using System.Collections.Generic;
 using System.Text.Json;
-using System.Threading.Tasks;
-using System;
-using System.IO;
-using RosaDB.Library.MoqQueries;
 
 namespace RosaDB.Library.Server;
 
 public class ClientSession(TcpClient client, Scope scope)
 {
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        WriteIndented = false
+    };
+    
     private class ClientResponse
     {
         public string Message { get; set; } = "";
@@ -33,28 +33,22 @@ public class ClientSession(TcpClient client, Scope scope)
             {
                 var lengthBuffer = new byte[4];
                 var bytesRead = await stream.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
-                if (bytesRead < 4)
-                {
-                    break;
-                }
+                if (bytesRead < 4) break;
 
                 var queryLength = BitConverter.ToInt32(lengthBuffer, 0);
                 if (queryLength <= 0) continue;
 
                 var queryBuffer = new byte[queryLength];
                 bytesRead = await stream.ReadAsync(queryBuffer, 0, queryBuffer.Length);
-                if (bytesRead < queryLength)
-                {
-                    break;
-                }
+                if (bytesRead < queryLength)  break;
 
-                DateTime init = DateTime.Now;
+                DateTime start = DateTime.Now;
+
                 var query = Encoding.UTF8.GetString(queryBuffer, 0, bytesRead);
-
                 QueryResult result = await TokensToQueryExecution(query, queryTokenizer, queryPlanner);
 
                 DateTime end = DateTime.Now;
-                TimeSpan duration = end - init;
+                TimeSpan duration = end - start;
 
                 await SendResponseAsync(stream, result, duration);
             }
@@ -81,7 +75,7 @@ public class ClientSession(TcpClient client, Scope scope)
 
         if (result.Rows.Count > 0)
         {
-            responseDto.Rows = new List<Dictionary<string, object?>>();
+            responseDto.Rows = [];
             foreach (var row in result.Rows)
             {
                 var rowDict = new Dictionary<string, object?>();
@@ -92,12 +86,8 @@ public class ClientSession(TcpClient client, Scope scope)
                 responseDto.Rows.Add(rowDict);
             }
         }
-
-        var jsonOptions = new JsonSerializerOptions()
-        {
-            WriteIndented = false
-        };
-        var jsonPayload = JsonSerializer.Serialize(responseDto, jsonOptions);
+        
+        var jsonPayload = JsonSerializer.Serialize(responseDto, _jsonOptions);
         var jsonBytes = Encoding.UTF8.GetBytes(jsonPayload);
 
         var lengthBytes = BitConverter.GetBytes(jsonBytes.Length);

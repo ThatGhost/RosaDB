@@ -15,36 +15,20 @@ public static class Installer
     public static void Install(ServiceContainer container)
     {
         container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
+        
         container.RegisterScoped<SessionState>();
-        container.Register<IFileSystem, FileSystem>();
-        container.Register<IFolderManager, FolderManager>();
         container.RegisterScoped<LogManager>();
         container.RegisterScoped<IIndexManager, IndexManager>();
+        container.RegisterScoped<ICellManager, CellManager>();
         
+        container.RegisterTransient<IFileSystem, FileSystem>();
+        container.RegisterTransient<IFolderManager, FolderManager>();
         container.RegisterTransient<LogCondenser>();
         container.RegisterTransient<RootManager>();
         container.RegisterTransient<IDatabaseManager, DatabaseManager>();
-        container.RegisterScoped<ICellManager, CellManager>();
-
-        container.Register<DataValidator>();
-        container.Register<StringToDataParser>();
-        container.Register<QueryTokenizer>();
-        container.Register<QueryPlanner>();
-
-        InstallMoqQueries(container);
-    }
-
-    private static void InstallMoqQueries(ServiceContainer container)
-    {
-        container.Register<CreateCellQuery>();
-        container.Register<WriteLogAndCommitQuery>();
-        container.Register<CreateDatabaseQuery>();
-        container.Register<UseDatabaseQuery>();
-        container.Register<InitializeDbQuery>();
-        container.Register<CreateTableDefinition>();
-        container.Register<GetAllLogsQuery>();
-        container.Register<GetCellLogsQuery>();
-        container.Register<UpdateCellLogsQuery>();
-        container.Register<RandomDeleteLogsQuery>();
+        container.RegisterTransient<DataValidator>();
+        container.RegisterTransient<StringToDataParser>();
+        container.RegisterTransient<QueryTokenizer>();
+        container.RegisterTransient<QueryPlanner>();
     }
 }

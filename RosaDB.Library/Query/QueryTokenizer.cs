@@ -18,14 +18,14 @@ namespace RosaDB.Library.Query
                 bool inLiteral = false;
                 char literalChar = '\'';
 
-                var PushToken = () =>
+                void PushToken()
                 {
                     if (currentToken.Length > 0)
                     {
                         tokens.Add(currentToken.ToString());
                         currentToken.Clear();
                     }
-                };
+                }
 
                 foreach (char c in query)
                 {

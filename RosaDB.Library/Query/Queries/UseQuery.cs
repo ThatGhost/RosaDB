@@ -17,6 +17,6 @@ public class UseQuery(string[] tokens, SessionState sessionState) : IQuery
         if (database.IsFailure) return database.Error;
 
         sessionState.CurrentDatabase = database.Value;
-        return new QueryResult($"Succesfully using {databaseName}");
+        return new QueryResult($"Successfully using {databaseName}");
     }
 }

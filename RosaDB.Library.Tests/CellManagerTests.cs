@@ -86,10 +86,9 @@ namespace RosaDB.Library.Tests
             CreateFakeCellEnvironmentFile(initialEnv);
             var newTableResult = Table.Create("NewTable", new[] { Column.Create("Col1", DataType.VARCHAR).Value });
             Assert.That(newTableResult.IsSuccess, Is.True);
-            var newTables = new[] { newTableResult.Value };
 
             // Act
-            var result = await _cellManager.AddTables(TestCellName, newTables);
+            var result = await _cellManager.CreateTable(TestCellName, newTableResult.Value);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);

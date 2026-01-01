@@ -2,7 +2,7 @@ using RosaDB.Library.Models;
 
 namespace RosaDB.Library.Server;
 
-public class SessionState
+public sealed class SessionState
 {
-    public virtual Database? CurrentDatabase { get; set; }
+    public Database? CurrentDatabase { get; set; }
 }
