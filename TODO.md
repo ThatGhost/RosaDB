@@ -33,7 +33,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
 4. **Implement USING in SELECT Queries:**
     *   Add the `USING` keywork to select queries to be able to search on Cell instances. 
-    *   Use indexes for the indexed properties of the cell
+    *   Use indexes for the indexed properties of the cell.
 
 ## Phase 3: Feature Development
 
@@ -46,14 +46,14 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   Enhance `ClientSession` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.
     *   Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).
 4. **Cell Metadata:**
-    *   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).
-    *   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.
+    ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
+    ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
     *   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.
 
 ## Phase 4: Developer Experience and Server Enhancements
 
 1. **Integrate Logging Framework:** Implement a robust logging framework (e.g., Serilog, NLog) across `RosaDB.Server` and `RosaDB.Library`, replacing existing `Console.WriteLine` calls with structured logging.
-2. **TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.
+~~2. **TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
 
 ## Phase 5: Start research about replication and scaling
 
