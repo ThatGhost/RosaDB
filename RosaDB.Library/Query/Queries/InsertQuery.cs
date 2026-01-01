@@ -28,29 +28,25 @@ public class InsertQuery(
 
     private async Task<QueryResult> InsertIntoAsync()
     {
-        var parseResult = ParseInsertInto();
-        if (!parseResult.TryGetValue(out var parsed)) return parseResult.Error;
-
-        var usingIndexValuesResult = await AssertUsingClause(parsed);
-        if (!usingIndexValuesResult.IsSuccess) return usingIndexValuesResult.Error;
-
-        var tableSchemaResult = await cellManager.GetColumnsFromTable(parsed.CellGroupName, parsed.TableName);
-        if (!tableSchemaResult.TryGetValue(out var tableSchemaColumns)) return tableSchemaResult.Error;
-        
-        var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
-        var tableRowValuesResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName);
-        if (!tableRowValuesResult.TryGetValue(out var tableRowValues)) return tableRowValuesResult.Error;
-
-        var tableRowCreateResult = Row.Create(tableRowValues, tableSchemaColumns);
-        if (!tableRowCreateResult.TryGetValue(out var tableRow)) return tableRowCreateResult.Error;
-
-        var serializedRowResult = RowSerializer.Serialize(tableRow);
-        if (!serializedRowResult.TryGetValue(out var serializedRowBytes)) return serializedRowResult.Error;
-
-        logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValuesResult.Value, serializedRowBytes);
-        
-        var commitResult = await logManager.Commit();
-        return commitResult.IsFailure ? commitResult.Error : new QueryResult("1 row inserted successfully.", 1);
+        return await ParseInsertInto()
+            .ThenAsync(parsed => AssertUsingClause(parsed)
+            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.CellGroupName, parsed.TableName)
+            .ThenAsync(tableSchemaColumns =>
+            {
+                var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
+                return GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
+                    .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
+                    .Then(RowSerializer.Serialize)
+                    .ThenAsync(serializedRowBytes =>
+                    {
+                        logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues, serializedRowBytes);
+                        return logManager.Commit();
+                    });
+            })))
+            .MatchAsync(
+                () => Task.FromResult(new QueryResult("1 row inserted successfully.", 1)),
+                error => Task.FromResult<QueryResult>(error)
+            );
     }
 
     private async Task<QueryResult> InsertCellAsync()
