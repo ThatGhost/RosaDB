@@ -3,7 +3,7 @@ using Terminal.Gui;
 
 namespace RosaDB.Client.TUI;
 
-public class NavigationView : View
+public sealed class NavigationView : View
 {
     public NavigationView()
     {

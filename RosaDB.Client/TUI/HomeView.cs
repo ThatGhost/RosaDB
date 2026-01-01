@@ -2,7 +2,7 @@ using Terminal.Gui;
 
 namespace RosaDB.Client.TUI;
 
-public class HomeView : View
+public sealed class HomeView : View
 {
     public HomeView()
     {

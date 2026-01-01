@@ -4,7 +4,7 @@ using System.Text;
 
 namespace RosaDB.Client.TUI;
 
-public class LogsView : View
+public sealed class LogsView : View
 {
     private readonly TextView _logOutput;
     private readonly CancellationTokenSource _cts = new();
@@ -86,9 +86,7 @@ public class LogsView : View
                 }
             }, _cts.Token);
 
-            // Read loop
-            string? message;
-            while ((message = await reader.ReadLineAsync()) != null)
+            while (await reader.ReadLineAsync() is { } message)
             {
                 Log($"Server: {message}");
             }

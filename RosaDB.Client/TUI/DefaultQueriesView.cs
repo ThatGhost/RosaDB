@@ -4,10 +4,9 @@ using Terminal.Gui;
 
 namespace RosaDB.Client.TUI
 {
-    public class DefaultQueriesView : View
+    public sealed class DefaultQueriesView : View
     {
-        private ListView _listView;
-        private List<(string Name, string Query)> _queries;
+        private readonly ListView _listView;
 
         public Action<string>? OnQuerySelected;
 
@@ -16,37 +15,31 @@ namespace RosaDB.Client.TUI
             Width = Dim.Fill();
             Height = Dim.Fill();
 
-            _queries = new List<(string, string)>
-            {
-                // Metadata
+            List<(string Name, string Query)> queries = [
                 ("Show Cell Groups", "SHOW CELL GROUPS;"),
                 ("Show Tables in Group", "SHOW TABLES IN sales;"),
-
                 // DDL
                 ("Initialize RosaDB", "INITIALIZE;"),
                 ("Create Database", "CREATE DATABASE my_db;"),
                 ("Use Database", "USE my_db;"),
                 ("Create Cell Group", "CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);"),
                 ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);"),
-                
                 // Cell Instance Management
                 ("Insert Cell Instance", "INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');"),
                 ("Update Cell Instance", "UPDATE CELL sales USING name = 'q4' SET is_active = FALSE;"),
                 ("Delete Cell Instance", "DELETE CELL sales USING name = 'q4';"),
-
                 // DML
                 ("Select All from Group", "SELECT * FROM sales.transactions;"), // Cross-cell query
                 ("Select with Data Filter", "SELECT * FROM sales.transactions WHERE amount > 100;"),
                 ("Select with Cell Filter", "SELECT * FROM sales.transactions USING name = 'q4';"),
                 ("Select with Both Filters", "SELECT * FROM sales.transactions USING name = 'q4' WHERE amount > 100;"),
                 ("Insert Data", "INSERT INTO sales.transactions USING name = 'q4' (id, product, amount) VALUES (1, 'item', 50);"),
-
                 // Subscriptions
                 ("Subscribe to Cell", "SUBSCRIBE TO sales USING name = 'q4';"),
                 ("Unsubscribe from Cell", "UNSUBSCRIBE FROM sales USING name = 'q4';")
-            };
+            ];
 
-            _listView = new ListView(_queries.ConvertAll(q => q.Name))
+            _listView = new ListView(queries.ConvertAll(q => q.Name))
             {
                 X = 0,
                 Y = 0,
@@ -56,7 +49,7 @@ namespace RosaDB.Client.TUI
 
             _listView.OpenSelectedItem += (args) =>
             {
-                OnQuerySelected?.Invoke(_queries[args.Item].Query);
+                OnQuerySelected?.Invoke(queries[args.Item].Query);
             };
 
             Add(_listView);

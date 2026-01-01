@@ -1,16 +1,10 @@
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using Terminal.Gui;
 
 namespace RosaDB.Client.TUI;
 
 public class QueryView : View
 {
-    private readonly Label _statusLabel;
-    private readonly TableView _tableView;
-    private readonly DefaultQueriesView _defaultQueriesView;
-
     public QueryView()
     {
         Width = Dim.Fill();
@@ -42,7 +36,7 @@ public class QueryView : View
             Y = 8
         };
 
-        _statusLabel = new Label("")
+        var statusLabel = new Label("")
         {
             X = 1,
             Y = 9,
@@ -50,7 +44,7 @@ public class QueryView : View
             Height = 2
         };
 
-        _tableView = new TableView()
+        var tableView = new TableView()
         {
             X = 1,
             Y = 11,
@@ -62,7 +56,7 @@ public class QueryView : View
         var sendButton = new Button("Send")
         {
             X = Pos.Center(),
-            Y = Pos.Bottom(_tableView) + 1
+            Y = Pos.Bottom(tableView) + 1
         };
 
         var newClientButton = new Button("Create new Client")
@@ -71,7 +65,7 @@ public class QueryView : View
             Y = Pos.Bottom(sendButton) + 1
         };
 
-        leftPane.Add(queryLabel, queryTextView, resultLabel, _statusLabel, _tableView, sendButton, newClientButton);
+        leftPane.Add(queryLabel, queryTextView, resultLabel, statusLabel, tableView, sendButton, newClientButton);
 
         var separator = new LineView(Terminal.Gui.Graphs.Orientation.Vertical)
         {
@@ -79,14 +73,14 @@ public class QueryView : View
             Height = Dim.Fill()
         };
 
-        _defaultQueriesView = new DefaultQueriesView()
+        var defaultQueriesView = new DefaultQueriesView()
         {
             X = Pos.Right(separator),
             Width = Dim.Fill(),
             Height = Dim.Fill()
         };
 
-        _defaultQueriesView.OnQuerySelected += (query) =>
+        defaultQueriesView.OnQuerySelected += (query) =>
         {
             queryTextView.Text = query;
         };
@@ -96,13 +90,13 @@ public class QueryView : View
             try
             {
                 ClientManager.Client = new Client.Client("127.0.0.1", 7575);
-                _statusLabel.Text = "Client re-initialized successfully.";
-                _tableView.Table = null; // Clear previous results
-                _tableView.Visible = false;
+                statusLabel.Text = "Client re-initialized successfully.";
+                tableView.Table = null;
+                tableView.Visible = false;
             }
             catch
             {
-                _statusLabel.Text = "Could not connect to server at port 7575. Check if server is running.";
+                statusLabel.Text = "Could not connect to server at port 7575. Check if server is running.";
             }
         };
         
@@ -110,21 +104,21 @@ public class QueryView : View
         {
             try
             {
-                if(ClientManager.Client is null) ClientManager.Client = new Client.Client("127.0.0.1", 7575);
+                ClientManager.Client ??= new Client.Client("127.0.0.1", 7575);
                 var response = await ClientManager.Client.SendQueryAsync(queryTextView.Text?.ToString() ?? "");
 
-                _tableView.Table = null;
-                _tableView.Visible = false;
+                tableView.Table = null;
+                tableView.Visible = false;
 
                 if (response is null)
                 {
-                    _statusLabel.Text = "Error: Did not receive a response from the server.";
+                    statusLabel.Text = "Error: Did not receive a response from the server.";
                     return;
                 }
 
-                _statusLabel.Text = $"{response.Message}\n({response.DurationMs:F2} ms, {response.RowsAffected} rows affected)";
+                statusLabel.Text = $"{response.Message}\n({response.DurationMs:F2} ms, {response.RowsAffected} rows affected)";
 
-                if (response.Rows != null && response.Rows.Count > 0)
+                if (response.Rows is { Count: > 0 })
                 {
                     var dataTable = new DataTable();
                     var firstRow = response.Rows.First();
@@ -143,16 +137,16 @@ public class QueryView : View
                         dataTable.Rows.Add(newRow);
                     }
 
-                    _tableView.Table = dataTable;
-                    _tableView.Visible = true;
+                    tableView.Table = dataTable;
+                    tableView.Visible = true;
                 }
             }
             catch
             {
-                _statusLabel.Text = "Could not connect to server at port 7575";
+                statusLabel.Text = "Could not connect to server at port 7575";
             }
         };
 
-        Add(leftPane, separator, _defaultQueriesView);
+        Add(leftPane, separator, defaultQueriesView);
     }
 }
