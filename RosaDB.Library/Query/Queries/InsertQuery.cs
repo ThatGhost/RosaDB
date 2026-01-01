@@ -16,10 +16,7 @@ public class InsertQuery(
 {
     public Task<QueryResult> Execute()
     {
-        if (tokens.Length < 2)
-        {
-            return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT statement."));
-        }
+        if (tokens.Length < 3) return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT statement."));
 
         return tokens[1].ToUpperInvariant() switch
         {
@@ -31,80 +28,27 @@ public class InsertQuery(
 
     private async Task<QueryResult> InsertIntoAsync()
     {
-        // 1. PARSE
         var parseResult = ParseInsertInto();
-        if (!parseResult.TryGetValue(out var parsed))
-            return parseResult.Error;
+        if (!parseResult.TryGetValue(out var parsed)) return parseResult.Error;
 
-        // 2. FIND CELL-INSTANCE HASH FROM USING CLAUSE
-        var cellEnvResult = await cellManager.GetEnvironment(parsed.CellGroupName);
-        if (!cellEnvResult.TryGetValue(out var cellEnv))
-            return cellEnvResult.Error;
+        var usingIndexValuesResult = await AssertUsingClause(parsed);
+        if (!usingIndexValuesResult.IsSuccess) return usingIndexValuesResult.Error;
 
-        var cellSchemaColumns = cellEnv.Columns;
-        var usingIndexValues = new Dictionary<string, string>();
-
-        foreach (var kvp in parsed.UsingProperties)
-        {
-            var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-            if (col == null)
-                return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in CellGroup '{parsed.CellGroupName}'.");
-            if (!col.IsIndex)
-                return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for CellGroup '{parsed.CellGroupName}'.");
-
-            usingIndexValues[col.Name] = kvp.Value;
-        }
-
-        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex))
-            return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
-
-        var cellInstanceHash = GenerateInstanceHash(usingIndexValues);
-
-        var getCellInstanceResult = await cellManager.GetCellInstance(parsed.CellGroupName, cellInstanceHash);
-        if (getCellInstanceResult.IsFailure) return getCellInstanceResult.Error;
-
-        // 3. GET TABLE SCHEMA & VALIDATE DATA
         var tableSchemaResult = await cellManager.GetColumnsFromTable(parsed.CellGroupName, parsed.TableName);
         if (!tableSchemaResult.TryGetValue(out var tableSchemaColumns)) return tableSchemaResult.Error;
         
         var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
+        var tableRowValuesResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName);
+        if (!tableRowValuesResult.TryGetValue(out var tableRowValues)) return tableRowValuesResult.Error;
 
-        var tableRowValues = new object?[tableSchemaColumns.Length];
-        var tablePkValues = new List<object>();
-
-        for (int i = 0; i < tableSchemaColumns.Length; i++)
-        {
-            var col = tableSchemaColumns[i];
-            if (rowValueMap.TryGetValue(col.Name, out var stringVal))
-            {
-                var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
-                if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
-
-                var validationResult = DataValidator.Validate(typedVal, col);
-                if (validationResult.IsFailure) return validationResult.Error;
-
-                tableRowValues[i] = typedVal;
-                if (col.IsPrimaryKey) tablePkValues.Add(typedVal);
-            }
-            else if (!col.IsNullable)
-                return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided for table '{parsed.TableName}'.");
-        }
-
-        if (tableSchemaColumns.Any(c => c.IsPrimaryKey) && tablePkValues.Count == 0)
-            return new Error(ErrorPrefixes.DataError, $"Table '{parsed.TableName}' has primary key(s), but no values were provided in the INSERT INTO statement.");
-
-        // 4. CREATE ROW AND LOG
         var tableRowCreateResult = Row.Create(tableRowValues, tableSchemaColumns);
-        if (!tableRowCreateResult.TryGetValue(out var tableRow))
-            return tableRowCreateResult.Error;
+        if (!tableRowCreateResult.TryGetValue(out var tableRow)) return tableRowCreateResult.Error;
 
         var serializedRowResult = RowSerializer.Serialize(tableRow);
-        if (!serializedRowResult.TryGetValue(out var serializedRowBytes))
-            return serializedRowResult.Error;
+        if (!serializedRowResult.TryGetValue(out var serializedRowBytes)) return serializedRowResult.Error;
 
-        logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues.Values.Cast<object>().ToArray(), serializedRowBytes);
+        logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValuesResult.Value, serializedRowBytes);
         
-        // 5. COMMIT
         var commitResult = await logManager.Commit();
         return commitResult.IsFailure ? commitResult.Error : new QueryResult("1 row inserted successfully.", 1);
     }
@@ -113,15 +57,13 @@ public class InsertQuery(
     {
         // 1. PARSE
         var parseResult = ParseInsertCell();
-        if (!parseResult.TryGetValue(out var parsed))
-            return parseResult.Error;
+        if (!parseResult.TryGetValue(out var parsed)) return parseResult.Error;
 
         // 2. GET SCHEMA & VALIDATE
         var envResult = await cellManager.GetEnvironment(parsed.CellGroupName);
-        if (!envResult.TryGetValue(out var env))
-            return envResult.Error;
+        if (!envResult.TryGetValue(out var cellEnv)) return envResult.Error;
 
-        var schemaColumns = env.Columns;
+        var schemaColumns = cellEnv.Columns;
         var valueMap = parsed.Props.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
 
         var rowValues = new object?[schemaColumns.Length];
@@ -129,19 +71,8 @@ public class InsertQuery(
 
         for (int i = 0; i < schemaColumns.Length; i++)
         {
-            var col = schemaColumns[i];
-            if (valueMap.TryGetValue(col.Name, out var stringVal))
-            {
-                var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
-                if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
-
-                var validationResult = DataValidator.Validate(typedVal, col);
-                if (validationResult.IsFailure) return validationResult.Error;
-
-                rowValues[i] = typedVal;
-                if (col.IsIndex) indexValues[col.Name] = stringVal;
-            }
-            else if (!col.IsNullable) return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
+            var addResult = AddValuesToCollections(schemaColumns[i], valueMap, rowValues, indexValues, i);
+            if (addResult.IsFailure) return addResult.Error;
         }
         
         var requiredIndexCols = schemaColumns.Where(c => c.IsIndex).ToList();
@@ -160,10 +91,26 @@ public class InsertQuery(
             return rowCreateResult.Error;
 
         var saveResult = await cellManager.CreateCellInstance(parsed.CellGroupName, instanceHash, row, schemaColumns);
-        if (saveResult.IsFailure)
-            return saveResult.Error;
+        if (saveResult.IsFailure) return saveResult.Error;
 
         return new QueryResult("1 cell instance inserted successfully.", 1);
+    }
+
+    private Result AddValuesToCollections(Column col, Dictionary<string, string> valueMap, object?[] rowValues, Dictionary<string, string> indexValues, int i)
+    {
+        if (valueMap.TryGetValue(col.Name, out var stringVal))
+        {
+            var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
+            if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
+
+            var validationResult = DataValidator.Validate(typedVal, col);
+            if (validationResult.IsFailure) return validationResult.Error;
+
+            rowValues[i] = typedVal;
+            if (col.IsIndex) indexValues[col.Name] = stringVal;
+        }
+        else if (!col.IsNullable) return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
+        return Result.Success();
     }
 
     private string GenerateInstanceHash(IReadOnlyDictionary<string, string> indexValues)
@@ -304,5 +251,60 @@ public class InsertQuery(
         for (int i = startIndex; i < tokens.Length; i++)
             if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase)) return i;
         return -1;
+    }
+
+    private async Task<Result<Object[]>> AssertUsingClause((string CellGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
+    {
+        var cellEnvResult = await cellManager.GetEnvironment(parsed.CellGroupName);
+        if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
+
+        var cellSchemaColumns = cellEnv.Columns;
+        var usingIndexValues = new Dictionary<string, string>();
+
+        foreach (var kvp in parsed.UsingProperties)
+        {
+            var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in CellGroup '{parsed.CellGroupName}'.");
+            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for CellGroup '{parsed.CellGroupName}'.");
+
+            usingIndexValues[col.Name] = kvp.Value;
+        }
+
+        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
+
+        var cellInstanceHash = GenerateInstanceHash(usingIndexValues);
+
+        var getCellInstanceResult = await cellManager.GetCellInstance(parsed.CellGroupName, cellInstanceHash);
+        if (getCellInstanceResult.IsFailure) return getCellInstanceResult.Error;
+        return usingIndexValues.Values.Cast<object>().ToArray();
+    }
+
+    private Result<Object?[]> GetRowValues(Dictionary<string, string> rowValueMap, Column[] tableSchemaColumns, string tableName)
+    {
+        var tableRowValues = new object?[tableSchemaColumns.Length];
+        var tablePkValues = new List<object>();
+
+        for (int i = 0; i < tableSchemaColumns.Length; i++)
+        {
+            var col = tableSchemaColumns[i];
+            if (rowValueMap.TryGetValue(col.Name, out var stringVal))
+            {
+                var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
+                if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
+
+                var validationResult = DataValidator.Validate(typedVal, col);
+                if (validationResult.IsFailure) return validationResult.Error;
+
+                tableRowValues[i] = typedVal;
+                if (col.IsPrimaryKey) tablePkValues.Add(typedVal);
+            }
+            else if (!col.IsNullable)
+                return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided for table '{tableName}'.");
+        }
+
+        if (tableSchemaColumns.Any(c => c.IsPrimaryKey) && tablePkValues.Count == 0)
+            return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' has primary key(s), but no values were provided in the INSERT INTO statement.");
+        
+        return tableRowValues;
     }
 }
