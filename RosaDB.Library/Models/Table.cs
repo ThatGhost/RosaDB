@@ -22,8 +22,5 @@ public class Table
         return new Table(name, columns);
     }
 
-    private Table()
-    {
-        
-    }
+    private Table() { }
 }

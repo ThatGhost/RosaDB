@@ -2,33 +2,18 @@ using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Models;
 
-public class QueryResult
+public class QueryResult(string message, int rowsAffected = 0)
 {
-    public string Message { get; init; }
-    public List<Row> Rows { get; init; } = [];
-    public int RowsAffected { get; init; } = 0;
-    
+    public string Message { get; } = message;
+    public List<Row> Rows { get; } = [];
+    public int RowsAffected { get; } = rowsAffected;
+
     public static implicit operator QueryResult(Error error) => new(error);
 
-    private QueryResult(Error error)
-    {
-        Message = error.Message;
-    }
+    private QueryResult(Error error) : this(error.Prefix + error.Message) { }
 
-    public QueryResult(string message)
+    public QueryResult(List<Row> rows) : this("Query executed successfully.")
     {
-        Message = message;
-    }
-
-    public QueryResult(string message, int rowsAffected)
-    {
-        Message = message;
-        RowsAffected = rowsAffected;
-    }
-
-
-    public QueryResult(List<Row> rows)
-    {
-        Message = "Query executed successfully.";
+        Rows = rows;
     }
 }

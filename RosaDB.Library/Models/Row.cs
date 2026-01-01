@@ -2,15 +2,7 @@ using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Models;
 
-public interface IRow
-{
-    object? this[int index] { get; }
-    object? this[string columnName] { get; }
-    object?[] Values { get; }
-    Column[] Columns { get; }
-}
-
-public class Row : IRow
+public class Row
 {
     private Dictionary<string, int> _columnIndexMap { get; } = [];
     

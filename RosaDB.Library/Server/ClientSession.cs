@@ -79,7 +79,7 @@ public class ClientSession(TcpClient client, Scope scope)
             Rows = null
         };
 
-        if (result.Rows != null && result.Rows.Count > 0)
+        if (result.Rows.Count > 0)
         {
             responseDto.Rows = new List<Dictionary<string, object?>>();
             foreach (var row in result.Rows)
