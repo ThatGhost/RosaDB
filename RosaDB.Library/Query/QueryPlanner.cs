@@ -22,7 +22,7 @@ public class QueryPlanner(
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager),
+            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, cellManager),
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
             "USE" => new UseQuery(tokens, sessionState),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager, indexManager),

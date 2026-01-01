@@ -79,30 +79,26 @@ namespace RosaDB.Library.StorageEngine
             return new Error(ErrorPrefixes.DataError, "Cell instance not found.");
         }
 
-        public async Task<Result> AddTables(string cellName, Table[] tables)
+        public async Task<Result> CreateTable(string cellName, Table table)
         {
             var env = await GetEnvironment(cellName);
             if (!env.TryGetValue(out var cellEnviroument)) return env.Error;
 
-            cellEnviroument.Tables = cellEnviroument.Tables.Concat(tables.ToArray()).ToArray();
+            var cellTables = cellEnviroument.Tables.ToList();
+            cellTables.Add(table);
+            cellEnviroument.Tables = cellTables.ToArray();
             await SaveEnvironment(cellEnviroument, cellName);
 
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            foreach (var table in tables)
+            var tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
+            try
             {
-                var tablePath = _fileSystem.Path.Combine(_folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
-                try
-                {
-                    if(!_fileSystem.Directory.Exists(tablePath))
-                    {
-                        _fileSystem.Directory.CreateDirectory(tablePath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}");
-                }
+                if(!_fileSystem.Directory.Exists(tablePath)) _fileSystem.Directory.CreateDirectory(tablePath);
+            }
+            catch (Exception ex)
+            {
+                return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}");
             }
             return Result.Success();
         }

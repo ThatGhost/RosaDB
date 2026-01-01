@@ -17,7 +17,7 @@ public class CreateTableDefinition(ICellManager cellManager)
 
         if (tableResult.IsFailure) return tableResult.Error;
         
-        var addTableResult = await cellManager.AddTables(cellName, new[] { tableResult.Value });
+        var addTableResult = await cellManager.CreateTable(cellName, tableResult.Value);
         return addTableResult;
     }
 }
