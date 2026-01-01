@@ -19,6 +19,10 @@ public class Client
 {
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
+    private readonly JsonSerializerOptions Options = new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public Client(string ipAddress, int port)
     {
@@ -30,39 +34,49 @@ public class Client
     {
         try
         {
-            // Send query with length prefix
-            var queryBytes = Encoding.UTF8.GetBytes(query);
-            var lengthBytes = BitConverter.GetBytes(queryBytes.Length);
-            await _stream.WriteAsync(lengthBytes);
-            await _stream.WriteAsync(queryBytes);
+            await SendQueryBytes(query);
+            var responseLength = await GetResponseLenght();
+            if(responseLength == -1) return null;
 
-            // Read response with length prefix
-            var responseLengthBuffer = new byte[4];
-            var bytesRead = await _stream.ReadAsync(responseLengthBuffer, 0, 4);
-            if (bytesRead < 4) return null; // Or throw an exception
-
-            var responseLength = BitConverter.ToInt32(responseLengthBuffer, 0);
-            var responseBuffer = new byte[responseLength];
-            var totalBytesRead = 0;
-            while(totalBytesRead < responseLength)
-            {
-                bytesRead = await _stream.ReadAsync(responseBuffer, totalBytesRead, responseLength - totalBytesRead);
-                if (bytesRead == 0) return null; // Connection closed prematurely
-                totalBytesRead += bytesRead;
-            }
-
-            var jsonResponse = Encoding.UTF8.GetString(responseBuffer, 0, responseLength);
-
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            return JsonSerializer.Deserialize<ClientResponse>(jsonResponse, options);
+            var jsonResponse = await GetJsonResponse(responseLength);
+            if(jsonResponse is null) return null;
+            
+            return JsonSerializer.Deserialize<ClientResponse>(jsonResponse, Options);
         }
         catch (Exception)
         {
             // Handle exceptions (e.g., connection lost)
             return null;
         }
+    }
+
+    private async Task SendQueryBytes(string query)
+    {
+        var queryBytes = Encoding.UTF8.GetBytes(query);
+        var lengthBytes = BitConverter.GetBytes(queryBytes.Length);
+        await _stream.WriteAsync(lengthBytes);
+        await _stream.WriteAsync(queryBytes);
+    }
+
+    private async Task<int> GetResponseLenght()
+    {
+        var responseLengthBuffer = new byte[4];
+        var bytesRead = await _stream.ReadAsync(responseLengthBuffer, 0, 4);
+        if (bytesRead < 4) return -1;
+        return BitConverter.ToInt32(responseLengthBuffer, 0);
+    }
+
+    private async Task<string?> GetJsonResponse(int responseLength)
+    {
+        var responseBuffer = new byte[responseLength];
+        var totalBytesRead = 0;
+        while(totalBytesRead < responseLength)
+        {
+            var bytesRead = await _stream.ReadAsync(responseBuffer, totalBytesRead, responseLength - totalBytesRead);
+            if (bytesRead == 0) return null;
+            totalBytesRead += bytesRead;
+        }
+
+        return Encoding.UTF8.GetString(responseBuffer, 0, responseLength);
     }
 }
