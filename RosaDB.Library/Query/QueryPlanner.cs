@@ -26,7 +26,7 @@ public class QueryPlanner(
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
             "USE" => new UseQuery(tokens, sessionState),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager, indexManager),
-            "INSERT" => new InsertQuery(tokens, cellManager, logManager),
+            "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager),
             "INITIALIZE" => new InitializeQuery(rootManager),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
         };

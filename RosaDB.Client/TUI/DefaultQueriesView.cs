@@ -22,7 +22,7 @@ namespace RosaDB.Client.TUI
                 ("Initialize RosaDB", "INITIALIZE;"),
                 ("Create Database", "CREATE DATABASE my_db;"),
                 ("Use Database", "USE my_db;"),
-                ("Create Cell Group", "CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT, is_active BOOLEAN);"),
+                ("Create Cell Group", "CREATE CELL sales (name TEXT INDEX, region TEXT, is_active BOOLEAN);"),
                 ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);"),
                 // Cell Instance Management
                 ("Insert Cell Instance", "INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');"),

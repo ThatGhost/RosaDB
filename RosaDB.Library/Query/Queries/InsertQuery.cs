@@ -12,7 +12,8 @@ namespace RosaDB.Library.Query.Queries;
 public class InsertQuery(
     string[] tokens,
     ICellManager cellManager,
-    LogManager logManager) : IQuery
+    LogManager logManager,
+    IIndexManager indexManager) : IQuery
 {
     public Task<QueryResult> Execute()
     {
@@ -36,6 +37,7 @@ public class InsertQuery(
                 var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
                 return GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
                     .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
+                    .Then(tableRow => CheckPrimaryKeys(parsed.CellGroupName, parsed.TableName, usingIndexValues, tableRow))
                     .Then(RowSerializer.Serialize)
                     .ThenAsync(serializedRowBytes =>
                     {
@@ -47,6 +49,32 @@ public class InsertQuery(
                 () => Task.FromResult(new QueryResult("1 row inserted successfully.", 1)),
                 error => Task.FromResult<QueryResult>(error)
             );
+    }
+    
+    private Result<Row> CheckPrimaryKeys(string cellGroupName, string tableName, object[] usingIndexValues, Row tableRow)
+    {
+        // Replicate LogManager's identifier creation logic
+        var indexString = string.Join(";", usingIndexValues.Select(v => v.ToString()));
+        var instanceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
+        var identifier = new TableInstanceIdentifier(cellGroupName, tableName, instanceHash);
+
+        foreach (var col in tableRow.Columns)
+        {
+            if (col.IsPrimaryKey)
+            {
+                var val = tableRow[col.Name];
+                if (val == null) continue; // Should not happen for PK, but safe check
+                
+                var keyBytes = IndexKeyConverter.ToByteArray(val);
+                var searchResult = indexManager.Search(identifier, col.Name, keyBytes);
+                
+                if (searchResult.IsSuccess)
+                {
+                     return new Error(ErrorPrefixes.DataError, $"Duplicate primary key value '{val}' for column '{col.Name}'.");
+                }
+            }
+        }
+        return tableRow;
     }
 
     private async Task<QueryResult> InsertCellAsync()
@@ -211,17 +239,28 @@ public class InsertQuery(
     private Result<Dictionary<string, string>> ParseUsingClause(int startIndex, out int endIndex)
     {
         endIndex = -1;
-        var usingPropsResult = ParseParenthesizedList(startIndex, out endIndex);
-        if (!usingPropsResult.TryGetValue(out var usingPropsTokens))
-            return usingPropsResult.Error;
+        
+        var nextParenIndex = Array.IndexOf(tokens, "(", startIndex);
+        if (nextParenIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing columns list after USING clause.");
+        
+        endIndex = nextParenIndex - 1;
 
+        if (endIndex < startIndex) return new Error(ErrorPrefixes.QueryParsingError, "Empty USING clause.");
+
+        var usingClauseTokens = tokens[startIndex..nextParenIndex];
+        
         var usingProperties = new Dictionary<string, string>();
-        for (int i = 0; i < usingPropsTokens.Length; i += 3)
+        for (int i = 0; i < usingClauseTokens.Length; i += 3)
         {
-            if (i + 2 >= usingPropsTokens.Length || usingPropsTokens[i+1] != "=")
-                return new Error(ErrorPrefixes.QueryParsingError, "Malformed USING clause. Expected 'key=value' pairs.");
-            usingProperties[usingPropsTokens[i]] = usingPropsTokens[i+2];
+            if (i + 2 >= usingClauseTokens.Length || usingClauseTokens[i+1] != "=") return new Error(ErrorPrefixes.QueryParsingError, "Malformed USING clause. Expected 'key=value' pairs.");
+            
+            var value = usingClauseTokens[i+2];
+            if (value.StartsWith("'") && value.EndsWith("'"))
+                value = value.Substring(1, value.Length - 2);
+
+            usingProperties[usingClauseTokens[i]] = value;
         }
+        
         return usingProperties;
     }
 

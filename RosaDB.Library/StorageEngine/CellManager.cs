@@ -36,10 +36,9 @@ namespace RosaDB.Library.StorageEngine
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
             var rowBytesResult = RowSerializer.Serialize(instanceData);
-            if (!rowBytesResult.TryGetValue(out var rowBytes))
-                return rowBytesResult.Error;
+            if (!rowBytesResult.TryGetValue(out var rowBytes)) return rowBytesResult.Error;
 
-            if(mainStore[hashBytes] is not null) return new Error(ErrorPrefixes.DataError, "Cell instance already exists");
+            if(mainStore.ContainsKey(hashBytes)) return new Error(ErrorPrefixes.DataError, "Cell instance already exists");
             
             mainStore[hashBytes] = rowBytes;
             mainStore.Commit();

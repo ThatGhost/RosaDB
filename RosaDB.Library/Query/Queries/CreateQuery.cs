@@ -42,6 +42,7 @@ public class CreateQuery(
         return await columnResult.MatchAsync<QueryResult>(
             async columns =>
             {
+                foreach (var c in columns) if (c.IsPrimaryKey) return new Error(ErrorPrefixes.QueryParsingError, "Primary key columns are not allowed. Use the INDEX keyword instead");
                 var result = await databaseManager.CreateCell(cellName, columns);
                 return result.Match(
                     () => new QueryResult($"Successfully created cell: {cellName}"),
