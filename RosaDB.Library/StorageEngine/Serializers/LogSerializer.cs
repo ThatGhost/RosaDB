@@ -5,13 +5,14 @@ namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class LogSerializer
 {
+    // TODO add versioning to log structure
     public static byte[] Serialize(Log log)
     {
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
-        writer.Write((int)0); 
-
+        writer.Write(0); 
+        
         writer.Write(log.Id);
         writer.Write(log.IsDeleted);
         writer.Write(log.Date.ToBinary());

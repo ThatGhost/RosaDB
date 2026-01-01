@@ -28,11 +28,21 @@ public static class RowSerializer
                     writer.Write((long)value!);
                     break;
                 case DataType.VARCHAR:
+                {
                     var str = (string)value!;
                     var bytes = Encoding.UTF8.GetBytes(str);
                     writer.Write(bytes.Length);
                     writer.Write(bytes);
                     break;
+                }
+                case DataType.TEXT:
+                {
+                    var str = (string)value!;
+                    var bytes = Encoding.UTF8.GetBytes(str);
+                    writer.Write(bytes.Length);
+                    writer.Write(bytes);
+                    break;
+                }
                 case DataType.BOOLEAN:
                     writer.Write((bool)value!);
                     break;
@@ -66,10 +76,21 @@ public static class RowSerializer
                         values[i] = reader.ReadInt64();
                         break;
                     case DataType.VARCHAR:
+                    {
+                        
                         var length = reader.ReadInt32();
                         var bytes = reader.ReadBytes(length);
                         values[i] = Encoding.UTF8.GetString(bytes);
                         break;
+                    }
+                    case DataType.TEXT:
+                    {
+                        
+                        var length = reader.ReadInt32();
+                        var bytes = reader.ReadBytes(length);
+                        values[i] = Encoding.UTF8.GetString(bytes);
+                        break;
+                    }
                     case DataType.BOOLEAN:
                         values[i] = reader.ReadBoolean();
                         break;

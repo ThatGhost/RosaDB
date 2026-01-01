@@ -9,6 +9,7 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.StorageEngine;
 
+// TODO split LogManager into reader and writer
 public class LogManager(
     LogCondenser logCondenser,
     SessionState sessionState,
