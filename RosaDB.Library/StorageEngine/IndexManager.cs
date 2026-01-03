@@ -9,7 +9,7 @@ namespace RosaDB.Library.StorageEngine;
 
 public class IndexManager(
     IFileSystem fileSystem,
-    IFolderManager folderManager) : IIndexManager
+    IFolderManager folderManager) : IIndexManager, IDisposable
 {
     private readonly Dictionary<string, BPlusTree<byte[], LogLocation>> _activeIndexes = new();
 
@@ -103,7 +103,7 @@ public class IndexManager(
         return new Error(ErrorPrefixes.DataError, $"Key '{key}' not found in index '{indexKey}'.");
     }
     
-    public void CloseAllIndexes()
+    public void Dispose()
     {
         foreach (var btree in _activeIndexes.Values)
         {

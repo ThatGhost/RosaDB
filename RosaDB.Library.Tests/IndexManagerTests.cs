@@ -65,7 +65,7 @@ namespace RosaDB.Library.Tests
         [TearDown]
         public void Teardown()
         {
-            _indexManager.CloseAllIndexes();
+            _indexManager.Dispose();
             if (Directory.Exists(_tempDirectory))
             {
                 Directory.Delete(_tempDirectory, true);

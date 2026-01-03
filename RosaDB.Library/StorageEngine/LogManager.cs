@@ -16,9 +16,10 @@ public class LogManager(
     IFileSystem fileSystem,
     IFolderManager folderManager,
     IIndexManager indexManager,
-    ICellManager cellManager)
+    ICellManager cellManager) : IAsyncDisposable
 {
     private const long MaxSegmentSize = 1024 * 1024;
+    private readonly Dictionary<string, Stream> _activeStreams = new();
 
     private readonly Dictionary<TableInstanceIdentifier, Queue<Log>> _writeAheadLogs = new();
     private readonly Dictionary<TableInstanceIdentifier, SegmentMetadata> _segmentMetadata = new();
@@ -122,16 +123,27 @@ public class LogManager(
             Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             if (result.IsFailure) return result.Error;
             
-            await using var segmentStream = fileSystem.FileStream.New(result.Value.segmentFilePath, FileMode.Append, FileAccess.Write, FileShare.None);
+            var path = result.Value.segmentFilePath;
+            Stream segmentStream;
+            if (_activeStreams.TryGetValue(path, out var stream))
+            {
+                segmentStream = stream;
+            }
+            else
+            {
+                segmentStream = fileSystem.FileStream.New(path, FileMode.Append, FileAccess.Write, FileShare.Read);
+                _activeStreams[path] = segmentStream;
+            }
 
             var finalOffset = await WriteSerializedLogs(identifier, result.Value.metadata, result.Value.serializedLogs, segmentStream, result.Value.metadata.CurrentSegmentSize, columns);
             
             if (finalOffset == -1) return new Error(ErrorPrefixes.DataError, "Failed to write serialized logs and update indexes.");
 
+            await segmentStream.FlushAsync();
+
             _segmentMetadata[identifier] = result.Value.metadata with { CurrentSegmentSize = finalOffset };
         }
         
-        indexManager.CloseAllIndexes();
         return Result.Success();
     }
     
@@ -208,7 +220,7 @@ public class LogManager(
         if (!fileSystem.File.Exists(segmentFilePath))
             return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
 
-        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         stream.Seek(logLocation.Offset, SeekOrigin.Begin);
         
         var log = await LogSerializer.DeserializeAsync(stream);
@@ -234,7 +246,7 @@ public class LogManager(
         if (segmentFilePath == null || !fileSystem.File.Exists(segmentFilePath))
             return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
 
-        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         stream.Seek(logLocation.Offset, SeekOrigin.Begin);
         
         var log = await LogSerializer.DeserializeAsync(stream);
@@ -257,7 +269,7 @@ public class LogManager(
 
         foreach (var dataFile in dataFiles)
         {
-            await using var stream = fileSystem.FileStream.New(dataFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+            await using var stream = fileSystem.FileStream.New(dataFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             while (stream.Position < stream.Length)
             {
                 var log = await LogSerializer.DeserializeAsync(stream);
@@ -296,7 +308,7 @@ public class LogManager(
 
             foreach (var dataFile in dataFiles)
             {
-                await using var stream = fileSystem.FileStream.New(dataFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+                await using var stream = fileSystem.FileStream.New(dataFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 while (stream.Position < stream.Length)
                 {
                     var log = await LogSerializer.DeserializeAsync(stream);
@@ -314,5 +326,14 @@ public class LogManager(
                 yield return log;
             }
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var stream in _activeStreams.Values)
+        {
+            await stream.DisposeAsync();
+        }
+        _activeStreams.Clear();
     }
 }

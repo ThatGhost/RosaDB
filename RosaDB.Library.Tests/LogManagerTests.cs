@@ -359,5 +359,12 @@ namespace RosaDB.Library.Tests
             Assert.That(result.Value, Is.Not.Null);
             Assert.That(result.Value.TupleData, Is.EqualTo(fakeData2));
         }
+
+        [TearDown]
+        public async Task TearDown()
+        {
+            if (_logManager != null)
+                await _logManager.DisposeAsync();
+        }
     }
 }
