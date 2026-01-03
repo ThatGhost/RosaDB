@@ -1,10 +1,9 @@
-using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class GetCellLogsQuery(LogManager logManager, ICellManager cellManager)
+public class GetCellLogsQuery(ILogManager logManager, ICellManager cellManager)
 {
     public async Task<List<string>> Execute(string cellName, string tableName, object[] indexValues)
     {

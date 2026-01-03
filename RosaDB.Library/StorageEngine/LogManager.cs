@@ -16,7 +16,7 @@ public class LogManager(
     IFileSystem fileSystem,
     IFolderManager folderManager,
     IIndexManager indexManager,
-    ICellManager cellManager) : IAsyncDisposable
+    ICellManager cellManager) : ILogManager
 {
     private const long MaxSegmentSize = 1024 * 1024;
     private readonly Dictionary<string, Stream> _activeStreams = new();

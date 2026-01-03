@@ -12,7 +12,7 @@ namespace RosaDB.Library.Query.Queries;
 public class InsertQuery(
     string[] tokens,
     ICellManager cellManager,
-    LogManager logManager,
+    ILogManager logManager,
     IIndexManager indexManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()

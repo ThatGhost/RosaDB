@@ -12,7 +12,7 @@ public class QueryPlanner(
     ICellManager cellManager, 
     RootManager rootManager,
     SessionState sessionState,
-    LogManager logManager,
+    ILogManager logManager,
     IIndexManager indexManager
     )
 {
@@ -25,7 +25,7 @@ public class QueryPlanner(
             "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, cellManager),
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
             "USE" => new UseQuery(tokens, sessionState),
-            "SELECT" => new SelectQuery(tokens, logManager, cellManager, indexManager),
+            "SELECT" => new SelectQuery(tokens, logManager, cellManager),
             "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager),
             "INITIALIZE" => new InitializeQuery(rootManager),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
