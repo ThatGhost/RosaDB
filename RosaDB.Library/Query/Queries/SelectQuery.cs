@@ -14,7 +14,7 @@ namespace RosaDB.Library.Query.Queries
             var tableNameParts = tokens[fromIndex + 1].Split('.');
             var cellName = tableNameParts[0];
             var tableName = tableNameParts[1];
-
+            var whereIndex = FindKeywordIndex("WHERE");
             var usingIndex = FindKeywordIndex("USING");
 
             IAsyncEnumerable<Log> logs;
@@ -23,7 +23,6 @@ namespace RosaDB.Library.Query.Queries
                 var cellEnv = await cellManager.GetEnvironment(cellName);
                 if (cellEnv.IsFailure) return cellEnv.Error;
                 
-                var whereIndex = FindKeywordIndex("WHERE");
                 var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
                 var usingTokens = tokens[(usingIndex + 1)..endIndex];
 
@@ -61,8 +60,89 @@ namespace RosaDB.Library.Query.Queries
                     rows.Add(row.Value);
                 }
             }
+            
+            if (whereIndex != -1)
+            {
+                var whereTokens = tokens[(whereIndex + 1)..^1];
+                for (int i = 0; i < whereTokens.Length; i += 4)
+                {
+                    var columnName = whereTokens[i];
+                    var op = whereTokens[i + 1];
+                    var value = whereTokens[i + 2];
+                    rows = rows.Where(r => ApplyWhere(r, columnName, op, value)).ToList();
+                }
+            }
 
+            var projectionIndex = FindKeywordIndex("SELECT");
+            var from = FindKeywordIndex("FROM");
+            var projectionTokens = tokens[(projectionIndex + 1)..from];
+
+            if (projectionTokens.Length > 0 && projectionTokens[0] != "*")
+            {
+                var projectedRows = new List<Row>();
+                foreach (var row in rows)
+                {
+                    var projectedRow = ApplyProjection(row, projectionTokens);
+                    if (projectedRow.IsSuccess)
+                    {
+                        projectedRows.Add(projectedRow.Value);
+                    }
+                    else
+                    {
+                        return projectedRow.Error;
+                    }
+                }
+                return new QueryResult(projectedRows);
+            }
+            
             return new QueryResult(rows);
+        }
+
+        private Result<Row> ApplyProjection(Row row, string[] projection)
+        {
+            var newColumns = new List<Column>();
+            var newValues = new List<object>();
+
+            foreach (var colName in projection)
+            {
+                if (colName == ",")
+                    continue;
+                
+                var colIndex = Array.FindIndex(row.Columns, c => c.Name.Equals(colName, StringComparison.OrdinalIgnoreCase));
+                if (colIndex != -1)
+                {
+                    newColumns.Add(row.Columns[colIndex]);
+                    var value = row.Values[colIndex];
+                    if (value != null)
+                    {
+                        newValues.Add(value);
+                    }
+                }
+            }
+
+            return Row.Create(newValues.ToArray(), newColumns.ToArray());
+        }
+
+        private bool ApplyWhere(Row row, string columnName, string op, string value)
+        {
+            var columnIndex = Array.FindIndex(row.Columns, c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
+            if (columnIndex == -1)
+            {
+                return false;
+            }
+
+            var rowValue = row.Values[columnIndex];
+            if(rowValue == null)
+                return false;
+            
+            var parsedValue = StringToDataParser.Parse(value, row.Columns[columnIndex].DataType).Value;
+
+            if (op == "=")
+            {
+                return rowValue.Equals(parsedValue);
+            }
+
+            return false;
         }
 
         private int FindKeywordIndex(string keyword, int startIndex = 0)

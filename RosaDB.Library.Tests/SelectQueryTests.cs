@@ -13,7 +13,7 @@ namespace RosaDB.Library.Tests
     [TestFixture]
     public class SelectQueryTests
     {
-        private Mock<ICellManager> _mockCellManager; 
+        private Mock<ICellManager> _mockCellManager;
         private Mock<ILogManager> _mockLogManager;
 
         private const string cellName = "TestCell";
@@ -22,9 +22,11 @@ namespace RosaDB.Library.Tests
         private readonly Column[] tableColumns =
         [
             Column.Create("data", DataType.VARCHAR).Value,
-            Column.Create("id", DataType.BIGINT, isPrimaryKey: true).Value
+            Column.Create("id", DataType.BIGINT, isPrimaryKey: true).Value,
+            Column.Create("age", DataType.INT).Value,
+            Column.Create("city", DataType.VARCHAR).Value
         ];
-        
+
         private readonly Column[] cellColumns =
         [
             Column.Create("cellId", DataType.BIGINT, isIndex: true).Value
@@ -37,26 +39,29 @@ namespace RosaDB.Library.Tests
         private Log fakeLog2;
         private Log fakeLog3;
         private Row fakeCellInstance1;
-        
+
         [SetUp]
         public void Setup()
         {
-            _mockCellManager = new Mock<ICellManager>(); 
-            _mockLogManager = new Mock<ILogManager>(); 
-            
+            _mockCellManager = new Mock<ICellManager>();
+            _mockLogManager = new Mock<ILogManager>();
+
             _mockCellManager.Setup(cm => cm.GetColumnsFromTable(cellName, tableName)).ReturnsAsync(tableColumns);
-            
+
             // Setup Environment for USING clause (needs to know about indexes)
             var cellEnv = new CellEnvironment
             {
                 Columns = cellColumns
             };
             _mockCellManager.Setup(cm => cm.GetEnvironment(cellName)).ReturnsAsync(cellEnv);
-            
-            fakeData1 = RowSerializer.Serialize(Row.Create(["data1", (long)1], tableColumns).Value).Value;
-            fakeData2 = RowSerializer.Serialize(Row.Create(["data2", (long)2], tableColumns).Value).Value;
-            fakeData3 = RowSerializer.Serialize(Row.Create(["data3", (long)3], tableColumns).Value).Value;
-            
+
+            fakeData1 = RowSerializer.Serialize(Row.Create(["data1", (long)1, 30, "New York"], tableColumns).Value)
+                .Value;
+            fakeData2 = RowSerializer.Serialize(Row.Create(["data2", (long)2, 25, "Los Angeles"], tableColumns).Value)
+                .Value;
+            fakeData3 = RowSerializer.Serialize(Row.Create(["data3", (long)3, 35, "Chicago"], tableColumns).Value)
+                .Value;
+
             fakeLog1 = new Log()
             {
                 Id = 1,
@@ -81,8 +86,9 @@ namespace RosaDB.Library.Tests
                 IsDeleted = false,
                 TupleData = fakeData3
             };
-            fakeCellInstance1 = Row.Create([1],cellColumns).Value;
-            _mockCellManager.Setup(c => c.GetCellInstance(cellName, It.IsAny<string>())).Returns(() => Task.FromResult(Result<Row>.Success(fakeCellInstance1)));
+            fakeCellInstance1 = Row.Create([1], cellColumns).Value;
+            _mockCellManager.Setup(c => c.GetCellInstance(cellName, It.IsAny<string>()))
+                .Returns(() => Task.FromResult(Result<Row>.Success(fakeCellInstance1)));
         }
 
         private async IAsyncEnumerable<T> ToAsyncEnumerable<T>(IEnumerable<T> source)
@@ -97,88 +103,98 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_AllRowsInTable()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1, fakeLog2
-            }));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
+                ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1, fakeLog2
+                }));
             string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", ";"];
-            
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(2));
         }
-        
+
         [Test]
         public async Task SELECT_AllRowsInCellTable()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 })).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1
-            }));
-            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 })).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog2
-            }));
-            
-            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1",";"];
-            
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 }))
+                .Returns(() => ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1
+                }));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 }))
+                .Returns(() => ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog2
+                }));
+
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", ";"];
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(1));
         }
-        
+
         [Test]
         public async Task SELECT_WithWHERE_ShouldReturnRowsAcrossCellsWithCorrectWhere()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1, fakeLog2
-            }));
-            
-            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "data", "=", "data1",";"];
-            
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
+                ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1, fakeLog2
+                }));
+
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "age", "=", "30", ";"];
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(1));
         }
-        
+
         [Test]
         public async Task SELECT_WithWHEREAndUSING_ShouldReturnRowsWithCorrectWhereAndUsing()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 })).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1
-            }));
-            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 })).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog2,
-                fakeLog3
-            }));
-            
-            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", "WHERE", "data", "=", "data2",";"];
-            
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 }))
+                .Returns(() => ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1
+                }));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 }))
+                .Returns(() => ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog2,
+                    fakeLog3
+                }));
+
+            string[] tokens =
+            [
+                "SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", "WHERE", "city", "=",
+                "Chicago", ";"
+            ];
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
@@ -189,45 +205,73 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_ProjectOneColumn_ShouldReturnRowsWithOneColumn()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1, fakeLog2
-            }));
-            string[] tokens = ["SELECT", "data", "FROM", $"{cellName}.{tableName}", ";"];
-            
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
+                ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1, fakeLog2
+                }));
+            string[] tokens = ["SELECT", "city", "FROM", $"{cellName}.{tableName}", ";"];
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(2));
             Assert.That(result.Rows[0].Columns.Length, Is.EqualTo(1));
-            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("data"));
+            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("city"));
         }
 
         [Test]
         public async Task SELECT_ProjectMultipleColumns_ShouldReturnRowsWithMultipleColumns()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable(new List<Log>()
-            {
-                fakeLog1, fakeLog2
-            }));
-            string[] tokens = ["SELECT", "data", ",", "id", "FROM", $"{cellName}.{tableName}", ";"];
-            
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
+                ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1, fakeLog2
+                }));
+            string[] tokens = ["SELECT", "age", ",", "city", "FROM", $"{cellName}.{tableName}", ";"];
+
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
             var result = await query.Execute();
-            
+
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(2));
             Assert.That(result.Rows[0].Columns.Length, Is.EqualTo(2));
-            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("data"));
-            Assert.That(result.Rows[0].Columns[1].Name, Is.EqualTo("id"));
+            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("age"));
+            Assert.That(result.Rows[0].Columns[1].Name, Is.EqualTo("city"));
+        }
+
+        [Test]
+        public async Task SELECT_WithWHEREAnd_ShouldReturnRowsWithCorrectWhere()
+        {
+            // Arrange
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
+                ToAsyncEnumerable(new List<Log>()
+                {
+                    fakeLog1, fakeLog2, fakeLog3
+                }));
+
+            string[] tokens =
+            [
+                "SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "age", "=", "30", "AND", "city", "=",
+                "New York", ";"
+            ];
+
+            // Act
+            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
+            var result = await query.Execute();
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.Rows, Is.Not.Null);
+            Assert.That(result.Rows.Count, Is.EqualTo(1));
         }
     }
 }
