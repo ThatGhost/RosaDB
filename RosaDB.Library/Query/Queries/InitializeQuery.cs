@@ -5,7 +5,7 @@ namespace RosaDB.Library.Query.Queries;
 
 public class InitializeQuery(RootManager rootManager) : IQuery
 {
-    public async Task<QueryResult> Execute()
+    public async ValueTask<QueryResult> Execute()
     {
         var result = await rootManager.InitializeRoot();
         return result.IsFailure ? result.Error : new QueryResult("RosaDB successfully initialized");

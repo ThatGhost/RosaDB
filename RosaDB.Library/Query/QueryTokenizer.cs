@@ -14,49 +14,67 @@ namespace RosaDB.Library.Query
                 if (string.IsNullOrWhiteSpace(query)) return Array.Empty<string>();
 
                 List<string> tokens = new();
-                var currentToken = new StringBuilder();
-                bool inLiteral = false;
-                char literalChar = '\'';
+                ReadOnlySpan<char> span = query.AsSpan();
+                int n = span.Length;
+                int tokenStart = 0;
+                bool inToken = false;
 
-                void PushToken()
+                for (int i = 0; i < n; i++)
                 {
-                    if (currentToken.Length > 0)
-                    {
-                        tokens.Add(currentToken.ToString());
-                        currentToken.Clear();
-                    }
-                }
+                    char c = span[i];
 
-                foreach (char c in query)
-                {
-                    if (inLiteral)
+                    // Handle Quotes
+                    if (c is '"' or '\'')
                     {
-                        if (c == literalChar)
+                        if (inToken)
                         {
-                            tokens.Add(currentToken.ToString());
-                            currentToken.Clear();
-                            inLiteral = false;
+                            tokens.Add(span.Slice(tokenStart, i - tokenStart).Trim().ToString());
+                            inToken = false;
                         }
-                        else currentToken.Append(c);
+
+                        char quote = c;
+                        int literalStart = i + 1;
+                        i++;
+                        while (i < n && span[i] != quote) i++;
+
+                        tokens.Add(i < n
+                            ? span.Slice(literalStart, i - literalStart).ToString()
+                            : span.Slice(literalStart, n - literalStart).ToString());
                         continue;
                     }
 
-                    if (c == '(' || c == ')' || c == ',' || c == ';' || char.IsWhiteSpace(c))
+                    // Handle Separators
+                    bool isSeparator = c == '(' || c == ')' || c == ',' || c == ';' || char.IsWhiteSpace(c);
+
+                    if (isSeparator)
                     {
-                        PushToken();
-                        if(!char.IsWhiteSpace(c)) tokens.Add(c.ToString());
+                        if (inToken)
+                        {
+                            tokens.Add(span.Slice(tokenStart, i - tokenStart).Trim().ToString());
+                            inToken = false;
+                        }
+
+                        if (!char.IsWhiteSpace(c))
+                        {
+                            tokens.Add(c.ToString());
+                        }
                     }
-                    else if (c == '"' || c == '\'')
+                    else
                     {
-                        PushToken(); 
-                        inLiteral = true;
-                        literalChar = c;
+                        if (!inToken)
+                        {
+                            tokenStart = i;
+                            inToken = true;
+                        }
                     }
-                    else currentToken.Append(c);
                 }
 
-                PushToken();
-                return tokens.Select(t => t.Trim()).ToArray();
+                if (inToken)
+                {
+                    tokens.Add(span.Slice(tokenStart, n - tokenStart).Trim().ToString());
+                }
+
+                return tokens.ToArray();
             }
             catch { return new CriticalError(); }
         }

@@ -13,7 +13,7 @@ public class CreateQuery(
     ICellManager cellManager)
     : IQuery
 {
-    public async Task<QueryResult> Execute()
+    public async ValueTask<QueryResult> Execute()
     {
         if (tokens[0].ToUpperInvariant() != "CREATE") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
 

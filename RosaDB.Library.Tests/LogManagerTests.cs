@@ -164,9 +164,9 @@ namespace RosaDB.Library.Tests
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
 
-            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId1);
+            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId: logId1);
             await _logManager.Commit();
-            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId2);
+            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId: logId2);
             await _logManager.Commit();
 
             // Act
@@ -193,9 +193,9 @@ namespace RosaDB.Library.Tests
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>()))
                 .Returns((Queue<Log> q) => q.ToList());
 
-            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId1);
+            _logManager.Put(cellName, tableName, cellIndex1, fakeData1, logId: logId1);
             await _logManager.Commit();
-            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId2);
+            _logManager.Put(cellName, tableName, cellIndex2, fakeData2, logId: logId2);
             await _logManager.Commit();
 
             // Act
@@ -232,7 +232,7 @@ namespace RosaDB.Library.Tests
                 It.Is<byte[]>(b => b.SequenceEqual(IndexKeyConverter.ToByteArray(logId)))))
                 .Returns(new LogLocation(0, 0));
 
-            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId: logId);
             await _logManager.Commit();
 
             // Act
@@ -255,7 +255,7 @@ namespace RosaDB.Library.Tests
 
             _mockLogCondenser.Setup(c => c.Condense(It.IsAny<Queue<Log>>())).Returns([log]);
 
-            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId: logId);
 
             var identifier = CreateIdentifier(cellIndex);
 
@@ -315,7 +315,7 @@ namespace RosaDB.Library.Tests
             var logId = 12345;
 
             // Act
-            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId: logId);
             var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert
@@ -350,8 +350,8 @@ namespace RosaDB.Library.Tests
             var logId = 67890;
 
             // Act
-            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId);
-            _logManager.Put(cellName, tableName, cellIndex, fakeData2, logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData1, logId: logId);
+            _logManager.Put(cellName, tableName, cellIndex, fakeData2, logId: logId);
             var result = await _logManager.FindLastestLog(cellName, tableName, cellIndex, logId);
 
             // Assert

@@ -4,5 +4,5 @@ namespace RosaDB.Library.Models;
 
 public interface IQuery
 {
-    public Task<QueryResult> Execute();
+    public ValueTask<QueryResult> Execute();
 }

@@ -6,7 +6,7 @@ namespace RosaDB.Library.Query.Queries;
 
 public class UseQuery(string[] tokens, SessionState sessionState) : IQuery
 {
-    public async Task<QueryResult> Execute()
+    public async ValueTask<QueryResult> Execute()
     {
         if (tokens[0].ToUpperInvariant() != "USE") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
         if (tokens.Length < 2) return new Error(ErrorPrefixes.QueryParsingError, "Not enough arguments for USE query");

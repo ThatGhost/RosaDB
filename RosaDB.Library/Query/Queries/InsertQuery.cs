@@ -15,15 +15,15 @@ public class InsertQuery(
     LogManager logManager,
     IIndexManager indexManager) : IQuery
 {
-    public Task<QueryResult> Execute()
+    public async ValueTask<QueryResult> Execute()
     {
-        if (tokens.Length < 3) return Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT statement."));
+        if (tokens.Length < 3) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT statement.");
 
         return tokens[1].ToUpperInvariant() switch
         {
-            "CELL" => InsertCellAsync(),
-            "INTO" => InsertIntoAsync(),
-            _ => Task.FromResult<QueryResult>(new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}")),
+            "CELL" => await InsertCellAsync(),
+            "INTO" => await InsertIntoAsync(),
+            _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}"),
         };
     }
 
@@ -32,18 +32,31 @@ public class InsertQuery(
         return await ParseInsertInto()
             .ThenAsync(parsed => AssertUsingClause(parsed)
             .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.CellGroupName, parsed.TableName)
-            .ThenAsync(tableSchemaColumns =>
+            .ThenAsync(async tableSchemaColumns =>
             {
                 var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
-                return GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
+                
+                var rowResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
                     .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
-                    .Then(tableRow => CheckPrimaryKeys(parsed.CellGroupName, parsed.TableName, usingIndexValues, tableRow))
-                    .Then(RowSerializer.Serialize)
-                    .ThenAsync(serializedRowBytes =>
+                    .Then(tableRow => CheckPrimaryKeys(parsed.CellGroupName, parsed.TableName, usingIndexValues, tableRow));
+                
+                if (rowResult.IsFailure) return rowResult.Error;
+                var row = rowResult.Value;
+
+                var serializeResult = RowSerializer.Serialize(row);
+                if (serializeResult.IsFailure) return serializeResult.Error;
+                
+                var indexValuesList = new List<(string, byte[], bool)>();
+                for(int i=0; i < row.Columns.Length; i++)
+                {
+                    if (row.Columns[i].IsIndex || row.Columns[i].IsPrimaryKey)
                     {
-                        logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues, serializedRowBytes);
-                        return logManager.Commit();
-                    });
+                         indexValuesList.Add((row.Columns[i].Name, IndexKeyConverter.ToByteArray(row.Values[i]), row.Columns[i].IsPrimaryKey));
+                    }
+                }
+
+                logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
+                return await logManager.Commit();
             })))
             .MatchAsync(
                 () => Task.FromResult(new QueryResult("1 row inserted successfully.", 1)),

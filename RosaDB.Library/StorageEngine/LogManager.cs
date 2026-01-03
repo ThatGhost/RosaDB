@@ -54,7 +54,7 @@ public class LogManager(
         return (metadata, segmentFilePathResult.Value, serializedLogs);
     }
 
-    private async Task<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset, Column[] columns)
+    private async ValueTask<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset, Column[] columns)
     {
         long currentOffset = initialOffset;
 
@@ -64,31 +64,38 @@ public class LogManager(
             
             indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
             
-            Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-            if (rowResult.IsFailure) return -1;
-
-            Row row = rowResult.Value;
-            for (int i = 0; i < row.Columns.Length; i++)
+            if (log.IndexValues != null)
             {
-                Column col = row.Columns[i];
-                object? val = row.Values[i];
-
-                if (col.IsPrimaryKey || col.IsIndex)
+                foreach (var (name, val, isPk) in log.IndexValues)
                 {
-                    byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
                     TableInstanceIdentifier indexIdentifier;
+                    if (!isPk) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
+                    else indexIdentifier = identifier;
 
-                    // Use a table-wide identifier for secondary indexes, and instance-specific for primary keys.
-                    if (col.IsIndex && !col.IsPrimaryKey)
+                    indexManager.Insert(indexIdentifier, name, val, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+                }
+            }
+            else
+            {
+                Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+                if (rowResult.IsFailure) return -1;
+
+                Row row = rowResult.Value;
+                for (int i = 0; i < row.Columns.Length; i++)
+                {
+                    Column col = row.Columns[i];
+                    object? val = row.Values[i];
+
+                    if (col.IsPrimaryKey || col.IsIndex)
                     {
-                        indexIdentifier = new TableInstanceIdentifier(identifier.CellName, identifier.TableName, "_TABLE_");
+                        byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
+                        TableInstanceIdentifier indexIdentifier;
+
+                        if (col.IsIndex && !col.IsPrimaryKey) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
+                        else indexIdentifier = identifier;
+
+                        indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
                     }
-                    else // This is a primary key
-                    {
-                        indexIdentifier = identifier;
-                    }
-                    
-                    indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
                 }
             }
             
@@ -97,7 +104,7 @@ public class LogManager(
         return currentOffset;
     }
 
-    public async Task<Result> Commit()
+    public async ValueTask<Result> Commit()
     {
         if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database is not set");
         
@@ -128,12 +135,12 @@ public class LogManager(
         return Result.Success();
     }
     
-    public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, long? logId = null)
+    public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
     {
         var identifier = CreateIdentifier(cellName, tableName, tableIndex);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
-        Log log = new() { TupleData = data, Id = finalLogId };
+        Log log = new() { TupleData = data, Id = finalLogId, IndexValues = indexValues };
         PutLog(log, identifier);
     }
 

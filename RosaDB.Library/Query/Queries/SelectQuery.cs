@@ -11,7 +11,7 @@ namespace RosaDB.Library.Query.Queries
     // TODO refactor after adding the USING clause to SELECT
     public class SelectQuery(string[] tokens, LogManager logManager, ICellManager cellManager, IIndexManager indexManager) : IQuery
     {
-        public async Task<QueryResult> Execute()
+        public async ValueTask<QueryResult> Execute()
         {
             // Basic parsing: SELECT <columns> FROM <tableName> IN <cellName> WHERE <column> = <value>
             if (tokens.Length < 6 || tokens[0].ToUpperInvariant() != "SELECT" || tokens[2].ToUpperInvariant() != "FROM" || tokens[4].ToUpperInvariant() != "IN")

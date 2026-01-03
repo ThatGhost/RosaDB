@@ -1,4 +1,4 @@
-using NUnit.Framework;
+#nullable disable
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Serializers;
 
@@ -26,13 +26,13 @@ public class RowSerializerNullableTests
         var serializeResult = RowSerializer.Serialize(originalRow);
         Assert.That(serializeResult.IsSuccess, Is.True);
         
-        var deserializeResult = RowSerializer.Deserialize(serializeResult.Value, columns);
+        var deserializeResult = RowSerializer.Deserialize(serializeResult.Value!, columns);
         
         // Assert
         Assert.That(deserializeResult.IsSuccess, Is.True);
         var deserializedRow = deserializeResult.Value;
         
-        Assert.That(deserializedRow.Values.Length, Is.EqualTo(4));
+        Assert.That(deserializedRow!.Values.Length, Is.EqualTo(4));
         Assert.That(deserializedRow.Values[0], Is.EqualTo(1));
         Assert.That(deserializedRow.Values[1], Is.Null);
         Assert.That(deserializedRow.Values[2], Is.Null);
@@ -57,13 +57,13 @@ public class RowSerializerNullableTests
         var serializeResult = RowSerializer.Serialize(originalRow);
         Assert.That(serializeResult.IsSuccess, Is.True);
 
-        var deserializeResult = RowSerializer.Deserialize(serializeResult.Value, columns);
+        var deserializeResult = RowSerializer.Deserialize(serializeResult.Value!, columns);
 
         // Assert
         Assert.That(deserializeResult.IsSuccess, Is.True);
         var deserializedRow = deserializeResult.Value;
 
-        Assert.That(deserializedRow.Values[0], Is.EqualTo(10));
+        Assert.That(deserializedRow!.Values[0], Is.EqualTo(10));
         Assert.That(deserializedRow.Values[1], Is.Null);
         Assert.That(deserializedRow.Values[2], Is.EqualTo(30));
     }

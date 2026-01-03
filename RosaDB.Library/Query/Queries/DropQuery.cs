@@ -10,7 +10,7 @@ public class DropQuery(
     IDatabaseManager databaseManager,
     ICellManager cellManager) : IQuery
 {
-    public async Task<QueryResult> Execute()
+    public async ValueTask<QueryResult> Execute()
     {
         if (tokens[0].ToUpperInvariant() != "DROP") return new Error(ErrorPrefixes.QueryParsingError, "Invalid query type");
         if (tokens.Length < 3) return new Error(ErrorPrefixes.QueryParsingError, "Invalid amount of query parameters for DROP");

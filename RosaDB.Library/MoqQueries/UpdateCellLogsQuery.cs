@@ -27,7 +27,7 @@ namespace RosaDB.Library.MoqQueries
                 var bytesResult = RowSerializer.Serialize(row);
                 if(!bytesResult.TryGetValue(out var bytes)) return bytesResult.Error;
                 
-                logManager.Put(cellName, tableName, index, bytes, log.Id);
+                logManager.Put(cellName, tableName, index, bytes, logId: log.Id);
                 i++;
             }
 
