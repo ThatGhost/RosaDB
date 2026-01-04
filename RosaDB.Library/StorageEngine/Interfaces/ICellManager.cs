@@ -14,5 +14,6 @@ namespace RosaDB.Library.StorageEngine.Interfaces
         Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName);
         Task<Result> CreateCellInstance(string cellGroupName, string instanceHash, Row instanceData, Column[] schema);
         Task<Result<Row>> GetCellInstance(string cellGroupName, string instanceHash);
+        Task<Result<IEnumerable<Row>>> GetAllCellInstances(string cellGroupName);
     }
 }

@@ -29,7 +29,8 @@ namespace RosaDB.Library.Tests
 
         private readonly Column[] cellColumns =
         [
-            Column.Create("cellId", DataType.BIGINT, isIndex: true).Value
+            Column.Create("cellId", DataType.BIGINT, isIndex: true).Value,
+            Column.Create("name", DataType.VARCHAR, isIndex: false).Value
         ];
 
         private byte[] fakeData1;
@@ -113,7 +114,7 @@ namespace RosaDB.Library.Tests
         }
 
         [Test]
-        public async Task SELECT_AllRowsInCellTable()
+        public async Task SELECT_WithUSING_ShouldReturnLogsInCellWithIndexedValue()
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 }))
@@ -131,6 +132,37 @@ namespace RosaDB.Library.Tests
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Rows, Is.Not.Null);
             Assert.That(result.Rows.Count, Is.EqualTo(1));
+            Assert.That(result.Rows[0], Is.Not.Null);
+            Assert.That(result.Rows[0].Values, Is.Not.Null);
+            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data2"));
+        }
+        
+        [Test]
+        public async Task SELECT_WithUSING_ShouldReturnLogsInCell()
+        {
+            // Arrange
+            _mockCellManager.Setup(c => c.GetAllCellInstances(cellName))
+                .Returns(() => Task.FromResult<Result<IEnumerable<Row>>>(
+                    new[] {
+                        Row.Create([(long)2, "test"], cellColumns).Value
+                    }
+                ));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
+
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "name", "=", "test", ";"];
+
+            // Act
+            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
+            var result = await query.Execute();
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.Rows, Is.Not.Null);
+            Assert.That(result.Rows.Count, Is.EqualTo(1));
+            Assert.That(result.Rows[0], Is.Not.Null);
+            Assert.That(result.Rows[0].Values, Is.Not.Null);
+            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data2"));
         }
 
         [Test]

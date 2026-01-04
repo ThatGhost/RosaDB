@@ -2,6 +2,7 @@ using System.IO.Abstractions;
 using CSharpTest.Net.Collections;
 using CSharpTest.Net.Serialization;
 using RosaDB.Library.Core;
+using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
@@ -9,9 +10,12 @@ namespace RosaDB.Library.StorageEngine;
 
 public class IndexManager(
     IFileSystem fileSystem,
-    IFolderManager folderManager) : IIndexManager, IDisposable
+    IFolderManager folderManager,
+    SessionState sessionState) : IIndexManager, IDisposable
 {
     private readonly Dictionary<string, BPlusTree<byte[], LogLocation>> _activeIndexes = new();
+    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellInstanceStores = new();
+    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellPropertyIndexes = new();
 
     public void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value)
     {
@@ -32,14 +36,63 @@ public class IndexManager(
         if (btree.TryGetValue(key, out var value)) return value;
         return new Error(ErrorPrefixes.DataError, $"Key '{key}' not found in index '{indexKey}'.");
     }
+
+    public Result InsertCellData(string cellName, byte[] key, byte[] value)
+    {
+        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        if (treeResult.IsFailure) return treeResult.Error;
+
+        var tree = treeResult.Value;
+        tree[key] = value;
+        tree.Commit();
+        return Result.Success();
+    }
+
+    public Result<byte[]> GetCellData(string cellName, byte[] key)
+    {
+        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        if (treeResult.IsFailure) return treeResult.Error;
+
+        if (treeResult.Value.TryGetValue(key, out var value)) return value;
+        return new Error(ErrorPrefixes.DataError, "Cell instance not found.");
+    }
+
+    public Result<bool> CellDataExists(string cellName, byte[] key)
+    {
+        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        if (treeResult.IsFailure) return treeResult.Error;
+
+        return treeResult.Value.ContainsKey(key);
+    }
+
+    public Result InsertCellPropertyIndex(string cellName, string propertyName, byte[] key, byte[] value)
+    {
+        var treeResult = GetOrCreateCellPropertyIndex(cellName, propertyName);
+        if (treeResult.IsFailure) return treeResult.Error;
+
+        var tree = treeResult.Value;
+        tree[key] = value;
+        tree.Commit();
+        return Result.Success();
+    }
+
+    public Result<IEnumerable<KeyValuePair<byte[], byte[]>>> GetAllCellData(string cellName)
+    {
+        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        
+        if (treeResult.IsFailure) return treeResult.Error;
+        return treeResult.Value.ToArray();
+    }
     
     public void Dispose()
     {
-        foreach (var btree in _activeIndexes.Values)
-        {
-            btree.Dispose();
-        }
+        foreach (var btree in _activeIndexes.Values) btree.Dispose();
+        foreach (var btree in _activeCellInstanceStores.Values) btree.Dispose();
+        foreach (var btree in _activeCellPropertyIndexes.Values) btree.Dispose();
+        
         _activeIndexes.Clear();
+        _activeCellInstanceStores.Clear();
+        _activeCellPropertyIndexes.Clear();
     }
     
     private string GetIndexPath(TableInstanceIdentifier identifier, string columnName)
@@ -94,5 +147,43 @@ public class IndexManager(
         btree = new BPlusTree<byte[], LogLocation>(options);
         _activeIndexes[indexKey] = btree;
         return btree;
+    }
+
+    private Result<BPlusTree<byte[], byte[]>> GetOrCreateCellInstanceStore(string cellName)
+    {
+        if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+        
+        var key = $"{sessionState.CurrentDatabase.Name}_{cellName}";
+        if (_activeCellInstanceStores.TryGetValue(key, out var tree)) return tree;
+
+        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "_idx");
+
+        var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
+        {
+            CreateFile = CreatePolicy.IfNeeded,
+            FileName = filePath
+        };
+        var newTree = new BPlusTree<byte[], byte[]>(options);
+        _activeCellInstanceStores[key] = newTree;
+        return newTree;
+    }
+
+    private Result<BPlusTree<byte[], byte[]>> GetOrCreateCellPropertyIndex(string cellName, string propertyName)
+    {
+        if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+        
+        var key = $"{sessionState.CurrentDatabase.Name}_{cellName}_{propertyName}";
+        if (_activeCellPropertyIndexes.TryGetValue(key, out var tree)) return tree;
+
+        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, $"_pidx_{propertyName}");
+
+        var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
+        {
+            CreateFile = CreatePolicy.IfNeeded,
+            FileName = filePath
+        };
+        var newTree = new BPlusTree<byte[], byte[]>(options);
+        _activeCellPropertyIndexes[key] = newTree;
+        return newTree;
     }
 }
