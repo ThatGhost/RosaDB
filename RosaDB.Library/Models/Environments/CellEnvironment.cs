@@ -7,4 +7,6 @@ public class CellEnvironment
     public int Version { get; set; } = Constants.Version;
     public Column[] Columns { get; set; } = [];
     public Table[] Tables { get; set; } = [];
+    
+    public Column[] IndexColumns => Columns.Where(c => c.IsIndex).ToArray();
 }

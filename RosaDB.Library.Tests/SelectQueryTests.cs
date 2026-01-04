@@ -48,19 +48,12 @@ namespace RosaDB.Library.Tests
 
             _mockCellManager.Setup(cm => cm.GetColumnsFromTable(cellName, tableName)).ReturnsAsync(tableColumns);
 
-            // Setup Environment for USING clause (needs to know about indexes)
-            var cellEnv = new CellEnvironment
-            {
-                Columns = cellColumns
-            };
+            var cellEnv = new CellEnvironment { Columns = cellColumns };
             _mockCellManager.Setup(cm => cm.GetEnvironment(cellName)).ReturnsAsync(cellEnv);
 
-            fakeData1 = RowSerializer.Serialize(Row.Create(["data1", (long)1, 30, "New York"], tableColumns).Value)
-                .Value;
-            fakeData2 = RowSerializer.Serialize(Row.Create(["data2", (long)2, 25, "Los Angeles"], tableColumns).Value)
-                .Value;
-            fakeData3 = RowSerializer.Serialize(Row.Create(["data3", (long)3, 35, "Chicago"], tableColumns).Value)
-                .Value;
+            fakeData1 = RowSerializer.Serialize(Row.Create(["data1", (long)1, 30, "New York"], tableColumns).Value).Value;
+            fakeData2 = RowSerializer.Serialize(Row.Create(["data2", (long)2, 25, "Los Angeles"], tableColumns).Value).Value;
+            fakeData3 = RowSerializer.Serialize(Row.Create(["data3", (long)3, 35, "Chicago"], tableColumns).Value).Value;
 
             fakeLog1 = new Log()
             {
@@ -91,7 +84,9 @@ namespace RosaDB.Library.Tests
                 .Returns(() => Task.FromResult(Result<Row>.Success(fakeCellInstance1)));
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async IAsyncEnumerable<T> ToAsyncEnumerable<T>(IEnumerable<T> source)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             foreach (var item in source)
             {
@@ -104,10 +99,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1, fakeLog2
-                }));
+                ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", ";"];
 
             // Act
@@ -125,15 +117,9 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 }))
-                .Returns(() => ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1
-                }));
+                .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 }))
-                .Returns(() => ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog2
-                }));
+                .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", ";"];
 
@@ -152,10 +138,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1, fakeLog2
-                }));
+                ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "age", "=", "30", ";"];
 
@@ -174,22 +157,11 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 }))
-                .Returns(() => ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1
-                }));
+                .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 }))
-                .Returns(() => ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog2,
-                    fakeLog3
-                }));
+                .Returns(() => ToAsyncEnumerable((List<Log>) [fakeLog2, fakeLog3]));
 
-            string[] tokens =
-            [
-                "SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", "WHERE", "city", "=",
-                "Chicago", ";"
-            ];
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "cellId", "=", "1", "WHERE", "city", "=", "Chicago", ";" ];
 
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
@@ -205,11 +177,7 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_ProjectOneColumn_ShouldReturnRowsWithOneColumn()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1, fakeLog2
-                }));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "city", "FROM", $"{cellName}.{tableName}", ";"];
 
             // Act
@@ -229,10 +197,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1, fakeLog2
-                }));
+                ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "age", ",", "city", "FROM", $"{cellName}.{tableName}", ";"];
 
             // Act
@@ -252,17 +217,9 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithWHEREAnd_ShouldReturnRowsWithCorrectWhere()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable(new List<Log>()
-                {
-                    fakeLog1, fakeLog2, fakeLog3
-                }));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2, fakeLog3]));
 
-            string[] tokens =
-            [
-                "SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "age", "=", "30", "AND", "city", "=",
-                "New York", ";"
-            ];
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "WHERE", "age", "=", "30", "AND", "city", "=", "New York", ";" ];
 
             // Act
             var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);

@@ -230,10 +230,8 @@ namespace RosaDB.Library.StorageEngine
 
         public void CloseAll()
         {
-            foreach (var tree in _activeCellInstanceStores.Values)
-                tree.Dispose();
-            foreach (var tree in _activeCellPropertyIndexes.Values)
-                tree.Dispose();
+            foreach (var tree in _activeCellInstanceStores.Values) tree.Dispose();
+            foreach (var tree in _activeCellPropertyIndexes.Values) tree.Dispose();
             _activeCellInstanceStores.Clear();
             _activeCellPropertyIndexes.Clear();
         }

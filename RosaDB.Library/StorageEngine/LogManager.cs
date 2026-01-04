@@ -1,6 +1,4 @@
 using System.IO.Abstractions;
-using System.Security.Cryptography;
-using System.Text;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
@@ -149,7 +147,7 @@ public class LogManager(
     
     public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
     {
-        var identifier = CreateIdentifier(cellName, tableName, tableIndex);
+        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, tableIndex);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
         Log log = new() { TupleData = data, Id = finalLogId, IndexValues = indexValues };
@@ -158,14 +156,14 @@ public class LogManager(
 
     public void Delete(string cellName, string tableName, object[] indexValues, long logId)
     {
-        var identifier = CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
         Log log = new() { Id = logId, IsDeleted = true };
         PutLog(log, identifier);
     }
     
     public async Task<Result<Log>> FindLastestLog(string cellName, string tableName, object[] indexValues, long id)
     {
-        var identifier = CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
         
         if (_writeAheadLogs.TryGetValue(identifier, out var logs))
         {
@@ -184,13 +182,6 @@ public class LogManager(
             _writeAheadLogs[identifier] = logs;
         }
         logs.Enqueue(log);
-    }
-    
-    private TableInstanceIdentifier CreateIdentifier(string cellName, string tableName, object[] indexValues)
-    {
-        var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
-        return new TableInstanceIdentifier(cellName, tableName, hash);
     }
 
     private Result<string> GetSegmentFilePath(TableInstanceIdentifier identifier, int segmentNumber)
@@ -290,7 +281,7 @@ public class LogManager(
     public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object[] indexValues)
     {
         if (sessionState.CurrentDatabase is null) throw new Exception();
-        var identifier = CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
 
         var allLogs = new List<Log>();
 

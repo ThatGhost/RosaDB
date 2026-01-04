@@ -13,6 +13,35 @@ public class IndexManager(
 {
     private readonly Dictionary<string, BPlusTree<byte[], LogLocation>> _activeIndexes = new();
 
+    public void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value)
+    {
+        var btree = GetOrCreateBPlusTree(identifier, columnName);
+        btree[key] = value;
+    }
+
+    public Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, byte[] key)
+    {
+        var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
+
+        if (!_activeIndexes.TryGetValue(indexKey, out var btree))
+        {
+            try { btree = GetOrCreateBPlusTree(identifier, columnName); }
+            catch (Exception ex) { return new Error(ErrorPrefixes.DataError, $"Failed to open B+Tree for {indexKey}: {ex.Message}"); }
+        }
+
+        if (btree.TryGetValue(key, out var value)) return value;
+        return new Error(ErrorPrefixes.DataError, $"Key '{key}' not found in index '{indexKey}'.");
+    }
+    
+    public void Dispose()
+    {
+        foreach (var btree in _activeIndexes.Values)
+        {
+            btree.Dispose();
+        }
+        _activeIndexes.Clear();
+    }
+    
     private string GetIndexPath(TableInstanceIdentifier identifier, string columnName)
     {
         string path;
@@ -43,22 +72,16 @@ public class IndexManager(
         return path;
     }
 
-    public BPlusTree<byte[], LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
+    private BPlusTree<byte[], LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
     {
         var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
 
-        if (_activeIndexes.TryGetValue(indexKey, out var btree))
-        {
-            return btree;
-        }
+        if (_activeIndexes.TryGetValue(indexKey, out var btree)) return btree;
 
         var indexPath = GetIndexPath(identifier, columnName);
         var indexDirectory = fileSystem.Path.GetDirectoryName(indexPath);
 
-        if (!string.IsNullOrEmpty(indexDirectory) && !fileSystem.Directory.Exists(indexDirectory))
-        {
-            fileSystem.Directory.CreateDirectory(indexDirectory);
-        }
+        if (!string.IsNullOrEmpty(indexDirectory) && !fileSystem.Directory.Exists(indexDirectory)) fileSystem.Directory.CreateDirectory(indexDirectory);
         
         var options = new BPlusTree<byte[], LogLocation>.OptionsV2(PrimitiveSerializer.Bytes, new LogLocationSerializer(), new ByteArrayComparer())
         {
@@ -71,44 +94,5 @@ public class IndexManager(
         btree = new BPlusTree<byte[], LogLocation>(options);
         _activeIndexes[indexKey] = btree;
         return btree;
-    }
-
-    public void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value)
-    {
-        var btree = GetOrCreateBPlusTree(identifier, columnName);
-        btree[key] = value;
-    }
-
-    public Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, byte[] key)
-    {
-        var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
-
-        if (!_activeIndexes.TryGetValue(indexKey, out var btree))
-        {
-            try
-            {
-                btree = GetOrCreateBPlusTree(identifier, columnName);
-            }
-            catch (Exception ex)
-            {
-                return new Error(ErrorPrefixes.DataError, $"Failed to open B+Tree for {indexKey}: {ex.Message}");
-            }
-        }
-
-        if (btree.TryGetValue(key, out var value))
-        {
-            return value;
-        }
-
-        return new Error(ErrorPrefixes.DataError, $"Key '{key}' not found in index '{indexKey}'.");
-    }
-    
-    public void Dispose()
-    {
-        foreach (var btree in _activeIndexes.Values)
-        {
-            btree.Dispose();
-        }
-        _activeIndexes.Clear();
     }
 }

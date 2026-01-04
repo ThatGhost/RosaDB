@@ -21,7 +21,6 @@ namespace RosaDB.Library.Tests
 
         private string cellName = "TestCell";
         private string tableName = "TestTable";
-        private object[] tableIndex = new object[] { 1 };
         private string columnName = "LogId";
 
         [SetUp]
@@ -33,33 +32,6 @@ namespace RosaDB.Library.Tests
             _mockFolderManager.Setup(f => f.BasePath).Returns(_tempDirectory);
 
             _indexManager = new IndexManager(_fileSystem, _mockFolderManager.Object);
-        }
-
-        private TableInstanceIdentifier CreateIdentifier(string cellName, string tableName, object[] indexValues)
-        {
-            var indexString = string.Join(";", indexValues.Select(v => v.ToString()));
-            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
-            return new TableInstanceIdentifier(cellName, tableName, hash);
-        }
-
-        [Test]
-        public void GetOrCreateBPlusTree_CreatesIndexFile()
-        {
-            // Arrange
-            var identifier = CreateIdentifier(cellName, tableName, tableIndex);
-            var expectedIndexFilePath = _fileSystem.Path.Combine(
-                _mockFolderManager.Object.BasePath,
-                "indexes",
-                identifier.CellName,
-                identifier.TableName,
-                identifier.InstanceHash.Substring(0, 2),
-                $"{identifier.InstanceHash}_{columnName}.idx");
-
-            // Act
-            _indexManager.GetOrCreateBPlusTree(identifier, columnName);
-
-            // Assert
-            Assert.That(_fileSystem.File.Exists(expectedIndexFilePath), Is.True);
         }
 
         [TearDown]

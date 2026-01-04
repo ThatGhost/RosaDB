@@ -120,7 +120,7 @@ public class InsertQuery(
         }
 
         // 3. GENERATE HASH
-        var instanceHash = GenerateInstanceHash(indexValues);
+        var instanceHash = InstanceHasher.GenerateCellInstanceHash(indexValues);
 
         // 4. CREATE ROW and SAVE
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
@@ -147,12 +147,6 @@ public class InsertQuery(
         }
         else if (!col.IsNullable) return new Error(ErrorPrefixes.DataError, $"Column '{col.Name}' is not nullable and must be provided.");
         return Result.Success();
-    }
-
-    private string GenerateInstanceHash(IReadOnlyDictionary<string, string> indexValues)
-    {
-        var combinedIndex = string.Join("::", indexValues.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(combinedIndex)));
     }
 
     private Result<(string CellGroupName, string[] Props, string[] Values)> ParseInsertCell()
@@ -319,7 +313,7 @@ public class InsertQuery(
 
         if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
 
-        var cellInstanceHash = GenerateInstanceHash(usingIndexValues);
+        var cellInstanceHash = InstanceHasher.GenerateCellInstanceHash(usingIndexValues);
 
         var getCellInstanceResult = await cellManager.GetCellInstance(parsed.CellGroupName, cellInstanceHash);
         if (getCellInstanceResult.IsFailure) return getCellInstanceResult.Error;
