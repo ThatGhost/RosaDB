@@ -117,25 +117,23 @@ namespace RosaDB.Library.Query.Queries
 
             var usingValues = new Dictionary<string, string>();
             for (int i = 0; i < usingTokens.Length; i += 4) usingValues[usingTokens[i]] = usingTokens[i + 2];
-
-            object[] orderedValues = cellEnv.Columns
-                .Where(c => c.IsIndex)
-                .Select(c => StringToDataParser.Parse(usingValues[c.Name], c.DataType).Value)
-                .Where(v => v != null)
-                .ToArray()!;
-            if (orderedValues.Length == 0) return new Error(ErrorPrefixes.QueryParsingError, "No values found in the USING statement");
             
             // check if all and only index columns are present for cell then use the cell instance
             var indexStringValues = usingValues.Keys.Where(u => cellEnv.IndexColumns.Select(i => i.Name).Contains(u)).ToArray();
-            if (orderedValues.Length == cellEnv.IndexColumns.Length && indexStringValues.Length == cellEnv.IndexColumns.Length)
+            if (usingValues.Count == cellEnv.IndexColumns.Length && indexStringValues.Length == cellEnv.IndexColumns.Length)
             {   
                 var indexValues = new List<object>();
-                foreach (var cellEnvIndexColumn in cellEnv.IndexColumns) indexValues.Add(usingValues[cellEnvIndexColumn.Name]);
+                foreach (var cellEnvIndexColumn in cellEnv.IndexColumns)
+                {
+                    var parseResult = StringToDataParser.Parse(usingValues[cellEnvIndexColumn.Name], cellEnvIndexColumn.DataType);
+                    if (parseResult.IsFailure) return parseResult.Error;
+                    indexValues.Add(parseResult.Value);
+                }
                 
                 logs = logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues.ToArray());
             }
             
-            
+            // if its not the indexes then get all the cell instances and concat all the confirming cells
                 
             return Result.Success();
         }

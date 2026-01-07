@@ -16,6 +16,7 @@ namespace RosaDB.Library.Tests
     {
         private Mock<SessionState> _mockSessionState;
         private Mock<IFolderManager> _mockFolderManager;
+        private Mock<IIndexManager> _mockIndexManager;
         private MockFileSystem _mockFileSystem;
         private CellManager _cellManager;
 
@@ -31,6 +32,7 @@ namespace RosaDB.Library.Tests
             _mockSessionState = new Mock<SessionState>();
             _mockFolderManager = new Mock<IFolderManager>();
             _mockFileSystem = new MockFileSystem();
+            _mockIndexManager = new Mock<IIndexManager>();
 
             _mockFolderManager.Setup(fm => fm.BasePath).Returns(_basePath);
             var dbResult = Database.Create(TestDbName);
@@ -43,7 +45,8 @@ namespace RosaDB.Library.Tests
             _cellManager = new CellManager(
                 _mockSessionState.Object,
                 _mockFileSystem,
-                _mockFolderManager.Object
+                _mockFolderManager.Object,
+                _mockIndexManager.Object
             );
 
             // Ensure the base DB directory exists for tests

@@ -32,12 +32,14 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   ~~Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.~~
     *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
 4. ~~**Implement USING in SELECT Queries:**~~
-    ~~*   Add the `USING` keywork to select queries to be able to search on Cell instances.~~
-    *   Use indexes for the indexed properties of the cell.                                                             
+   ~~*   Add the `USING` keywork to select queries to be able to search on Cell instances.~~
+    *   Add the `USING` keywork to select queries to be able to search on Cell instances with clause test.
+    ~~*   Use indexes for the indexed properties of the cell~~
+5. **Add Greater and Lesser than operations to `SELECT`**
 
 ## Phase 3: Feature Development
 
-1. **Implement `UNIQUE` Constraint:** Leverage the newly implemented B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
+1. **Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
 2. **Implement `JOIN` Queries:**
     *   Extend `QueryTokenizer` and `QueryPlanner` to support `INNER JOIN ... ON` syntax.
     *   Develop a `JoinOperator` that can merge data from two tables based on specified join conditions. A nested loop join can be a starting point.

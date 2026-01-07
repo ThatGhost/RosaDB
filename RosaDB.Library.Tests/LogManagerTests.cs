@@ -86,7 +86,7 @@ namespace RosaDB.Library.Tests
             Mock<IIndexManager> mockIndexManager = new Mock<IIndexManager>();
             IIndexManager indexManager = mockIndexManager.Object;
 
-            ICellManager realCellManager = new CellManager(sessionState, fileSystem, folderManager);
+            ICellManager realCellManager = new CellManager(sessionState, fileSystem, folderManager, indexManager);
             IDatabaseManager databaseManager = new DatabaseManager(sessionState, realCellManager, fileSystem, folderManager);
             var rootManager = new RootManager(databaseManager, sessionState, fileSystem, folderManager);
             var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager, realCellManager);
