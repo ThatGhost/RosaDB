@@ -97,7 +97,7 @@ public class ClientSession(TcpClient client, Scope scope)
             // Send end-of-stream message
             var endOfStreamDto = new ClientResponse
             {
-                Message = "Stream ended",
+                Message = "Got rows successfully",
                 RowsAffected = rowsAffected,
                 DurationMs = duration.TotalMilliseconds
             };

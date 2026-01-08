@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace RosaDB.Client.Client;
 
@@ -19,7 +16,7 @@ public class Client
 {
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
-    private readonly JsonSerializerOptions Options = new JsonSerializerOptions
+    private readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true
     };
@@ -30,23 +27,24 @@ public class Client
         _stream = _client.GetStream();
     }
 
-    public async Task<ClientResponse?> SendQueryAsync(string query)
+    public async IAsyncEnumerable<ClientResponse> SendQueryAndStreamAsync(string query)
     {
-        try
+        await SendQueryBytes(query);
+
+        while (true)
         {
-            await SendQueryBytes(query);
             var responseLength = await GetResponseLenght();
-            if(responseLength == -1) return null;
+            if (responseLength == -1) yield break;
 
             var jsonResponse = await GetJsonResponse(responseLength);
-            if(jsonResponse is null) return null;
-            
-            return JsonSerializer.Deserialize<ClientResponse>(jsonResponse, Options);
-        }
-        catch (Exception)
-        {
-            // Handle exceptions (e.g., connection lost)
-            return null;
+            if (jsonResponse is null) yield break;
+
+            var response = JsonSerializer.Deserialize<ClientResponse>(jsonResponse, Options);
+            if (response is null) yield break;
+
+            yield return response;
+
+            if (response.Message != "Row stream") break;
         }
     }
 
@@ -70,7 +68,7 @@ public class Client
     {
         var responseBuffer = new byte[responseLength];
         var totalBytesRead = 0;
-        while(totalBytesRead < responseLength)
+        while (totalBytesRead < responseLength)
         {
             var bytesRead = await _stream.ReadAsync(responseBuffer, totalBytesRead, responseLength - totalBytesRead);
             if (bytesRead == 0) return null;

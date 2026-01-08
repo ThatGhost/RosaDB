@@ -105,45 +105,59 @@ public class QueryView : View
             try
             {
                 ClientManager.Client ??= new Client.Client("127.0.0.1", 7575);
-                var response = await ClientManager.Client.SendQueryAsync(queryTextView.Text?.ToString() ?? "");
+                var stream = ClientManager.Client.SendQueryAndStreamAsync(queryTextView.Text?.ToString() ?? "");
 
                 tableView.Table = null;
                 tableView.Visible = false;
+                var dataTable = new DataTable();
+                var isFirst = true;
+                var totalRowsAffected = 0;
+                var duration = 0.0;
+                var message = "";
 
-                if (response is null)
+                await foreach (var response in stream)
                 {
-                    statusLabel.Text = "Error: Did not receive a response from the server.";
-                    return;
-                }
-
-                statusLabel.Text = $"{response.Message}\n({response.DurationMs:F2} ms, {response.RowsAffected} rows affected)";
-
-                if (response.Rows is { Count: > 0 })
-                {
-                    var dataTable = new DataTable();
-                    var firstRow = response.Rows.First();
-                    foreach (var colName in firstRow.Keys)
+                    duration = response.DurationMs;
+                    message = response.Message;
+                    if (response.Message == "Row stream")
                     {
-                        dataTable.Columns.Add(colName, typeof(string));
+                        totalRowsAffected += response.Rows?.Count ?? 0;
+                        statusLabel.Text = $"Streaming rows... ({totalRowsAffected} so far)";
                     }
-
-                    foreach (var rowDict in response.Rows)
+                    else totalRowsAffected = response.RowsAffected;
+                    
+                    if (response.Rows is { Count: > 0 })
                     {
-                        var newRow = dataTable.NewRow();
-                        foreach (var col in rowDict)
+                        if (isFirst)
                         {
-                            newRow[col.Key] = col.Value?.ToString() ?? "NULL";
+                            var firstRow = response.Rows.First();
+                            foreach (var colName in firstRow.Keys)
+                            {
+                                dataTable.Columns.Add(colName, typeof(string));
+                            }
+                            tableView.Table = dataTable;
+                            tableView.Visible = true;
+                            isFirst = false;
                         }
-                        dataTable.Rows.Add(newRow);
-                    }
 
-                    tableView.Table = dataTable;
-                    tableView.Visible = true;
+                        foreach (var rowDict in response.Rows)
+                        {
+                            var newRow = dataTable.NewRow();
+                            foreach (var col in rowDict)
+                            {
+                                newRow[col.Key] = col.Value?.ToString() ?? "NULL";
+                            }
+                            dataTable.Rows.Add(newRow);
+                        }
+                        tableView.SetNeedsDisplay();
+                        Application.Refresh();
+                    }
                 }
+                statusLabel.Text = $"{message}\n({duration:F2} ms, {totalRowsAffected} rows affected)";
             }
-            catch
+            catch(Exception ex)
             {
-                statusLabel.Text = "Could not connect to server at port 7575";
+                statusLabel.Text = "Could not connect to server at port 7575. " + ex.Message;
             }
         };
 

@@ -51,9 +51,7 @@ namespace RosaDB.Library.Query.Queries
             var projectionTokens = tokens[(selectIndex + 1)..fromIndex];
             bool hasProjection = projectionTokens.Length > 0 && projectionTokens[0] != "*";
 
-            IAsyncEnumerable<Row> finalStream = hasProjection 
-                ? ApplyProjection(filteredStream, projectionTokens, columns) 
-                : filteredStream;
+            IAsyncEnumerable<Row> finalStream = hasProjection ? ApplyProjection(filteredStream, projectionTokens, columns) : filteredStream;
 
             // 3. Yield from the final stream
             await foreach (var row in finalStream)

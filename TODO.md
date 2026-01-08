@@ -33,21 +33,18 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
 4. ~~**Implement USING in SELECT Queries:**~~
    ~~*   Add the `USING` keywork to select queries to be able to search on Cell instances.~~
-    *   Add the `USING` keywork to select queries to be able to search on Cell instances with clause test.
+    ~~*   Add the `USING` keywork to select queries to be able to search on Cell instances with clause test.~~
     ~~*   Use indexes for the indexed properties of the cell~~
 5. **Add Greater and Lesser than operations to `SELECT`**
 
 ## Phase 3: Feature Development
 
 1. **Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
-2. **Implement `JOIN` Queries:**
-    *   Extend `QueryTokenizer` and `QueryPlanner` to support `INNER JOIN ... ON` syntax.
-    *   Develop a `JoinOperator` that can merge data from two tables based on specified join conditions. A nested loop join can be a starting point.
-3. **Implement Real-time Subscriptions (WebSockets):**
+2. **Implement Real-time Subscriptions (WebSockets):**
     *   Create and register a `SubscriptionManager` service using `LightInject`.
     *   Enhance `ClientSession` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.
     *   Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).
-4. **Cell Metadata:**
+3. **Cell Metadata:**
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
     *   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.
@@ -65,6 +62,6 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 ## Phase 6: Optimization
 1. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
 2. **Optimize Data Structures:** Refine data structures and algorithms based on profiling results to enhance performance.
-3. **Index Optimization:** Analyze and optimize B-Tree index structures for faster lookups and reduced storage overhead.
-4. **Caching Mechanisms:** Implement caching strategies for frequently accessed data to reduce disk I/O and improve response times.
-5. **Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.
+3. ~~**Index Optimization:** Analyze and optimize B-Tree index structures for faster lookups and reduced storage overhead.~~
+4. ~~**Caching Mechanisms:** Implement caching strategies for frequently accessed data to reduce disk I/O and improve response times.~~
+5. ~~**Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.~~

@@ -16,7 +16,7 @@ namespace RosaDB.Client.TUI
             Height = Dim.Fill();
 
             List<(string Name, string Query)> queries = [
-                ("Show Cell Groups", "SHOW CELL GROUPS;"),
+                ("Show Cells", "SHOW CELLS;"),
                 ("Show Tables in Group", "SHOW TABLES IN sales;"),
                 // DDL
                 ("Initialize RosaDB", "INITIALIZE;"),
@@ -34,9 +34,6 @@ namespace RosaDB.Client.TUI
                 ("Select with Cell Filter", "SELECT * FROM sales.transactions USING name = 'q4';"),
                 ("Select with Both Filters", "SELECT * FROM sales.transactions USING name = 'q4' WHERE amount > 100;"),
                 ("Insert Data", "INSERT INTO sales.transactions USING name = 'q4' (id, product, amount) VALUES (1, 'item', 50);"),
-                // Subscriptions
-                ("Subscribe to Cell", "SUBSCRIBE TO sales USING name = 'q4';"),
-                ("Unsubscribe from Cell", "UNSUBSCRIBE FROM sales USING name = 'q4';")
             ];
 
             _listView = new ListView(queries.ConvertAll(q => q.Name))
