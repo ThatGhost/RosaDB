@@ -26,8 +26,9 @@ namespace RosaDB.Library.Query.Queries
                 var cellEnv = await cellManager.GetEnvironment(cellName);
                 if (cellEnv.IsFailure) return cellEnv.Error;
                 
-                var result = ApplyUsing(ref logs, tableName, cellName, whereIndex, usingIndex, cellEnv.Value);
+                var result = await ApplyUsing(tableName, cellName, whereIndex, usingIndex, cellEnv.Value);
                 if(result.IsFailure) return result.Error;
+                logs = result.Value;
             }
             else logs = logManager.GetAllLogsForCellTable(cellName, tableName);
             if (logs is null) return new QueryResult(new CriticalError());
@@ -110,13 +111,13 @@ namespace RosaDB.Library.Query.Queries
             return -1;
         }
 
-        private Result ApplyUsing(ref IAsyncEnumerable<Log>? logs, string tableName, string cellName, int whereIndex, int usingIndex, CellEnvironment cellEnv)
+        private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string cellName, int whereIndex, int usingIndex, CellEnvironment cellEnv)
         {
             var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
             var usingTokens = tokens[(usingIndex + 1)..endIndex];
 
-            var usingValues = new Dictionary<string, string>();
-            for (int i = 0; i < usingTokens.Length; i += 4) usingValues[usingTokens[i]] = usingTokens[i + 2];
+            var usingValues = new Dictionary<string, (string value, string operation)>();
+            for (int i = 0; i < usingTokens.Length; i += 4) usingValues[usingTokens[i]] = new(usingTokens[i + 2], usingTokens[i + 1]);
             
             // check if all and only index columns are present for cell then use the cell instance
             var indexStringValues = usingValues.Keys.Where(u => cellEnv.IndexColumns.Select(i => i.Name).Contains(u)).ToArray();
@@ -125,17 +126,41 @@ namespace RosaDB.Library.Query.Queries
                 var indexValues = new List<object>();
                 foreach (var cellEnvIndexColumn in cellEnv.IndexColumns)
                 {
-                    var parseResult = StringToDataParser.Parse(usingValues[cellEnvIndexColumn.Name], cellEnvIndexColumn.DataType);
+                    var parseResult = StringToDataParser.Parse(usingValues[cellEnvIndexColumn.Name].value, cellEnvIndexColumn.DataType);
                     if (parseResult.IsFailure) return parseResult.Error;
                     indexValues.Add(parseResult.Value);
                 }
                 
-                logs = logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues.ToArray());
+                return Result<IAsyncEnumerable<Log>>.Success(logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues.ToArray()));
             }
             
-            // if its not the indexes then get all the cell instances and concat all the confirming cells
-                
-            return Result.Success();
+            // if it's not the indexes then get all the cell instances and concat all the conforming cells
+            var cellsResult = await cellManager.GetAllCellInstances(cellName);
+            if (cellsResult.IsFailure) return cellsResult.Error;
+
+            List<Row> cellsThatApply = []; 
+            foreach (Row cell in cellsResult.Value)
+            {
+                bool doesUsingApply = true;
+                foreach (var usingValue in usingValues) if(!ApplyWhere(cell, usingValue.Key, usingValue.Value.operation, usingValue.Value.value)) { 
+                    doesUsingApply = false;
+                    break;
+                }
+                if(doesUsingApply) cellsThatApply.Add(cell);
+            }
+
+            return Result<IAsyncEnumerable<Log>>.Success(TurnCellRowsToLogs(cellsThatApply, tableName, cellName, cellEnv));
+        }
+
+        private async IAsyncEnumerable<Log> TurnCellRowsToLogs(List<Row> cells, string tableName, string cellName, CellEnvironment cellEnv)
+        {
+            foreach (var cell in cells)
+            {
+                await foreach (var log in logManager.GetAllLogsForCellInstanceTable(cellName, tableName, cellEnv.GetIndexValues(cell)))
+                {
+                    yield return log;
+                }
+            }
         }
 
         private Func<Row, bool> ConvertWHEREToFunction(int whereIndex)

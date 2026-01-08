@@ -162,7 +162,7 @@ namespace RosaDB.Library.Tests
             Assert.That(result.Rows.Count, Is.EqualTo(1));
             Assert.That(result.Rows[0], Is.Not.Null);
             Assert.That(result.Rows[0].Values, Is.Not.Null);
-            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data2"));
+            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data1"));
         }
 
         [Test]
