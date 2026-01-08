@@ -80,9 +80,8 @@ namespace RosaDB.Library.Tests
                 IsDeleted = false,
                 TupleData = fakeData3
             };
-            fakeCellInstance1 = Row.Create([1], cellColumns).Value;
-            _mockCellManager.Setup(c => c.GetCellInstance(cellName, It.IsAny<string>()))
-                .Returns(() => Task.FromResult(Result<Row>.Success(fakeCellInstance1)));
+            fakeCellInstance1 = Row.Create([1, "test"], cellColumns).Value;
+            _mockCellManager.Setup(c => c.GetCellInstance(cellName, It.IsAny<string>())).Returns(() => Task.FromResult(Result<Row>.Success(fakeCellInstance1)));
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -94,13 +93,23 @@ namespace RosaDB.Library.Tests
                 yield return item;
             }
         }
+        
+        private async Task<List<T>> ToList<T>(IAsyncEnumerable<T> source)
+        {
+            List<T> result = [];
+            await foreach (var item in source)
+            {
+                result.Add(item);
+            }
+
+            return result;
+        }
 
         [Test]
         public async Task SELECT_AllRowsInTable()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() =>
-                ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellTable(cellName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", ";"];
 
             // Act
@@ -109,8 +118,9 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(2));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(2));
         }
 
         [Test]
@@ -130,11 +140,12 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(1));
-            Assert.That(result.Rows[0], Is.Not.Null);
-            Assert.That(result.Rows[0].Values, Is.Not.Null);
-            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data2"));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
+            Assert.That(rows[0], Is.Not.Null);
+            Assert.That(rows[0].Values, Is.Not.Null);
+            Assert.That(rows[0].Values[0], Is.EqualTo("data2"));
         }
         
         [Test]
@@ -158,11 +169,36 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(1));
-            Assert.That(result.Rows[0], Is.Not.Null);
-            Assert.That(result.Rows[0].Values, Is.Not.Null);
-            Assert.That(result.Rows[0].Values[0], Is.EqualTo("data1"));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
+            Assert.That(rows[0], Is.Not.Null);
+            Assert.That(rows[0].Values, Is.Not.Null);
+            Assert.That(rows[0].Values[0], Is.EqualTo("data1"));
+        }
+        
+        [Test]
+        public async Task SELECT_WithUSINGAndAND_ShouldReturnLogsInCell()
+        {
+            // Arrange
+            _mockCellManager.Setup(c => c.GetAllCellInstances(cellName)).Returns(() => Task.FromResult<Result<IEnumerable<Row>>>(new[] { Row.Create([(long)2, "test"], cellColumns).Value } ));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
+            _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
+
+            string[] tokens = ["SELECT", "*", "FROM", $"{cellName}.{tableName}", "USING", "name", "=", "test", "AND", "cellId", "=", "1", ";"];
+
+            // Act
+            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockCellManager.Object);
+            var result = await query.Execute();
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
+            Assert.That(rows[0], Is.Not.Null);
+            Assert.That(rows[0].Values, Is.Not.Null);
+            Assert.That(rows[0].Values[0], Is.EqualTo("data2"));
         }
 
         [Test]
@@ -180,8 +216,9 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(1));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
         }
 
         [Test]
@@ -201,8 +238,9 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(1));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
         }
 
         [Test]
@@ -218,10 +256,11 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(2));
-            Assert.That(result.Rows[0].Columns.Length, Is.EqualTo(1));
-            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("city"));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(2));
+            Assert.That(rows[0].Columns.Length, Is.EqualTo(1));
+            Assert.That(rows[0].Columns[0].Name, Is.EqualTo("city"));
         }
 
         [Test]
@@ -238,11 +277,12 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(2));
-            Assert.That(result.Rows[0].Columns.Length, Is.EqualTo(2));
-            Assert.That(result.Rows[0].Columns[0].Name, Is.EqualTo("age"));
-            Assert.That(result.Rows[0].Columns[1].Name, Is.EqualTo("city"));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(2));
+            Assert.That(rows[0].Columns.Length, Is.EqualTo(2));
+            Assert.That(rows[0].Columns[0].Name, Is.EqualTo("age"));
+            Assert.That(rows[0].Columns[1].Name, Is.EqualTo("city"));
         }
 
         [Test]
@@ -259,8 +299,9 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Rows, Is.Not.Null);
-            Assert.That(result.Rows.Count, Is.EqualTo(1));
+            var rows = await ToList(result.RowStream);
+            Assert.That(rows, Is.Not.Null);
+            Assert.That(rows.Count, Is.EqualTo(1));
         }
     }
 }
