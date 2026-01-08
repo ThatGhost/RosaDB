@@ -11,14 +11,11 @@ namespace RosaDB.Library.Query.Queries
     {
         public async ValueTask<QueryResult> Execute()
         {
-            var fromIndex = FindKeywordIndex("FROM");
+            var (selectIndex, fromIndex, whereIndex, usingIndex) = ParseQueryTokens();
+
             var tableNameParts = tokens[fromIndex + 1].Split('.');
             var cellName = tableNameParts[0];
             var tableName = tableNameParts[1];
-            var whereIndex = FindKeywordIndex("WHERE");
-            var usingIndex = FindKeywordIndex("USING");
-            var projectionIndex = FindKeywordIndex("SELECT");
-            var from = FindKeywordIndex("FROM");
 
             IAsyncEnumerable<Log>? logs = null;
             if (usingIndex != -1)
@@ -48,7 +45,7 @@ namespace RosaDB.Library.Query.Queries
                 }
             }
             
-            var projectionTokens = tokens[(projectionIndex + 1)..from];
+            var projectionTokens = tokens[(selectIndex + 1)..fromIndex];
             if (projectionTokens.Length > 0 && projectionTokens[0] != "*")
             {
                 var projectedRows = new List<Row>();
@@ -62,6 +59,23 @@ namespace RosaDB.Library.Query.Queries
             }
             
             return new QueryResult(rows);
+        }
+
+        private (int selectIndex, int fromIndex, int whereIndex, int usingIndex) ParseQueryTokens()
+        {
+            int selectIdx = -1;
+            int fromIdx = -1;
+            int whereIdx = -1;
+            int usingIdx = -1;
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                if (tokens[i].Equals("SELECT", StringComparison.OrdinalIgnoreCase)) selectIdx = i;
+                else if (tokens[i].Equals("FROM", StringComparison.OrdinalIgnoreCase)) fromIdx = i;
+                else if (tokens[i].Equals("WHERE", StringComparison.OrdinalIgnoreCase)) whereIdx = i;
+                else if (tokens[i].Equals("USING", StringComparison.OrdinalIgnoreCase)) usingIdx = i;
+            }
+            return (selectIdx, fromIdx, whereIdx, usingIdx);
         }
 
         private Result<Row> ApplyProjection(Row row, string[] projection)
@@ -104,12 +118,7 @@ namespace RosaDB.Library.Query.Queries
             return false;
         }
 
-        private int FindKeywordIndex(string keyword, int startIndex = 0)
-        {
-            for (int i = startIndex; i < tokens.Length; i++)
-                if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase)) return i;
-            return -1;
-        }
+
 
         private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string cellName, int whereIndex, int usingIndex, CellEnvironment cellEnv)
         {
