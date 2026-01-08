@@ -66,34 +66,79 @@ public class ClientSession(TcpClient client, Scope scope)
 
     private async Task SendResponseAsync(NetworkStream stream, QueryResult result, TimeSpan duration)
     {
-        var responseDto = new ClientResponse
+        if (result.IsStreaming)
         {
-            Message = result.Message,
-            RowsAffected = result.RowsAffected,
-            DurationMs = duration.TotalMilliseconds,
-            Rows = null
-        };
-
-        if (result.Rows.Count > 0)
-        {
-            responseDto.Rows = [];
-            foreach (var row in result.Rows)
+            // Streaming response
+            int rowsAffected = 0;
+            await foreach(var row in result.RowStream)
             {
                 var rowDict = new Dictionary<string, object?>();
                 for (int i = 0; i < row.Columns.Length; i++)
                 {
                     rowDict[row.Columns[i].Name] = row.Values[i];
                 }
-                responseDto.Rows.Add(rowDict);
-            }
-        }
-        
-        var jsonPayload = JsonSerializer.Serialize(responseDto, _jsonOptions);
-        var jsonBytes = Encoding.UTF8.GetBytes(jsonPayload);
 
-        var lengthBytes = BitConverter.GetBytes(jsonBytes.Length);
-        await stream.WriteAsync(lengthBytes);
-        await stream.WriteAsync(jsonBytes);
+                var responseDto = new ClientResponse
+                {
+                    Message = "Row stream",
+                    Rows = [rowDict],
+                    DurationMs = 0
+                };
+
+                var jsonPayload = JsonSerializer.Serialize(responseDto, _jsonOptions);
+                var jsonBytes = Encoding.UTF8.GetBytes(jsonPayload);
+
+                var lengthBytes = BitConverter.GetBytes(jsonBytes.Length);
+                await stream.WriteAsync(lengthBytes);
+                await stream.WriteAsync(jsonBytes);
+                rowsAffected++;
+            }
+
+            // Send end-of-stream message
+            var endOfStreamDto = new ClientResponse
+            {
+                Message = "Stream ended",
+                RowsAffected = rowsAffected,
+                DurationMs = duration.TotalMilliseconds
+            };
+            var endJsonPayload = JsonSerializer.Serialize(endOfStreamDto, _jsonOptions);
+            var endJsonBytes = Encoding.UTF8.GetBytes(endJsonPayload);
+            var endLengthBytes = BitConverter.GetBytes(endJsonBytes.Length);
+            await stream.WriteAsync(endLengthBytes);
+            await stream.WriteAsync(endJsonBytes);
+        }
+        else
+        {
+            // Non-streaming response
+            var responseDto = new ClientResponse
+            {
+                Message = result.Message,
+                RowsAffected = result.RowsAffected,
+                DurationMs = duration.TotalMilliseconds,
+                Rows = null
+            };
+
+            if (result.Rows.Count > 0)
+            {
+                responseDto.Rows = new List<Dictionary<string, object?>>();
+                foreach (var row in result.Rows)
+                {
+                    var rowDict = new Dictionary<string, object?>();
+                    for (int i = 0; i < row.Columns.Length; i++)
+                    {
+                        rowDict[row.Columns[i].Name] = row.Values[i];
+                    }
+                    responseDto.Rows.Add(rowDict);
+                }
+            }
+            
+            var jsonPayload = JsonSerializer.Serialize(responseDto, _jsonOptions);
+            var jsonBytes = Encoding.UTF8.GetBytes(jsonPayload);
+
+            var lengthBytes = BitConverter.GetBytes(jsonBytes.Length);
+            await stream.WriteAsync(lengthBytes);
+            await stream.WriteAsync(jsonBytes);
+        }
     }
 
     private async Task<QueryResult> TokensToQueryExecution(string query, QueryTokenizer queryTokenizer, QueryPlanner queryPlanner)

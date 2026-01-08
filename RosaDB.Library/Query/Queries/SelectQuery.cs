@@ -12,53 +12,58 @@ namespace RosaDB.Library.Query.Queries
         public async ValueTask<QueryResult> Execute()
         {
             var (selectIndex, fromIndex, whereIndex, usingIndex) = ParseQueryTokens();
-
+            
             var tableNameParts = tokens[fromIndex + 1].Split('.');
             var cellName = tableNameParts[0];
             var tableName = tableNameParts[1];
 
-            IAsyncEnumerable<Log>? logs = null;
-            if (usingIndex != -1)
-            {
-                var cellEnv = await cellManager.GetEnvironment(cellName);
-                if (cellEnv.IsFailure) return cellEnv.Error;
-                
-                var result = await ApplyUsing(tableName, cellName, whereIndex, usingIndex, cellEnv.Value);
-                if(result.IsFailure) return result.Error;
-                logs = result.Value;
-            }
-            else logs = logManager.GetAllLogsForCellTable(cellName, tableName);
-            if (logs is null) return new QueryResult(new CriticalError());
-            
             var columnsResult = await cellManager.GetColumnsFromTable(cellName, tableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
-            Func<Row, bool> WhereFunction = ConvertWHEREToFunction(whereIndex);
+            return new QueryResult(StreamRows(selectIndex, fromIndex, whereIndex, usingIndex, columns));
+        }
+
+        private async IAsyncEnumerable<Row> StreamRows(int selectIndex, int fromIndex, int whereIndex, int usingIndex, Column[] columns)
+        {
+            var tableNameParts = tokens[fromIndex + 1].Split('.');
+            var cellName = tableNameParts[0];
+            var tableName = tableNameParts[1];
+
+            IAsyncEnumerable<Log> logs;
+            if (usingIndex != -1)
+            {
+                var cellEnv = await cellManager.GetEnvironment(cellName);
+                if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
+                
+                var result = await ApplyUsing(tableName, cellName, whereIndex, usingIndex, cellEnv.Value);
+                if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
+                logs = result.Value;
+            }
+            else logs = logManager.GetAllLogsForCellTable(cellName, tableName);
             
-            var rows = new List<Row>();
+            if (logs is null) yield break;
+
+            // 2. Prepare filter and projection
+            var whereFunction = ConvertWHEREToFunction(whereIndex);
+            var projectionTokens = tokens[(selectIndex + 1)..fromIndex];
+            bool hasProjection = projectionTokens.Length > 0 && projectionTokens[0] != "*";
+
+            // 3. Process the stream
             await foreach (var log in logs)
             {
-                var row = RowSerializer.Deserialize(log.TupleData, columns);
-                if (row.IsSuccess && WhereFunction(row.Value))
+                var rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+                if (!rowResult.IsSuccess) continue;
+                
+                var row = rowResult.Value;
+                if (!whereFunction(row)) continue;
+                
+                if (hasProjection)
                 {
-                    rows.Add(row.Value);
+                    var projectedRowResult = ApplyProjection(row, projectionTokens);
+                    if (projectedRowResult.IsSuccess) yield return projectedRowResult.Value;
                 }
+                else yield return row;
             }
-            
-            var projectionTokens = tokens[(selectIndex + 1)..fromIndex];
-            if (projectionTokens.Length > 0 && projectionTokens[0] != "*")
-            {
-                var projectedRows = new List<Row>();
-                foreach (var row in rows)
-                {
-                    var projectedRow = ApplyProjection(row, projectionTokens);
-                    if (projectedRow.IsSuccess) projectedRows.Add(projectedRow.Value);
-                    else return projectedRow.Error;
-                }
-                return new QueryResult(projectedRows);
-            }
-            
-            return new QueryResult(rows);
         }
 
         private (int selectIndex, int fromIndex, int whereIndex, int usingIndex) ParseQueryTokens()
@@ -118,8 +123,6 @@ namespace RosaDB.Library.Query.Queries
             return false;
         }
 
-
-
         private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string cellName, int whereIndex, int usingIndex, CellEnvironment cellEnv)
         {
             var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
@@ -151,10 +154,11 @@ namespace RosaDB.Library.Query.Queries
             foreach (Row cell in cellsResult.Value)
             {
                 bool doesUsingApply = true;
-                foreach (var usingValue in usingValues) if(!ApplyWhere(cell, usingValue.Key, usingValue.Value.operation, usingValue.Value.value)) { 
-                    doesUsingApply = false;
-                    break;
-                }
+                foreach (var usingValue in usingValues) 
+                    if(!ApplyWhere(cell, usingValue.Key, usingValue.Value.operation, usingValue.Value.value)) { 
+                        doesUsingApply = false;
+                        break;
+                    }
                 if(doesUsingApply) cellsThatApply.Add(cell);
             }
 
