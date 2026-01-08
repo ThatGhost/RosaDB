@@ -52,7 +52,7 @@ namespace RosaDB.Library.Query.Queries
             bool hasProjection = projectionTokens.Length > 0 && projectionTokens[0] != "*";
 
             IAsyncEnumerable<Row> finalStream = hasProjection 
-                ? ApplyProjectionOptimized(filteredStream, projectionTokens, columns) 
+                ? ApplyProjection(filteredStream, projectionTokens, columns) 
                 : filteredStream;
 
             // 3. Yield from the final stream
@@ -195,14 +195,17 @@ namespace RosaDB.Library.Query.Queries
                     var rowValue = row.Values[columnIndex];
                     if (rowValue == null) return false;
 
-                    if (op == "=") 
+                    if (op == "=")
+                    {
                         if (!rowValue.Equals(parsedValue)) return false;
-                        else return false; 
+                    }
+                    else return false;
                 }
+                // All conditions passed
                 return true;
             };
         }
-        private async IAsyncEnumerable<Row> ApplyProjectionOptimized(IAsyncEnumerable<Row> rows, string[] projection, Column[] originalColumns)
+        private async IAsyncEnumerable<Row> ApplyProjection(IAsyncEnumerable<Row> rows, string[] projection, Column[] originalColumns)
         {
             var projectedColumns = new List<Column>();
             var projectedIndices = new List<int>();

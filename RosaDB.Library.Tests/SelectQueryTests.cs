@@ -181,7 +181,7 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithUSINGAndAND_ShouldReturnLogsInCell()
         {
             // Arrange
-            _mockCellManager.Setup(c => c.GetAllCellInstances(cellName)).Returns(() => Task.FromResult<Result<IEnumerable<Row>>>(new[] { Row.Create([(long)2, "test"], cellColumns).Value } ));
+            _mockCellManager.Setup(c => c.GetAllCellInstances(cellName)).Returns(() => Task.FromResult<Result<IEnumerable<Row>>>(new[] { Row.Create([(long)1, "test"], cellColumns).Value } ));
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)2 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
             _mockLogManager.Setup(l => l.GetAllLogsForCellInstanceTable(cellName, tableName, new object[] { (long)1 })).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
 
