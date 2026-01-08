@@ -11,5 +11,5 @@ public interface ILogManager : IAsyncDisposable
     Task<Result<Log>> FindLastestLog(string cellName, string tableName, object[] indexValues, long id);
     Task<Result<Log>> GetLogAtLocation(LogLocation logLocation);
     IAsyncEnumerable<Log> GetAllLogsForCellTable(string cellName, string tableName);
-    IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object[] indexValues);
+    IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object?[] indexValues);
 }

@@ -14,9 +14,9 @@ public class CellEnvironment
     
     public Column[] IndexColumns => Columns.Where(c => c.IsIndex).ToArray();
 
-    public object[] GetIndexValues(Row instanceRow)
+    public object?[] GetIndexValues(Row instanceRow)
     {
-        var indexValues = new List<object>();
+        var indexValues = new List<object?>();
         foreach (var indexCol in IndexColumns)
         {
             var colIndex = Array.FindIndex(instanceRow.Columns, c => c.Name.Equals(indexCol.Name, StringComparison.OrdinalIgnoreCase));

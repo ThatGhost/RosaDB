@@ -278,7 +278,7 @@ public class LogManager(
         }
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object[] indexValues)
+    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object?[] indexValues)
     {
         if (sessionState.CurrentDatabase is null) throw new Exception();
         var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
