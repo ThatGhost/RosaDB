@@ -22,87 +22,6 @@ public class LogManager(
     private readonly Dictionary<TableInstanceIdentifier, Queue<Log>> _writeAheadLogs = new();
     private readonly Dictionary<TableInstanceIdentifier, SegmentMetadata> _segmentMetadata = new();
 
-    private Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
-    {
-        if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
-        
-        long batchSize = 0;
-        var serializedLogs = new List<(Log log, byte[] bytes)>();
-        foreach (var log in condensedLogs)
-        {
-            var bytes = LogSerializer.Serialize(log);
-            serializedLogs.Add((log, bytes));
-            batchSize += bytes.Length;
-        }
-        
-        if (metadata.CurrentSegmentSize + batchSize > MaxSegmentSize)
-        {
-            metadata = new SegmentMetadata(metadata.CurrentSegmentNumber + 1, 0);
-        }
-
-        var segmentFilePathResult = GetSegmentFilePath(identifier, metadata.CurrentSegmentNumber);
-        if (segmentFilePathResult.IsFailure) return segmentFilePathResult.Error;
-        
-        var segmentDirectory = fileSystem.Path.GetDirectoryName(segmentFilePathResult.Value);
-        
-        if (!string.IsNullOrEmpty(segmentDirectory) && !fileSystem.Directory.Exists(segmentDirectory))
-        {
-            fileSystem.Directory.CreateDirectory(segmentDirectory);
-        }
-
-        return (metadata, segmentFilePathResult.Value, serializedLogs);
-    }
-
-    private async ValueTask<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset, Column[] columns)
-    {
-        long currentOffset = initialOffset;
-
-        foreach ((Log log, byte[] bytes) in serializedLogs)
-        {
-            await segmentStream.WriteAsync(bytes, CancellationToken.None);
-            
-            indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
-            
-            if (log.IndexValues != null)
-            {
-                foreach (var (name, val, isPk) in log.IndexValues)
-                {
-                    TableInstanceIdentifier indexIdentifier;
-                    if (!isPk) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
-                    else indexIdentifier = identifier;
-
-                    indexManager.Insert(indexIdentifier, name, val, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
-                }
-            }
-            else
-            {
-                Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-                if (rowResult.IsFailure) return -1;
-
-                Row row = rowResult.Value;
-                for (int i = 0; i < row.Columns.Length; i++)
-                {
-                    Column col = row.Columns[i];
-                    object? val = row.Values[i];
-
-                    if (col.IsPrimaryKey || col.IsIndex)
-                    {
-                        byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
-                        TableInstanceIdentifier indexIdentifier;
-
-                        if (col.IsIndex && !col.IsPrimaryKey) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
-                        else indexIdentifier = identifier;
-
-                        indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
-                    }
-                }
-            }
-            
-            currentOffset += bytes.Length;
-        }
-        return currentOffset;
-    }
-
     public async ValueTask<Result> Commit()
     {
         if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database is not set");
@@ -123,10 +42,7 @@ public class LogManager(
             
             var path = result.Value.segmentFilePath;
             Stream segmentStream;
-            if (_activeStreams.TryGetValue(path, out var stream))
-            {
-                segmentStream = stream;
-            }
+            if (_activeStreams.TryGetValue(path, out var stream)) segmentStream = stream;
             else
             {
                 segmentStream = fileSystem.FileStream.New(path, FileMode.Append, FileAccess.Write, FileShare.Read);
@@ -174,6 +90,86 @@ public class LogManager(
         return await FindOnDisk(identifier, id);
     }
     
+    private Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> GetCommitFilePathsAndMetadata(TableInstanceIdentifier identifier, List<Log> condensedLogs)
+    {
+        if (!_segmentMetadata.TryGetValue(identifier, out SegmentMetadata metadata)) metadata = new SegmentMetadata(0, 0); 
+        
+        long batchSize = 0;
+        var serializedLogs = new List<(Log log, byte[] bytes)>();
+        foreach (var log in condensedLogs)
+        {
+            var bytes = LogSerializer.Serialize(log);
+            serializedLogs.Add((log, bytes));
+            batchSize += bytes.Length;
+        }
+        
+        if (metadata.CurrentSegmentSize + batchSize > MaxSegmentSize)
+        {
+            metadata = new SegmentMetadata(metadata.CurrentSegmentNumber + 1, 0);
+        }
+
+        var segmentFilePathResult = GetSegmentFilePath(identifier, metadata.CurrentSegmentNumber);
+        if (segmentFilePathResult.IsFailure) return segmentFilePathResult.Error;
+        
+        var segmentDirectory = fileSystem.Path.GetDirectoryName(segmentFilePathResult.Value);
+        
+        if (!string.IsNullOrEmpty(segmentDirectory) && !fileSystem.Directory.Exists(segmentDirectory))
+        {
+            fileSystem.Directory.CreateDirectory(segmentDirectory);
+        }
+
+        return (metadata, segmentFilePathResult.Value, serializedLogs);
+    }
+
+    private async ValueTask<long> WriteSerializedLogs(TableInstanceIdentifier identifier, SegmentMetadata metadata, List<(Log log, byte[] bytes)> serializedLogs, Stream segmentStream, long initialOffset, Column[] columns)
+    {
+        long currentOffset = initialOffset;
+
+        foreach ((Log log, byte[] bytes) in serializedLogs)
+        {
+            Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+            if (rowResult.IsFailure) return -1;
+
+            await segmentStream.WriteAsync(bytes, CancellationToken.None);
+            indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+            
+            if (log.IndexValues != null)
+            {
+                foreach (var (name, val, isPk) in log.IndexValues)
+                {
+                    TableInstanceIdentifier indexIdentifier;
+                    if (!isPk) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
+                    else indexIdentifier = identifier;
+
+                    indexManager.Insert(indexIdentifier, name, val, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+                }
+            }
+            else
+            {
+                Row row = rowResult.Value;
+                for (int i = 0; i < row.Columns.Length; i++)
+                {
+                    Column col = row.Columns[i];
+                    object? val = row.Values[i];
+
+                    if (col.IsPrimaryKey || col.IsIndex)
+                    {
+                        byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
+                        TableInstanceIdentifier indexIdentifier;
+
+                        if (col.IsIndex && !col.IsPrimaryKey) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
+                        else indexIdentifier = identifier;
+
+                        indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
+                    }
+                }
+            }
+            
+            currentOffset += bytes.Length;
+        }
+        return currentOffset;
+    }
+
     private void PutLog(Log log, TableInstanceIdentifier identifier)
     {
         if (!_writeAheadLogs.TryGetValue(identifier, out var logs))

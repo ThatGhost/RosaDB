@@ -10,10 +10,11 @@ namespace RosaDB.Library.Websockets
     {
         private readonly ConcurrentQueue<WebSocket> _sockets = new ConcurrentQueue<WebSocket>();
         private readonly ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>> _socketTasks = new ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>>();
-        ServiceContainer _container = new ServiceContainer();
+        private readonly ServiceContainer _container;
 
-        public SocketManager()
+        public SocketManager(ServiceContainer container)
         {
+            _container = container;
             var thread = new Thread(ProcessWebSockets);
             thread.IsBackground = true;
             thread.Start();
@@ -55,7 +56,7 @@ namespace RosaDB.Library.Websockets
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        var queryResult = await queryPlanner.ExecuteWebsocketQuery(message);
+                        var queryResult = await queryPlanner.ExecuteWebsocketQuery(message, webSocket);
                         var reply = $"{queryResult.Message}";
                         var replyBuffer = Encoding.UTF8.GetBytes(reply);
                         await webSocket.SendAsync(new ArraySegment<byte>(replyBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
@@ -73,6 +74,7 @@ namespace RosaDB.Library.Websockets
             finally
             {
                 _socketTasks.TryRemove(webSocket, out _);
+                
                 webSocket.Dispose();
                 tcs.SetResult(true);
             }

@@ -66,10 +66,7 @@ public class InsertQuery(
     
     private Result<Row> CheckPrimaryKeys(string cellGroupName, string tableName, object[] usingIndexValues, Row tableRow)
     {
-        // Replicate LogManager's identifier creation logic
-        var indexString = string.Join(";", usingIndexValues.Select(v => v.ToString()));
-        var instanceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
-        var identifier = new TableInstanceIdentifier(cellGroupName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(cellGroupName, tableName, usingIndexValues);
 
         foreach (var col in tableRow.Columns)
         {
