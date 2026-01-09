@@ -1,5 +1,4 @@
 using LightInject;
-using RosaDB.Library.MoqQueries;
 using RosaDB.Library.Query;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Validation;
@@ -27,7 +26,7 @@ public static class Installer
         container.RegisterTransient<RootManager>();
         container.RegisterTransient<IDatabaseManager, DatabaseManager>();
         container.RegisterTransient<DataValidator>();
-        container.RegisterTransient<StringToDataParser>();
+        container.RegisterTransient<TokensToDataParser>();
         container.RegisterTransient<QueryTokenizer>();
         container.RegisterTransient<QueryPlanner>();
     }

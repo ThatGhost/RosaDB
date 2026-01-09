@@ -2,7 +2,7 @@
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
 
-namespace RosaDB.Library.Validation
+namespace RosaDB.Library.Query
 {
     public class DataValidator()
     {

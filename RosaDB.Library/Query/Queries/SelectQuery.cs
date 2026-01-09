@@ -104,7 +104,7 @@ namespace RosaDB.Library.Query.Queries
                 var indexValues = new List<object>();
                 foreach (var cellEnvIndexColumn in cellEnv.IndexColumns)
                 {
-                    var parseResult = StringToDataParser.Parse(usingValues[cellEnvIndexColumn.Name].value, cellEnvIndexColumn.DataType);
+                    var parseResult = TokensToDataParser.Parse(usingValues[cellEnvIndexColumn.Name].value, cellEnvIndexColumn.DataType);
                     if (parseResult.IsFailure) return parseResult.Error;
                     indexValues.Add(parseResult.Value);
                 }
@@ -128,7 +128,7 @@ namespace RosaDB.Library.Query.Queries
                     var rowValue = cell.Values[columnIndex];
                     if(rowValue == null) { doesUsingApply = false; break; }
                     
-                    var parsedValueResult = StringToDataParser.Parse(usingValue.Value.value, cell.Columns[columnIndex].DataType);
+                    var parsedValueResult = TokensToDataParser.Parse(usingValue.Value.value, cell.Columns[columnIndex].DataType);
                     if(parsedValueResult.IsFailure) { doesUsingApply = false; break; }
 
                     if (usingValue.Value.operation == "=") {
@@ -175,7 +175,7 @@ namespace RosaDB.Library.Query.Queries
                 if (columnIndex == -1) return _ => false;
 
                 var columnDataType = allColumns[columnIndex].DataType;
-                var parseResult = StringToDataParser.Parse(stringValue, columnDataType);
+                var parseResult = TokensToDataParser.Parse(stringValue, columnDataType);
                 if (parseResult.IsFailure) return _ => false;
 
                 conditions.Add((columnIndex, op, parseResult.Value));
@@ -193,10 +193,8 @@ namespace RosaDB.Library.Query.Queries
                     var rowValue = row.Values[columnIndex];
                     if (rowValue == null) return false;
 
-                    if (op == "=")
-                    {
-                        if (!rowValue.Equals(parsedValue)) return false;
-                    }
+                    if (op == "=") return rowValue.Equals(parsedValue);
+
                     else return false;
                 }
                 // All conditions passed

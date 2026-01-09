@@ -136,7 +136,7 @@ public class InsertQuery(
     {
         if (valueMap.TryGetValue(col.Name, out var stringVal))
         {
-            var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
+            var parseValResult = TokensToDataParser.Parse(stringVal, col.DataType);
             if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
 
             var validationResult = DataValidator.Validate(typedVal, col);
@@ -330,7 +330,7 @@ public class InsertQuery(
             var col = tableSchemaColumns[i];
             if (rowValueMap.TryGetValue(col.Name, out var stringVal))
             {
-                var parseValResult = StringToDataParser.Parse(stringVal, col.DataType);
+                var parseValResult = TokensToDataParser.Parse(stringVal, col.DataType);
                 if (!parseValResult.TryGetValue(out var typedVal)) return parseValResult.Error;
 
                 var validationResult = DataValidator.Validate(typedVal, col);

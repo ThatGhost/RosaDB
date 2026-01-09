@@ -4,7 +4,7 @@ using RosaDB.Library.Models;
 
 namespace RosaDB.Library.Validation
 {
-    public class StringToDataParser
+    public class TokensToDataParser
     {
         public Result<List<object>> ParseData(string[] data, DataType[] dataType)
         {
