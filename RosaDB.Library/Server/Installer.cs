@@ -3,9 +3,9 @@ using RosaDB.Library.Query;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Validation;
 using System.Net.Sockets;
-using RosaDB.Library.Query.Queries;
 using System.IO.Abstractions;
 using RosaDB.Library.StorageEngine.Interfaces;
+using RosaDB.Library.Websockets;
 
 namespace RosaDB.Library.Server;
 
@@ -29,5 +29,23 @@ public static class Installer
         container.RegisterTransient<TokensToDataParser>();
         container.RegisterTransient<QueryTokenizer>();
         container.RegisterTransient<QueryPlanner>();
+    }
+
+    public static void InstallForWebsockets(ServiceContainer container)
+    {
+        container.RegisterScoped<SessionState>();
+        container.RegisterScoped<WebsocketQueryPlanner>();
+        container.RegisterScoped<SubscriptionManager>();
+        container.RegisterScoped<ILogManager, LogManager>();
+        container.RegisterScoped<IIndexManager, IndexManager>();
+        container.RegisterScoped<ICellManager, CellManager>();
+        container.RegisterTransient<IFileSystem, FileSystem>();
+        container.RegisterTransient<IFolderManager, FolderManager>();
+        container.RegisterTransient<LogCondenser>();
+        container.RegisterTransient<RootManager>();
+        container.RegisterTransient<IDatabaseManager, DatabaseManager>();
+        container.RegisterTransient<DataValidator>();
+        container.RegisterTransient<TokensToDataParser>();
+        container.RegisterTransient<QueryTokenizer>();
     }
 }

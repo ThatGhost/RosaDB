@@ -1,6 +1,6 @@
 using RosaDB.Server;
-using System.Net.WebSockets;
-using System.Text;
+using RosaDB.Library.Websockets;
+using LightInject;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,21 +10,15 @@ var app = builder.Build();
 
 app.UseWebSockets();
 
+var socketManager = new SocketManager();
+
 app.Map("/ws", async context =>
 {
+    // TODO: Add Authorization callback here
     if (context.WebSockets.IsWebSocketRequest)
     {
-        using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-        
-        await using var wsStream = WebSocketStream.Create(webSocket, WebSocketMessageType.Text, true);
-        using var reader = new StreamReader(wsStream, Encoding.UTF8);
-        await using var writer = new StreamWriter(wsStream, Encoding.UTF8);
-        writer.AutoFlush = true;
-
-        while (await reader.ReadLineAsync() is { } message)
-        {
-            await writer.WriteLineAsync($"Echo: {message}");
-        }
+        var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        await socketManager.AddSocket(webSocket);
     }
     else
     {

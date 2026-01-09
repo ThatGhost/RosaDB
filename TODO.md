@@ -42,12 +42,16 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 1. **Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
 2. **Implement Real-time Subscriptions (WebSockets):**
     *   Create and register a `SubscriptionManager` service using `LightInject`.
-    *   Enhance `ClientSession` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.
+    *   Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.
     *   Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).
 3. **Cell Metadata:**
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
     *   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.
+4. **Implement Transactions:**
+    *   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.
+    *   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.
+    *   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.
 
 ## Phase 4: Developer Experience and Server Enhancements
 
