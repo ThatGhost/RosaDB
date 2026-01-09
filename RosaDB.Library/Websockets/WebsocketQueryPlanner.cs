@@ -5,7 +5,7 @@ using System.Net.WebSockets;
 
 namespace RosaDB.Library.Websockets;
 
-public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, SubscriptionManager subscriptionManager)
+public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, ISubscriptionManager subscriptionManager)
 {
     public async Task<QueryResult> ExecuteWebsocketQuery(string query, WebSocket webSocket)
     {

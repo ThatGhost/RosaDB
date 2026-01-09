@@ -11,7 +11,7 @@ using System.Text.Json;
 
 namespace RosaDB.Library.Websockets;
 
-public class SubscriptionManager(ICellManager cellManager)
+public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManager
 {
     private readonly Dictionary<TableInstanceIdentifier, List<WebSocket>> _subscriptions = new();
 
@@ -119,11 +119,11 @@ public class SubscriptionManager(ICellManager cellManager)
         return new QueryResult($"Succesfully unsubscribed to {nameParts} instance");
     }
 
-    public async Task WebsocketClosed()
+    public void RemoveWebSocket(WebSocket webSocket)
     {
-        foreach (var webSocketList in _subscriptions.Values)
+        foreach (var subscriptionList in _subscriptions.Values)
         {
-            webSocketList.RemoveAll(ws => ws.State != WebSocketState.Open);
+            subscriptionList.Remove(webSocket);
         }
     }
 

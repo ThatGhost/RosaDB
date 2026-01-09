@@ -12,9 +12,12 @@ namespace RosaDB.Library.Websockets
         private readonly ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>> _socketTasks = new ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>>();
         private readonly ServiceContainer _container;
 
+        private readonly ISubscriptionManager _subscriptionManager;
+
         public SocketManager(ServiceContainer container)
         {
             _container = container;
+            _subscriptionManager = _container.GetInstance<ISubscriptionManager>();
             var thread = new Thread(ProcessWebSockets);
             thread.IsBackground = true;
             thread.Start();
@@ -72,7 +75,7 @@ namespace RosaDB.Library.Websockets
             finally
             {
                 _socketTasks.TryRemove(webSocket, out _);
-                
+                _subscriptionManager.RemoveWebSocket(webSocket);
                 webSocket.Dispose();
                 tcs.SetResult(true);
             }

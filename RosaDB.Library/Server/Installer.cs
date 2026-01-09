@@ -13,7 +13,7 @@ public static class Installer
 {
     public static void Install(ServiceContainer container)
     {
-        container.RegisterSingleton<SubscriptionManager>();
+        container.RegisterSingleton<ISubscriptionManager, SubscriptionManager>();
         
         container.RegisterScoped<SessionState>();
         container.RegisterScoped<ILogManager, LogManager>();

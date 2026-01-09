@@ -4,6 +4,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
+using RosaDB.Library.Websockets;
 
 namespace RosaDB.Library.StorageEngine;
 
@@ -14,7 +15,8 @@ public class LogManager(
     IFileSystem fileSystem,
     IFolderManager folderManager,
     IIndexManager indexManager,
-    ICellManager cellManager) : ILogManager
+    ICellManager cellManager,
+    ISubscriptionManager subscriptionManager) : ILogManager
 {
     private const long MaxSegmentSize = 1024 * 1024;
     private readonly Dictionary<string, Stream> _activeStreams = new();
@@ -128,11 +130,11 @@ public class LogManager(
         foreach ((Log log, byte[] bytes) in serializedLogs)
         {
             Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-            if (rowResult.IsFailure) return -1;
+            if (!rowResult.TryGetValue(out var row)) return -1;
 
             await segmentStream.WriteAsync(bytes, CancellationToken.None);
             indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
-            
+
             if (log.IndexValues != null)
             {
                 foreach (var (name, val, isPk) in log.IndexValues)
@@ -146,7 +148,6 @@ public class LogManager(
             }
             else
             {
-                Row row = rowResult.Value;
                 for (int i = 0; i < row.Columns.Length; i++)
                 {
                     Column col = row.Columns[i];
@@ -166,6 +167,7 @@ public class LogManager(
             }
             
             currentOffset += bytes.Length;
+            _ = subscriptionManager.NotifySubscriber(identifier, row);
         }
         return currentOffset;
     }

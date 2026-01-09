@@ -11,6 +11,7 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
 using System.Text;
 using RosaDB.Library.MoqQueries;
+using RosaDB.Library.Websockets;
 
 namespace RosaDB.Library.Tests
 {
@@ -22,7 +23,8 @@ namespace RosaDB.Library.Tests
         private MockFileSystem _mockFileSystem;
         private Mock<IFolderManager> _mockFolderManager;
         private Mock<IIndexManager> _mockIndexManager;
-        private Mock<ICellManager> _mockCellManager; 
+        private Mock<ICellManager> _mockCellManager;
+        private Mock<ISubscriptionManager> _mockSubscriptionManager;
         private LogManager _logManager;
 
         private const string cellName = "TestCell";
@@ -45,7 +47,8 @@ namespace RosaDB.Library.Tests
             _mockFileSystem = new MockFileSystem();
             _mockFolderManager = new Mock<IFolderManager>();
             _mockIndexManager = new Mock<IIndexManager>();
-            _mockCellManager = new Mock<ICellManager>(); 
+            _mockCellManager = new Mock<ICellManager>();
+            _mockSubscriptionManager = new Mock<ISubscriptionManager>();
 
             var mockDatabase = Database.Create("TestDb").Value;
             _mockSessionState.Setup(s => s.CurrentDatabase).Returns(mockDatabase);
@@ -62,7 +65,8 @@ namespace RosaDB.Library.Tests
                 _mockFileSystem, 
                 _mockFolderManager.Object,
                 _mockIndexManager.Object,
-                _mockCellManager.Object);
+                _mockCellManager.Object,
+                _mockSubscriptionManager.Object);
         }
 
         // This goes through a whole flow 
@@ -89,7 +93,8 @@ namespace RosaDB.Library.Tests
             ICellManager realCellManager = new CellManager(sessionState, fileSystem, folderManager, indexManager);
             IDatabaseManager databaseManager = new DatabaseManager(sessionState, realCellManager, fileSystem, folderManager);
             var rootManager = new RootManager(databaseManager, sessionState, fileSystem, folderManager);
-            var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager, realCellManager);
+            var mockSubscriptionManager = new Mock<ISubscriptionManager>();
+            var logManager = new LogManager(new LogCondenser(), sessionState, fileSystem, folderManager, indexManager, realCellManager, mockSubscriptionManager.Object);
             
             var createDbQuery = new CreateDatabaseQuery(rootManager);
             var useDbQuery = new UseDatabaseQuery(rootManager, sessionState);
