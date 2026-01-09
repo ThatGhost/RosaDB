@@ -193,11 +193,13 @@ namespace RosaDB.Library.Query.Queries
                     var rowValue = row.Values[columnIndex];
                     if (rowValue == null) return false;
 
-                    if (op == "=") return rowValue.Equals(parsedValue);
-
+                    if (op == "=") return DataComparer.CompareEquals(rowValue,parsedValue);
+                    else if (op == ">") return DataComparer.CompareGreaterThan(rowValue, parsedValue);
+                    else if (op == "<") return DataComparer.CompareLessThan(rowValue, parsedValue);
+                    else if (op == ">=") return DataComparer.CompareGreaterThanOrEqual(rowValue, parsedValue);
+                    else if (op == "<=") return DataComparer.CompareLessThanOrEqual(rowValue, parsedValue);
                     else return false;
                 }
-                // All conditions passed
                 return true;
             };
         }
