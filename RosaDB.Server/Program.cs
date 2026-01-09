@@ -1,6 +1,7 @@
 using RosaDB.Server;
 using RosaDB.Library.Websockets;
 using LightInject;
+using RosaDB.Library.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,12 @@ var app = builder.Build();
 
 app.UseWebSockets();
 
-var socketManager = new SocketManager();
+var container = new ServiceContainer();
+Installer.Install(container);
+var tcpService = app.Services.GetRequiredService<TcpServerService>();
+
+tcpService.serviceContainer = container;
+var socketManager = new SocketManager(container);
 
 app.Map("/ws", async context =>
 {

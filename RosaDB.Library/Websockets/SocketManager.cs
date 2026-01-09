@@ -18,8 +18,6 @@ namespace RosaDB.Library.Websockets
             var thread = new Thread(ProcessWebSockets);
             thread.IsBackground = true;
             thread.Start();
-
-            Installer.InstallForWebsockets(_container);
         }
 
         public Task AddSocket(WebSocket socket)

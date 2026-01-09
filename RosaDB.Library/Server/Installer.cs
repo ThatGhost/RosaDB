@@ -13,13 +13,15 @@ public static class Installer
 {
     public static void Install(ServiceContainer container)
     {
-        container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
+        container.RegisterSingleton<SubscriptionManager>();
         
         container.RegisterScoped<SessionState>();
         container.RegisterScoped<ILogManager, LogManager>();
         container.RegisterScoped<IIndexManager, IndexManager>();
         container.RegisterScoped<ICellManager, CellManager>();
+        container.RegisterScoped<WebsocketQueryPlanner>();
         
+        container.Register<TcpClient, Scope, ClientSession>((_, client, scope) => new ClientSession(client, scope));
         container.RegisterTransient<IFileSystem, FileSystem>();
         container.RegisterTransient<IFolderManager, FolderManager>();
         container.RegisterTransient<LogCondenser>();
@@ -29,23 +31,5 @@ public static class Installer
         container.RegisterTransient<TokensToDataParser>();
         container.RegisterTransient<QueryTokenizer>();
         container.RegisterTransient<QueryPlanner>();
-    }
-
-    public static void InstallForWebsockets(ServiceContainer container)
-    {
-        container.RegisterScoped<SessionState>();
-        container.RegisterScoped<WebsocketQueryPlanner>();
-        container.RegisterScoped<SubscriptionManager>();
-        container.RegisterScoped<ILogManager, LogManager>();
-        container.RegisterScoped<IIndexManager, IndexManager>();
-        container.RegisterScoped<ICellManager, CellManager>();
-        container.RegisterTransient<IFileSystem, FileSystem>();
-        container.RegisterTransient<IFolderManager, FolderManager>();
-        container.RegisterTransient<LogCondenser>();
-        container.RegisterTransient<RootManager>();
-        container.RegisterTransient<IDatabaseManager, DatabaseManager>();
-        container.RegisterTransient<DataValidator>();
-        container.RegisterTransient<TokensToDataParser>();
-        container.RegisterTransient<QueryTokenizer>();
     }
 }
