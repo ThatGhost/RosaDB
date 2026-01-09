@@ -1,5 +1,7 @@
 # RosaDB
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ThatGhost/RosaDB)
+
 **RosaDB is a reactive, partitioned datastore written in C# for modern, real-time applications.**
 
 It combines a unique, cell-based architecture with a powerful real-time subscription model, making it an ideal backend for multi-tenant SaaS applications, IoT platforms, collaborative tools, and online games.
