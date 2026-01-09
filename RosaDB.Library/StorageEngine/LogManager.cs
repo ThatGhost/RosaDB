@@ -218,7 +218,6 @@ public class LogManager(
         return log;
     }
 
-    // needs refactoring to where LogLocation gives a hash to the segment file
     public async Task<Result<Log>> GetLogAtLocation(LogLocation logLocation)
     {
         if (sessionState.CurrentDatabase is null)

@@ -12,7 +12,7 @@ namespace RosaDB.Library.Websockets
         private readonly ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>> _socketTasks = new ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>>();
         private readonly ServiceContainer _container;
 
-        private ISubscriptionManager _subscriptionManager;
+        private ISubscriptionManager? _subscriptionManager;
 
         public SocketManager(ServiceContainer container)
         {

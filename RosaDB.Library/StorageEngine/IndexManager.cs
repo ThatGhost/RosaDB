@@ -102,6 +102,7 @@ public class IndexManager(
         {
             path = fileSystem.Path.Combine(
                 folderManager.BasePath,
+                sessionState.CurrentDatabase!.Name,
                 "indexes",
                 identifier.CellName,
                 identifier.TableName,
@@ -116,6 +117,7 @@ public class IndexManager(
 
             path = fileSystem.Path.Combine(
                 folderManager.BasePath,
+                sessionState.CurrentDatabase!.Name,
                 "indexes",
                 identifier.CellName,
                 identifier.TableName,

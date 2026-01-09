@@ -49,7 +49,7 @@ public class QueryView : View
             X = 1,
             Y = 11,
             Width = Dim.Fill() - 2,
-            Height = Dim.Fill() - 12,
+            Height = Dim.Fill() - 5,
             Visible = false
         };
 

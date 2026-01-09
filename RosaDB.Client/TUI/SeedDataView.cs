@@ -42,6 +42,9 @@ namespace RosaDB.Client.TUI
             {
                 ClientManager.Client ??= new Client.Client("127.0.0.1", 7575);
 
+                await SendQuery("INITIALIZE;");
+                await SendQuery("CREATE DATABASE SeededDatabase;");
+                await SendQuery("USE SeededDatabase;");
                 await CreateAndSeedCells();
             }
             catch (Exception ex)
@@ -68,23 +71,23 @@ namespace RosaDB.Client.TUI
             for (int i = 0; i < cells.Length; i++)
             {
                 var cell = cells[i];
-                await SendQuery($"CREATE CELL {cell} (id INT PRIMARY KEY, name TEXT);");
-
+                await SendQuery($"CREATE CELL {cell} (id INT INDEX, name TEXT);");
                 for (int j = 0; j < 2; j++)
                 {
                     var table = tables[i, j];
                     await SendQuery($"CREATE TABLE {cell}.{table} (id INT PRIMARY KEY, data TEXT);");
-                    await SeedTable(cell, table);
+                    await SeedTable(cell, table, j);
                 }
             }
         }
 
-        private async Task SeedTable(string cell, string table)
+        private async Task SeedTable(string cell, string table, int cellInstance)
         {
+            await SendQuery($"INSERT CELL {cell} (id, name) VALUES ({cellInstance}, 'cell-{cell}');");
             Log($"Seeding table {cell}.{table}...");
             for (int i = 0; i < 100; i++)
             {
-                await SendQuery($"INSERT INTO {cell}.{table} USING id = {i} (id, data) VALUES ({i}, 'some random data {i}');");
+                await SendQuery($"INSERT INTO {cell}.{table} USING id = {cellInstance} (id, data) VALUES ({i}, 'some random data {i}');");
             }
         }
 
@@ -93,10 +96,17 @@ namespace RosaDB.Client.TUI
             Log($"Sending: {query}");
             try
             {
-                var stream = ClientManager.Client.SendQueryAndStreamAsync(query);
-                await foreach (var response in stream)
+                if (ClientManager.Client is not null)
                 {
-                    Log($"Response: {response.Message} ({response.RowsAffected} rows affected)");
+                    var stream = ClientManager.Client.SendQueryAndStreamAsync(query);
+                    await foreach (var response in stream)
+                    {
+                        Log($"Response: {response.Message} ({response.RowsAffected} rows affected)");
+                    }
+                }
+                else
+                {
+                    Log("Client is not initialized.");
                 }
             }
             catch (Exception ex)
