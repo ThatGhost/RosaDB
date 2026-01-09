@@ -7,6 +7,8 @@ public class ContentView : View
     private readonly HomeView _homeView = new();
     private readonly QueryView _queryView = new();
     private readonly LogsView _logsView = new();
+    private readonly WebsocketClientView _websocketClientView = new();
+    private readonly SeedDataView _seedDataView = new();
 
     public ContentView()
     {
@@ -30,6 +32,12 @@ public class ContentView : View
                 break;
             case 2:
                 Add(_logsView);
+                break;
+            case 3:
+                Add(_websocketClientView);
+                break;
+            case 4:
+                Add(_seedDataView);
                 break;
         }
     }

@@ -14,7 +14,8 @@ public static class Installer
     public static void Install(ServiceContainer container)
     {
         container.RegisterSingleton<ISubscriptionManager, SubscriptionManager>();
-        
+        container.RegisterSingleton<SocketManager>();
+
         container.RegisterScoped<SessionState>();
         container.RegisterScoped<ILogManager, LogManager>();
         container.RegisterScoped<IIndexManager, IndexManager>();

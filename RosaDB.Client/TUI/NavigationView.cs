@@ -10,7 +10,7 @@ public sealed class NavigationView : View
         Width = 20;
         Height = Dim.Fill();
 
-        var menu = new ListView(new[] { "Home", "Query", "Logs" })
+        var menu = new ListView(new[] { "Home", "Query", "Logs", "Websocket", "Seed Data" })
         {
             X = 0,
             Y = 0,

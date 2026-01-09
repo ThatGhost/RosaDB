@@ -5,7 +5,8 @@ using RosaDB.Library.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHostedService<TcpServerService>();
+builder.Services.AddSingleton<TcpServerService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<TcpServerService>());
 
 var app = builder.Build();
 
@@ -15,7 +16,7 @@ var container = new ServiceContainer();
 Installer.Install(container);
 var tcpService = app.Services.GetRequiredService<TcpServerService>();
 
-tcpService.serviceContainer = container;
+tcpService!.serviceContainer = container;
 var socketManager = new SocketManager(container);
 
 app.Map("/ws", async context =>

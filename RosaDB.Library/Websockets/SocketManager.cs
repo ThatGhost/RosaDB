@@ -12,12 +12,11 @@ namespace RosaDB.Library.Websockets
         private readonly ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>> _socketTasks = new ConcurrentDictionary<WebSocket, TaskCompletionSource<bool>>();
         private readonly ServiceContainer _container;
 
-        private readonly ISubscriptionManager _subscriptionManager;
+        private ISubscriptionManager _subscriptionManager;
 
         public SocketManager(ServiceContainer container)
         {
             _container = container;
-            _subscriptionManager = _container.GetInstance<ISubscriptionManager>();
             var thread = new Thread(ProcessWebSockets);
             thread.IsBackground = true;
             thread.Start();
@@ -47,6 +46,7 @@ namespace RosaDB.Library.Websockets
         private async Task HandleWebSocketAsync(WebSocket webSocket, TaskCompletionSource<bool> tcs)
         {
             await using var scope = _container.BeginScope();
+            _subscriptionManager = scope.GetInstance<ISubscriptionManager>();
             WebsocketQueryPlanner queryPlanner = scope.GetInstance<WebsocketQueryPlanner>();
             var buffer = new byte[1024 * 4];
             try
