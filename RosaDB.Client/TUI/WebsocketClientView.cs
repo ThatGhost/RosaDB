@@ -29,7 +29,7 @@ namespace RosaDB.Client.TUI
             {
                 X = 0,
                 Y = 1,
-                Width = Dim.Fill() - 15
+                Width = Dim.Fill() - 35
             };
             var sendButton = new Button("Send")
             {
@@ -37,7 +37,17 @@ namespace RosaDB.Client.TUI
                 Y = 1
             };
             sendButton.Clicked += SendQuery;
-
+            
+            var retryButton = new Button("Retry")
+            {
+                X = Pos.Right(_queryInput) + 15,
+                Y = 1
+            };
+            retryButton.Clicked += () =>
+            {
+                Task.Run(ConnectAndListen);
+            };
+            
             _logOutput = new TextView()
             {
                 X = 0,
@@ -47,7 +57,7 @@ namespace RosaDB.Client.TUI
                 ReadOnly = true
             };
 
-            Add(queryLabel, _queryInput, sendButton, _logOutput);
+            Add(queryLabel, _queryInput, sendButton, retryButton, _logOutput);
 
             Task.Run(ConnectAndListen);
         }
@@ -114,10 +124,7 @@ namespace RosaDB.Client.TUI
             }
 
             var query = _queryInput.Text.ToString();
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(query)) return;
 
             var queryBytes = Encoding.UTF8.GetBytes(query);
             await _client.SendAsync(new ArraySegment<byte>(queryBytes), WebSocketMessageType.Text, true, CancellationToken.None);
@@ -128,7 +135,7 @@ namespace RosaDB.Client.TUI
         {
             Application.MainLoop.Invoke(() =>
             {
-                _logOutput.Text += $"{DateTime.Now:HH:mm:ss} - {message}\n";
+                _logOutput.Text = $"{DateTime.Now:HH:mm:ss} - {message}\n" + _logOutput.Text; 
             });
         }
 

@@ -40,10 +40,10 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 ## Phase 3: Feature Development
 
 1. **Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
-2. **Implement Real-time Subscriptions (WebSockets):**
-    *   Create and register a `SubscriptionManager` service using `LightInject`.
-    *   Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.
-    *   Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).
+2. ~~**Implement Real-time Subscriptions (WebSockets):**~~
+    *   ~~Create and register a `SubscriptionManager` service using `LightInject`.~~
+    *   ~~Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.~~
+    *   ~~Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).~~
 3. **Cell Metadata:**
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
@@ -56,12 +56,16 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 ## Phase 4: Developer Experience and Server Enhancements
 
 1. **Integrate Logging Framework:** Implement a robust logging framework (e.g., Serilog, NLog) across `RosaDB.Server` and `RosaDB.Library`, replacing existing `Console.WriteLine` calls with structured logging.
-~~2. **TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
+   *    Add this to a special cell instance that users can `SUBSCRIBE` to using the websockets. 
+2. ~~**TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
+3. **Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`
 
-## Phase 5: Start research about replication and scaling
-
-1. **Research Replication Strategies:** Investigate various replication methods (e.g., master-slave, multi-master) suitable for RosaDB's architecture. Document findings and propose a replication model.
-2. **Research Scaling Techniques:** Explore scaling strategies, including sharding and partitioning
+## Phase 5: Rigorous Testing and further Feature Development
+1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
+2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
+3. **Add DELETE Query:** Add the ability to delete rows or cells.
+4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
+5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.
 
 ## Phase 6: Optimization
 1. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
@@ -69,3 +73,6 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. ~~**Index Optimization:** Analyze and optimize B-Tree index structures for faster lookups and reduced storage overhead.~~
 4. ~~**Caching Mechanisms:** Implement caching strategies for frequently accessed data to reduce disk I/O and improve response times.~~
 5. ~~**Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.~~
+6. **Websockets dedicated thread:** Websockets and its callbacks should run on its own separate thread to not interfere with regular queries.
+
+## Phase 7: User management and Connection strings

@@ -43,8 +43,8 @@ namespace RosaDB.Client.TUI
                 ClientManager.Client ??= new Client.Client("127.0.0.1", 7575);
 
                 await SendQuery("INITIALIZE;");
-                await SendQuery("CREATE DATABASE SeededDatabase;");
-                await SendQuery("USE SeededDatabase;");
+                await SendQuery("CREATE DATABASE seededDatabase;");
+                await SendQuery("USE seededDatabase;");
                 await CreateAndSeedCells();
             }
             catch (Exception ex)
@@ -119,7 +119,7 @@ namespace RosaDB.Client.TUI
         {
             Application.MainLoop.Invoke(() =>
             {
-                _logOutput.Text += $"{DateTime.Now:HH:mm:ss} - {message}\n";
+                _logOutput.Text = $"{DateTime.Now:HH:mm:ss} - {message}\n" + _logOutput.Text;
             });
         }
     }

@@ -24,7 +24,7 @@ public class QueryPlanner(
         {
             "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, cellManager),
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
-            "USE" => new UseQuery(tokens, sessionState),
+            "USE" => new UseQuery(tokens, sessionState, rootManager),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager),
             "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager),
             "INITIALIZE" => new InitializeQuery(rootManager),
