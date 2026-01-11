@@ -61,6 +61,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
    *    Add this to a special cell instance that users can `SUBSCRIBE` to using the websockets. 
 2. ~~**TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
 3. **Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`
+4. **Better seeder:** Add better seeding data. with lots of cell instances and maybe tables. Real-ish data.
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
@@ -81,3 +82,6 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 6. **Websockets dedicated thread:** Websockets and its callbacks should run on its own separate thread to not interfere with regular queries.
 
 ## Phase 8: User management and Connection strings
+
+## Phase 9: Missing features
+1.  **`ALTER TABLE` & `CELL` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
