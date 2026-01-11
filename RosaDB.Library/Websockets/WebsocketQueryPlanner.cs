@@ -12,14 +12,19 @@ public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, ISubscriptionM
 {
     public async Task<QueryResult> ExecuteWebsocketQuery(string query, WebSocket webSocket)
     {
-        var result = queryTokenizer.TokenizeQuery(query);
-        if (result.IsFailure) return result.Error;
+        var tokenizeResult = queryTokenizer.Tokenize(query);
+        if (!tokenizeResult.TryGetValue(out var tokenLists)) return tokenizeResult.Error;
 
-        return result.Value[0].ToUpperInvariant() switch
+        if (tokenLists.Count > 1) return new Error(ErrorPrefixes.QueryParsingError, "Batch commands are not supported over websockets.");
+
+        var tokens = tokenLists.FirstOrDefault();
+        if (tokens == null || tokens.Length == 0) return new Error(ErrorPrefixes.QueryParsingError, "Empty query.");
+
+        return tokens[0].ToUpperInvariant() switch
         {
-            "USE" => await new UseQuery(result.Value, sessionState, rootManager).Execute(),
-            "SUBSCRIBE" => await subscriptionManager.HandleSubscribe(result.Value, webSocket),
-            "UNSUBSCRIBE" => await subscriptionManager.HandleUnsubscribe(result.Value, webSocket),
+            "USE" => await new UseQuery(tokens, sessionState, rootManager).Execute(),
+            "SUBSCRIBE" => await subscriptionManager.HandleSubscribe(tokens, webSocket),
+            "UNSUBSCRIBE" => await subscriptionManager.HandleUnsubscribe(tokens, webSocket),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unsupported websocket query type")
         };
     }

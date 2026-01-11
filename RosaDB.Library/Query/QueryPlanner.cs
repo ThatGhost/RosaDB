@@ -16,9 +16,37 @@ public class QueryPlanner(
     IIndexManager indexManager
     )
 {
-    public Result<IQuery> CreateQueryPlanFromTokens(string[] tokens)
+    public Result<List<IQuery>> CreateQueryPlans(List<string[]> tokenLists)
     {
-        if (tokens.Length <= 1) return new Error(ErrorPrefixes.QueryParsingError, "Empty query");
+        var queryPlans = new List<IQuery>();
+        var selectQueryCount = 0;
+
+        foreach (var tokens in tokenLists)
+        {
+            if (tokens.Length > 0 && tokens[0].ToUpperInvariant() == "SELECT")
+            {
+                selectQueryCount++;
+            }
+
+            if (selectQueryCount > 1)
+            {
+                return new Error(ErrorPrefixes.QueryParsingError, "Only one SELECT query is allowed in a batch.");
+            }
+
+            var queryPlanResult = _CreateQueryPlanFromTokens(tokens);
+            if (!queryPlanResult.TryGetValue(out var queryPlan))
+            {
+                return queryPlanResult.Error;
+            }
+            queryPlans.Add(queryPlan);
+        }
+
+        return queryPlans;
+    }
+
+    private Result<IQuery> _CreateQueryPlanFromTokens(string[] tokens)
+    {
+        if (tokens.Length < 1) return new Error(ErrorPrefixes.QueryParsingError, "Empty query.");
 
         return tokens[0].ToUpperInvariant() switch
         {

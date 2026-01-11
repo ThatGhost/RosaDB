@@ -7,7 +7,25 @@ namespace RosaDB.Library.Query
 {
     public class QueryTokenizer
     {
-        public Result<string[]> TokenizeQuery(string query)
+        public Result<List<string[]>> Tokenize(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))  return new List<string[]>();
+
+            var queries = query.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            var tokenizedQueries = new List<string[]>();
+
+            foreach (var singleQuery in queries)
+            {
+                if (string.IsNullOrWhiteSpace(singleQuery)) continue;
+
+                var tokensResult = _TokenizeSingleQuery(singleQuery);
+                if (!tokensResult.TryGetValue(out var tokens)) return tokensResult.Error;
+                tokenizedQueries.Add(tokens);
+            }
+            return tokenizedQueries;
+        }
+
+        private Result<string[]> _TokenizeSingleQuery(string query)
         {
             try
             {

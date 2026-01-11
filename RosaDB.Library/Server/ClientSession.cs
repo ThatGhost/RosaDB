@@ -5,6 +5,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Query;
 using System.Text.Json;
 using RosaDB.Library.Core;
+using RosaDB.Library.Query.Queries;
 
 namespace RosaDB.Library.Server;
 
@@ -46,7 +47,7 @@ public class ClientSession(TcpClient client, Scope scope)
                 DateTime start = DateTime.Now;
 
                 var query = Encoding.UTF8.GetString(queryBuffer, 0, bytesRead);
-                QueryResult result = await TokensToQueryExecution(query, queryTokenizer, queryPlanner);
+                QueryResult result = await ExecuteQueries(query, queryTokenizer, queryPlanner);
 
                 DateTime end = DateTime.Now;
                 TimeSpan duration = end - start;
@@ -141,14 +142,24 @@ public class ClientSession(TcpClient client, Scope scope)
         }
     }
 
-    private async Task<QueryResult> TokensToQueryExecution(string query, QueryTokenizer queryTokenizer, QueryPlanner queryPlanner)
+    private async Task<QueryResult> ExecuteQueries(string query, QueryTokenizer queryTokenizer, QueryPlanner queryPlanner)
     {
-        var tokensResult = queryTokenizer.TokenizeQuery(query);
-        if (!tokensResult.TryGetValue(out var tokens)) return tokensResult.Error;
+        var tokenListsResult = queryTokenizer.Tokenize(query);
+        if (!tokenListsResult.TryGetValue(out var tokenLists)) return tokenListsResult.Error;
 
-        var queryPlanResult = queryPlanner.CreateQueryPlanFromTokens(tokens);
-        if (!queryPlanResult.TryGetValue(out var queryPlan)) return queryPlanResult.Error;
+        var queryPlansResult = queryPlanner.CreateQueryPlans(tokenLists);
+        if (!queryPlansResult.TryGetValue(out var queryPlans)) return queryPlansResult.Error;
+        
+        QueryResult lastResult = new QueryResult("No queries executed.");
 
-        return await queryPlan.Execute();
+        foreach (var queryPlan in queryPlans)
+        {
+            lastResult = await queryPlan.Execute();
+            
+            if (lastResult.IsError) return lastResult; 
+            if (queryPlan is SelectQuery)  return lastResult;
+        }
+        
+        return lastResult;
     }
 }
