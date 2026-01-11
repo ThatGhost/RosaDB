@@ -24,8 +24,25 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
 
     private async Task<QueryResult> ExecuteAlterCell()
     {
+        if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER CELL syntax.");
+        
+        switch (tokens[3].ToUpperInvariant())
+        {
+            case "ADD":
+                return await ExecuteAddColumn();
+            case "DROP":
+                return await ExecuteDropColumn();
+            case "UPDATE":
+                return new Error(ErrorPrefixes.QueryParsingError, "UPDATE COLUMN is not yet implemented.");
+            default:
+                return new Error(ErrorPrefixes.QueryParsingError, $"Unsupported action. Expected ADD, DROP, or UPDATE.");
+        }
+    }
+    
+    private async Task<QueryResult> ExecuteAddColumn()
+    {
         // Expecting: ALTER CELL <cellName> ADD COLUMN <colName> <colType>
-        if (tokens.Length != 7 || tokens[3].ToUpperInvariant() != "ADD" || tokens[4].ToUpperInvariant() != "COLUMN")
+        if (tokens.Length != 7 || tokens[4].ToUpperInvariant() != "COLUMN")
             return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <cellName> ADD COLUMN <colName> <colType>");
 
         var cellName = tokens[2];
@@ -47,6 +64,20 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
         currentColumns.Add(newColumn.Value);
         
         var result = await cellManager.UpdateCellEnvironment(cellName, currentColumns.ToArray());
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully updated cell {cellName}.");
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to cell {cellName}.");
+    }
+
+    private async Task<QueryResult> ExecuteDropColumn()
+    {
+        // Expecting: ALTER CELL <cellName> DROP COLUMN <colName>
+        if (tokens.Length != 6 || tokens[4].ToUpperInvariant() != "COLUMN")
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <cellName> DROP COLUMN <colName>");
+
+        var cellName = tokens[2];
+        var columnName = tokens[5];
+
+        var result = await cellManager.DropColumnAsync(cellName, columnName);
+
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from cell {cellName}.");
     }
 }

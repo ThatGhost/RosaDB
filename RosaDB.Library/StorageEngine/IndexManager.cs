@@ -81,7 +81,7 @@ public class IndexManager(
         var treeResult = GetOrCreateCellInstanceStore(cellName);
         
         if (treeResult.IsFailure) return treeResult.Error;
-        return treeResult.Value.ToArray();
+        return treeResult.Value;
     }
     
     public void Dispose()
