@@ -52,7 +52,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.~~
     ~~*   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.~~
     ~~*   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.~~
-5. ~~**Multiline Queries:** ~~
+5. ~~**Multiline Queries:**~~
     ~~*   Introduce the ability to send multiline queries. this should be handled in the `QueryTokenizer` And the `QueryPlanner`.~~
 
 ## Phase 5: Developer Experience and Server Enhancements
