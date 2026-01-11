@@ -12,6 +12,7 @@ RosaDB is an in-development database solution written in C# targeting .NET 10, d
 -   **Cell-based Architecture**: Data is partitioned into logical groups called "Cells," allowing for fine-grained organization and querying.
 -   **Real-time Subscriptions**: Clients can subscribe to changes (INSERT, UPDATE, DELETE) within a specific cell instance via WebSockets, enabling reactive, real-time application development.
 -   **Log-Structured Storage**: An append-only storage engine inspired by LSM-trees provides efficient writes and clear data lineage.
+-   **Schema Evolution**: Supports adding and removing columns from `CellGroup` schemas with built-in data migration.
 
 ## 1.2. Typical Use Cases
 
@@ -66,6 +67,12 @@ Data persistence is handled by the `LogManager` and split into segments.
 -   Reads on a specific cell instance are strongly consistent.
 -   For cross-cell queries (`SELECT` without `USING`), read consistency is on a per-cell-read basis. The query does not operate on a single, global snapshot of the entire database, prioritizing availability and performance.
 
+#### 3.2.4. Schema Evolution & Row Format
+To support schema evolution (i.e., adding or dropping columns), the on-disk format for serialized rows was updated. Each `CellInstance` row is now prefixed with an integer indicating the number of columns present when it was written.
+
+-   **On Read**: When `RowSerializer` deserializes data, it reads this column count first. If the current schema has more columns than the persisted data (e.g., after an `ADD COLUMN`), the missing columns are treated as `null`.
+-   **On `DROP COLUMN`**: This versioning enables a safe data migration. The `CellManager` reads each row using its original schema, creates a new row conforming to the new (smaller) schema, and overwrites the old data.
+
 ### 3.3. Server (`RosaDB.Library/Server`)
 
 -   **Communication**: Implements a `TcpListener` for standard queries and a WebSocket listener for managing real-time subscriptions.
@@ -105,7 +112,10 @@ The custom syntax extends to DDL for managing the lifecycle of database objects.
 -   **`DELETE CELL <CellGroup> USING <filter>;`**: Deletes a cell instance and all its data.
 -   **`CREATE TABLE <CellGroup>.<TableName> (<cols>);`**: Defines a table schema for an entire cell group.
     *   *Example:* `CREATE TABLE sales.transactions (id INT PRIMARY KEY, amount INT);`
--   **`ALTER TABLE...` / `ALTER CELL...`**: Syntax for schema evolution is planned but will follow industry-standard approaches, which may involve downtime or data migration.
+-   **`ALTER CELL ...`**: Modifies the schema of a `CellGroup`.
+    -   **`ALTER CELL <CellGroup> ADD COLUMN <colName> <colType>;`**: Adds a new, nullable column to the `CellGroup` schema. This is a fast, metadata-only operation. Old rows will have a `null` value for this column when read.
+    -   **`ALTER CELL <CellGroup> DROP COLUMN <colName>;`**: Removes a column from the `CellGroup` schema. **This is a slow, blocking operation** as it requires a full data migration. Every row in every instance of the `CellGroup` is rewritten to conform to the new schema.
+-   **`ALTER TABLE...`**: Syntax for altering table schemas is planned but not yet implemented.
 
 #### 3.4.3. Metadata & Discoverability
 
@@ -121,7 +131,8 @@ The following commands are available for discovering the database schema:
 
 ### 3.5. Error Handling (`RosaDB.Library/Core`)
 
--   Uses a functional `Result<T>` monad pattern for explicit error handling.
+-   Uses a functional `Result<T>` monad pattern for explicit error handling, leveraging a chain of `.Then()` and `.ThenAsync()` extension methods.
+-   For the final operation in a chain that performs a side effect but returns no value, a `.Finally()` method is used to terminate the chain and return a non-generic `Result`.
 
 ### 3.6. Authentication and Authorization
 

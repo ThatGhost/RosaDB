@@ -22,7 +22,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Inject the `IndexManager` into the `LogManager`.~~
     ~~*   Modify `LogManager.Commit` to update the relevant B-Tree indexes for indexed columns after persisting data logs.~~
 
-## ~~Phase 2.5: Implement SELECT and Insert queries~~
+## ~~Phase 3: Implement SELECT and Insert queries~~
 1. ~~**Implement Basic SELECT Queries:**~~
     ~~*   Extend `QueryTokenizer` and `QueryPlanner` to support basic `SELECT ... FROM ... WHERE ...` syntax.~~
     ~~*   Implement a `SelectOperator` that can retrieve rows from a table based on simple `WHERE` conditions (e.g., equality checks).~~
@@ -37,7 +37,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Use indexes for the indexed properties of the cell~~
 5. ~~**Add Greater and Lesser than operations to `SELECT`**~~
 
-## Phase 3: Feature Development
+## Phase 4: Feature Development
 
 1. ~~**Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` operations by checking for existing values in the index.~~
 2. ~~**Implement Real-time Subscriptions (WebSockets):**~~
@@ -53,21 +53,21 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.
     *   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.
 
-## Phase 4: Developer Experience and Server Enhancements
+## Phase 5: Developer Experience and Server Enhancements
 
 1. **Integrate Logging Framework:** Implement a robust logging framework (e.g., Serilog, NLog) across `RosaDB.Server` and `RosaDB.Library`, replacing existing `Console.WriteLine` calls with structured logging.
    *    Add this to a special cell instance that users can `SUBSCRIBE` to using the websockets. 
 2. ~~**TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
 3. **Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`
 
-## Phase 5: Rigorous Testing and further Feature Development
+## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
 2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
 3. **Add DELETE Query:** Add the ability to delete rows or cells.
 4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
 5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.
 
-## Phase 6: Optimization
+## Phase 7: Optimization
 1. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
 2. **Optimize Data Structures:** Refine data structures and algorithms based on profiling results to enhance performance.
 3. ~~**Index Optimization:** Analyze and optimize B-Tree index structures for faster lookups and reduced storage overhead.~~
@@ -75,4 +75,4 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 5. ~~**Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.~~
 6. **Websockets dedicated thread:** Websockets and its callbacks should run on its own separate thread to not interfere with regular queries.
 
-## Phase 7: User management and Connection strings
+## Phase 8: User management and Connection strings
