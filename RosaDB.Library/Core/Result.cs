@@ -74,6 +74,11 @@ public sealed class Result<T>
     {
         return IsSuccess ? await func(Value!) : Result.Failure(Error!);
     }
+    
+    public Result Finally(Func<T,Result> func)
+    {
+        return IsSuccess ? func(Value!) : Error!;
+    }
 }
 
 public sealed class Result
@@ -116,6 +121,11 @@ public sealed class Result
     public Result<T> Then<T>(Func<Result<T>> func)
     {
         return IsSuccess ? func() : new Result<T>(Error!);
+    }
+    
+    public Result Finally(Func<Result> func)
+    {
+        return IsSuccess ? func() : new Result(Error!);
     }
 
     public async Task<Result<T>> ThenAsync<T>(Func<Task<Result<T>>> func)

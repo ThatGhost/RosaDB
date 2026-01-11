@@ -210,60 +210,58 @@ namespace RosaDB.Library.StorageEngine
             return table.Columns.ToArray();
         }
 
-        public async Task<Result> DropColumnAsync(string cellName, string columnName)
+        public Task<Result> DropColumnAsync(string cellName, string columnName)
         {
-            // 1. Get the current environment (the "before" schema)
-            var envResult = await GetEnvironment(cellName);
-            if (!envResult.TryGetValue(out var env)) return envResult.Error;
-
-            var oldColumns = env.Columns;
-            var columnToRemove = oldColumns.FirstOrDefault(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
-            if (columnToRemove == null)
-                return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' does not exist in cell '{cellName}'.");
-
-            // 2. Prepare the new schema
-            var newColumns = oldColumns.Where(c => c != columnToRemove).ToArray();
-
-            // 3. Get the streaming enumerator for all cell instance data
-            var allDataResult = indexManager.GetAllCellData(cellName);
-            if (allDataResult.IsFailure) return allDataResult.Error;
-
-            // 4. Migrate each row using a private helper method
-            var migrationResult = await MigrateDroppedColumnData(cellName, oldColumns, newColumns, allDataResult.Value);
-            if (migrationResult.IsFailure) return migrationResult.Error;
-
-            // 5. After successful migration, update the environment file
-            env.Columns = newColumns;
-            return await SaveEnvironment(env, cellName);
+            return GetEnvironment(cellName)
+                .Then<CellEnvironment, (CellEnvironment, Column[], Column[])>(env =>
+                {
+                    var oldColumns = env.Columns;
+                    var columnToRemove = oldColumns.FirstOrDefault(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
+                    if (columnToRemove == null)
+                        return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' does not exist in cell '{cellName}'.");
+        
+                    var newColumns = oldColumns.Where(c => c != columnToRemove).ToArray();
+                    return (env, oldColumns, newColumns);
+                })
+                .Then<(CellEnvironment, Column[], Column[]), (CellEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>)>(data =>
+                { 
+                    var cellData = indexManager.GetAllCellData(cellName);
+                    if (cellData.IsFailure) return cellData.Error;
+                    return (data.Item1, data.Item2, data.Item3, cellData.Value);
+                })
+                .ThenAsync<(CellEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>), (CellEnvironment, Column[])>(async data =>
+                {
+                    var migrationResult = await MigrateDroppedColumnData(cellName, data.Item2, data.Item3, data.Item4);
+                    return migrationResult.IsSuccess ? (data.Item1, data.Item3) : migrationResult.Error;
+                })
+                .ThenAsync(async data =>
+                {
+                    var env = data.Item1;
+                    var newColumns = data.Item2;
+                    env.Columns = newColumns;
+                    return await SaveEnvironment(env, cellName);
+                });
         }
 
         private async Task<Result> MigrateDroppedColumnData(string cellName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allCellData)
         {
             foreach (var kvp in allCellData)
             {
-                var instanceHash = kvp.Key;
-                var rawData = kvp.Value;
+                var migrationResult = 
+                    RowSerializer.Deserialize(kvp.Value, oldColumns)
+                    .Then(oldRow =>
+                    {
+                        var newValues = new object?[newColumns.Length];
+                        for (int i = 0; i < newColumns.Length; i++)
+                        {
+                            newValues[i] = oldRow.Values[Array.IndexOf(oldColumns, newColumns[i])];
+                        }
+                        return Row.Create(newValues, newColumns);
+                    })
+                    .Then(RowSerializer.Serialize)
+                    .Finally(newRowBytes => indexManager.InsertCellData(cellName, kvp.Key, newRowBytes));
 
-                // a. Deserialize with the OLD schema
-                var rowResult = RowSerializer.Deserialize(rawData, oldColumns);
-                if (rowResult.IsFailure) return new Error(ErrorPrefixes.DataError, $"Failed to deserialize row during migration: {rowResult.Error.Message}");
-
-                // b. Create a new row with the NEW schema
-                var oldRow = rowResult.Value;
-                var newValues = new object?[newColumns.Length];
-                for (int i = 0; i < newColumns.Length; i++)
-                {
-                    newValues[i] = oldRow.Values[Array.IndexOf(oldColumns, newColumns[i])];
-                }
-                var newRow = Row.Create(newValues, newColumns);
-                if(newRow.IsFailure) return newRow.Error;
-
-                var newRowBytesResult = RowSerializer.Serialize(newRow.Value);
-                if (newRowBytesResult.IsFailure) return new Error(ErrorPrefixes.DataError, $"Failed to serialize row during migration: {newRowBytesResult.Error.Message}");
-
-                // d. Overwrite the data in the index
-                var updateResult = indexManager.InsertCellData(cellName, instanceHash, newRowBytesResult.Value);
-                if (updateResult.IsFailure) return new Error(ErrorPrefixes.DataError, $"Failed to write migrated row: {updateResult.Error.Message}");
+                if (migrationResult.IsFailure) return migrationResult.Error;
             }
             return Result.Success();
         }
