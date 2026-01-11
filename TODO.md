@@ -48,10 +48,10 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
     ~~*   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.~~ (Only added ADD and DROP Column for now)
-4. **Implement Transactions:**
-    *   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.
-    *   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.
-    *   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.
+4. ~~**Implement Transactions:**~~
+    ~~*   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.~~
+    ~~*   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.~~
+    ~~*   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.~~
 5. **Multiline Queries:** 
     *   Introduce the ability to send multiline queries. this should be handled in the `QueryTokenizer` And the `QueryPlanner`.
 
@@ -65,9 +65,12 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
 2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
-3. **Add DELETE Query:** Add the ability to delete rows or cells.
+3. **Add `DELETE` Query:** Add the ability to delete rows or cells.
+    *   Take into account transactions
 4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
 5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.
+6. **Add `UPDATE` Query:** Add the ability to update rows or cells.
+    *   Take into account transactions
 
 ## Phase 7: Optimization
 1. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
