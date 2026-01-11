@@ -47,7 +47,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. **Cell Metadata:**
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
-    *   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.
+    ~~*   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.~~ (Only added ADD and DROP Column for now)
 4. **Implement Transactions:**
     *   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.
     *   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.
