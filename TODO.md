@@ -37,7 +37,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Use indexes for the indexed properties of the cell~~
 5. ~~**Add Greater and Lesser than operations to `SELECT`**~~
 
-## Phase 4: Feature Development
+## ~~Phase 4: Feature Development~~
 
 1. ~~**Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` operations by checking for existing values in the index.~~
 2. ~~**Implement Real-time Subscriptions (WebSockets):**~~
@@ -52,8 +52,8 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     ~~*   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.~~
     ~~*   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.~~
     ~~*   Modify the `LogManager` to support transactional logging, ensuring that changes are only persisted upon `COMMIT` and can be reverted on `ROLLBACK`.~~
-5. **Multiline Queries:** 
-    *   Introduce the ability to send multiline queries. this should be handled in the `QueryTokenizer` And the `QueryPlanner`.
+5. ~~**Multiline Queries:** ~~
+    ~~*   Introduce the ability to send multiline queries. this should be handled in the `QueryTokenizer` And the `QueryPlanner`.~~
 
 ## Phase 5: Developer Experience and Server Enhancements
 
