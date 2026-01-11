@@ -21,6 +21,16 @@ namespace RosaDB.Library.StorageEngine
             return await SaveEnvironment(env, cellName);
         }
 
+        public async Task<Result> UpdateCellEnvironment(string cellName, Column[] columns)
+        {
+            var envResult = await GetEnvironment(cellName);
+            if (!envResult.TryGetValue(out var env)) return envResult.Error;
+
+            env.Columns = columns;
+
+            return await SaveEnvironment(env, cellName);
+        }
+
         public Task<Result> CreateCellInstance(string cellGroupName, string instanceHash, Row instanceData, Column[] schema)
         {
             // 1. Save main data

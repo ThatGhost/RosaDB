@@ -39,7 +39,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 
 ## Phase 3: Feature Development
 
-1. **Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` and `UPDATE` operations by checking for existing values in the index.
+1. ~~**Implement `UNIQUE` Constraint:** Leverage the B-Tree indexing to enforce `UNIQUE` constraints during `INSERT` operations by checking for existing values in the index.~~
 2. ~~**Implement Real-time Subscriptions (WebSockets):**~~
     *   ~~Create and register a `SubscriptionManager` service using `LightInject`.~~
     *   ~~Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.~~

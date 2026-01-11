@@ -14,6 +14,8 @@ public static class RowSerializer
         var columns = row.Columns;
         var values = row.Values;
 
+        writer.Write(columns.Length);
+
         // 1. Write Null Bitmap
         int bitmapLen = (columns.Length + 7) / 8;
         byte[] nullBitmap = new byte[bitmapLen];
@@ -79,8 +81,10 @@ public static class RowSerializer
 
             var values = new object?[columns.Length];
 
+            var persistedColumnCount = reader.ReadInt32();
+            
             // 1. Read Null Bitmap
-            int bitmapLen = (columns.Length + 7) / 8;
+            int bitmapLen = (persistedColumnCount + 7) / 8;
             byte[] nullBitmap = reader.ReadBytes(bitmapLen);
             
             if (nullBitmap.Length != bitmapLen)
@@ -88,6 +92,12 @@ public static class RowSerializer
 
             for (int i = 0; i < columns.Length; i++)
             {
+                if (i >= persistedColumnCount)
+                {
+                    values[i] = null;
+                    continue;
+                }
+
                 // Check if the value is null based on the bitmap
                 bool isNull = (nullBitmap[i / 8] & (1 << (i % 8))) != 0;
                 
@@ -134,7 +144,10 @@ public static class RowSerializer
             
             return Row.Create(values, columns);
         }
-        catch (EndOfStreamException) { return new Error(ErrorPrefixes.DataError, "Unexpected end of stream while deserializing row."); }
+        catch (EndOfStreamException)
+        {
+            return new Error(ErrorPrefixes.DataError, "Data is in an old, incompatible format. Please migrate data to use schema evolution features.");
+        }
         catch (Exception) { return new CriticalError(); }
     }
 }

@@ -8,6 +8,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
     public interface ICellManager
     {
         Task<Result> CreateCellEnvironment(string cellName, Column[] columns);
+        Task<Result> UpdateCellEnvironment(string cellName, Column[] columns);
         Task<Result> CreateTable(string cellName, Table table);
         Task<Result> DeleteTable(string cellName, string tableName);
         Task<Result<CellEnvironment>> GetEnvironment(string cellName);
