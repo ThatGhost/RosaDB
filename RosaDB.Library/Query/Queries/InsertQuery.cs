@@ -6,6 +6,7 @@ using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.Validation;
 using System.Security.Cryptography;
 using System.Text;
+using RosaDB.Library.Server;
 
 namespace RosaDB.Library.Query.Queries;
 
@@ -13,7 +14,8 @@ public class InsertQuery(
     string[] tokens,
     ICellManager cellManager,
     ILogManager logManager,
-    IIndexManager indexManager) : IQuery
+    IIndexManager indexManager,
+    SessionState sessionState) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -56,7 +58,10 @@ public class InsertQuery(
                 }
 
                 logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
-                return await logManager.Commit();
+                
+                if (!sessionState.IsInTransaction) return await logManager.Commit();
+
+                return Result.Success();
             })))
             .MatchAsync(
                 () => Task.FromResult(new QueryResult("1 row inserted successfully.", 1)),

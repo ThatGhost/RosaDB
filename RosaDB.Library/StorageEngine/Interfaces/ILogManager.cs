@@ -6,6 +6,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces;
 public interface ILogManager : IAsyncDisposable
 {
     ValueTask<Result> Commit();
+    void Rollback();
     void Put(string cellName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null);
     void Delete(string cellName, string tableName, object[] indexValues, long logId);
     Task<Result<Log>> FindLastestLog(string cellName, string tableName, object[] indexValues, long id);

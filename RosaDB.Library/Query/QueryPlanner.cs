@@ -26,9 +26,12 @@ public class QueryPlanner(
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
             "USE" => new UseQuery(tokens, sessionState, rootManager),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager),
-            "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager),
+            "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager, sessionState),
             "INITIALIZE" => new InitializeQuery(rootManager),
             "ALTER" => new AlterQuery(tokens, cellManager),
+            "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
+            "COMMIT" => new CommitQuery(sessionState, logManager),
+            "ROLLBACK" => new RollbackQuery(sessionState, logManager),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
         };
     }

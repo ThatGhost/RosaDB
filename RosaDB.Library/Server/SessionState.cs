@@ -5,4 +5,6 @@ namespace RosaDB.Library.Server;
 public class SessionState
 {
     public virtual Database? CurrentDatabase { get; set; }
+    public virtual bool IsInTransaction { get; set; } = false;
 }
+

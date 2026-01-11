@@ -63,6 +63,11 @@ public class LogManager(
         return Result.Success();
     }
     
+    public void Rollback()
+    {
+        _writeAheadLogs.Clear();
+    }
+    
     public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
     {
         var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, tableIndex);
