@@ -44,7 +44,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
     *   ~~Create and register a `SubscriptionManager` service using `LightInject`.~~
     *   ~~Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.~~
     *   ~~Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).~~
-3. **Cell Metadata:**
+3. ~~**Cell Metadata:**~~
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Cell` model (`Cell.cs`).~~
     ~~*   Update `CellEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
     ~~*   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from cell metadata.~~ (Only added ADD and DROP Column for now)
