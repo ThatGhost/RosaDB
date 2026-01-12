@@ -4,7 +4,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
-using RosaDB.Library.Websockets;
+using RosaDB.Library.Websockets.Interfaces;
 
 namespace RosaDB.Library.StorageEngine;
 

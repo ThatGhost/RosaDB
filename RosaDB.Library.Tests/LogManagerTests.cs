@@ -11,7 +11,7 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
 using System.Text;
 using RosaDB.Library.MoqQueries;
-using RosaDB.Library.Websockets;
+using RosaDB.Library.Websockets.Interfaces;
 
 namespace RosaDB.Library.Tests
 {

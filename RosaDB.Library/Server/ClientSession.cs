@@ -1,11 +1,13 @@
-using System.Net.Sockets;
-using System.Text;
 using LightInject;
+using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query;
-using System.Text.Json;
-using RosaDB.Library.Core;
 using RosaDB.Library.Query.Queries;
+using RosaDB.Library.StorageEngine.Interfaces;
+using RosaDB.Library.StorageEngine.Serializers;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 
 namespace RosaDB.Library.Server;
 
@@ -28,7 +30,10 @@ public class ClientSession(TcpClient client, Scope scope)
     {
         var queryTokenizer = scope.GetInstance<QueryTokenizer>();
         var queryPlanner = scope.GetInstance<QueryPlanner>();
+        var sessionId = await InitializeClientSession(scope);
+        
         await using var stream = client.GetStream();
+        await SendResponseAsync(stream, new QueryResult($"Session initialized with ID: {sessionId}"), TimeSpan.Zero);
         while (client.Connected)
         {
             try
@@ -161,5 +166,28 @@ public class ClientSession(TcpClient client, Scope scope)
         }
         
         return lastResult;
+    }
+
+    private async Task<Result<Guid>> InitializeClientSession(Scope scope)
+    {
+        var sessionState = scope.GetInstance<SessionState>();
+        var cellManager = scope.GetInstance<ICellManager>();
+
+        sessionState.SessionId = Guid.CreateVersion7();
+        sessionState.CurrentDatabase = Database.Create("_system").Value;
+
+        var columnResult = Column.Create("sessionId", DataType.TEXT, isIndex: true);
+        if (!columnResult.TryGetValue(out var sessionIdColumn)) return columnResult.Error;
+
+        Column[] schemaColumns = [sessionIdColumn];
+
+        var rowCreateResult = Row.Create([sessionState.SessionId.ToString()], schemaColumns);
+        if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
+
+        var instanceHash = InstanceHasher.GenerateCellInstanceHash(new Dictionary<string, string>{{ "sessionId", sessionState.SessionId.ToString() }});
+
+        var saveResult = await cellManager.CreateCellInstance("_logs", instanceHash, row, schemaColumns);
+        if(saveResult.IsFailure) return saveResult.Error;
+        return sessionState.SessionId;
     }
 }

@@ -55,7 +55,7 @@ public class QueryPlanner(
             "USE" => new UseQuery(tokens, sessionState, rootManager),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager),
             "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager, sessionState),
-            "INITIALIZE" => new InitializeQuery(rootManager),
+            "INITIALIZE" => new InitializeQuery(rootManager, cellManager, databaseManager, sessionState),
             "ALTER" => new AlterQuery(tokens, cellManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logManager),

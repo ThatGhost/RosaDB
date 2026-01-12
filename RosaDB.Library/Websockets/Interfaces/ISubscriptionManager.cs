@@ -2,7 +2,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
 using System.Net.WebSockets;
 
-namespace RosaDB.Library.Websockets
+namespace RosaDB.Library.Websockets.Interfaces
 {
     public interface ISubscriptionManager
     {

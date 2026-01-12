@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.IO.Abstractions;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.Websockets;
+using RosaDB.Library.Websockets.Interfaces;
 
 namespace RosaDB.Library.Server;
 

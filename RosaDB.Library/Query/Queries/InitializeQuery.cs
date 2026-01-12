@@ -40,10 +40,14 @@ public class InitializeQuery(RootManager rootManager, ICellManager cellManager, 
             {
                 var logColumnResult = Column.Create("message", DataType.TEXT);
                 if (logColumnResult.IsFailure) return logColumnResult.Error;
+
                 var sessionIdColumnResult = Column.Create(SessionIdColumnName, DataType.TEXT);
                 if (sessionIdColumnResult.IsFailure) return sessionIdColumnResult.Error;
 
-                return Result<Column[]>.Success([sessionIdColumnResult.Value, logColumnResult.Value]);
+                var timestampColumnResult = Column.Create("timestamp", DataType.TEXT);
+                if (timestampColumnResult.IsFailure) return timestampColumnResult.Error;
+
+                return Result<Column[]>.Success([sessionIdColumnResult.Value, logColumnResult.Value, timestampColumnResult.Value]);
             })
             .Then(columns => Table.Create(LogTableName, columns))
             .ThenAsync<Table>(table => cellManager.CreateTable(LogTableName, table));

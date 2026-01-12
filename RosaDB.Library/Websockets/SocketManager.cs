@@ -1,5 +1,6 @@
 using LightInject;
 using RosaDB.Library.Server;
+using RosaDB.Library.Websockets.Interfaces;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;

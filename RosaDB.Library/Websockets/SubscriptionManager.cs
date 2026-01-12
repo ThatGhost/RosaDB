@@ -4,6 +4,7 @@ using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
+using RosaDB.Library.Websockets.Interfaces;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
