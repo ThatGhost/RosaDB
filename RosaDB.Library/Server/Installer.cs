@@ -19,11 +19,11 @@ public static class Installer
         // Logging Services
         container.RegisterSingleton<ILogQueue, LogQueue>();
         container.RegisterSingleton<LogBackgroundService>();
-        container.RegisterScoped<ISystemLogPublisher, SystemLogPublisher>();
-
+        container.RegisterInstance<IServiceContainer>(container);
         container.RegisterSingleton<ISubscriptionManager, SubscriptionManager>();
         container.RegisterSingleton<SocketManager>();
 
+        container.RegisterScoped<ISystemLogPublisher, SystemLogPublisher>();
         container.RegisterScoped<SessionState>();
         container.RegisterScoped<ILogManager, LogManager>();
         container.RegisterScoped<IIndexManager, IndexManager>();

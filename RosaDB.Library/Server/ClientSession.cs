@@ -43,7 +43,7 @@ public class ClientSession
         var sessionId = InitializeClientSession(_scope);
         
         await using var stream = _client.GetStream();
-        await SendResponseAsync(stream, new QueryResult($"Session initialized with ID: {sessionId}"), TimeSpan.Zero);
+        //await SendResponseAsync(stream, new QueryResult($"Session initialized with ID: {sessionId}"), TimeSpan.Zero);
         while (_client.Connected)
         {
             try

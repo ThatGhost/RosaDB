@@ -41,7 +41,7 @@ namespace RosaDB.Library.Server.Logging
 
         private async Task WriteLogRecord(LogRecord record)
         {
-            using (var scope = serviceContainer.BeginScope())
+            await using (var scope = serviceContainer.BeginScope())
             {
                 var logManager = scope.GetInstance<ILogManager>();
                 var sessionState = scope.GetInstance<SessionState>();

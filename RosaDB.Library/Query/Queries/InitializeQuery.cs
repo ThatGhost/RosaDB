@@ -18,7 +18,7 @@ public class InitializeQuery(RootManager rootManager, SessionState sessionState,
     {
         var rootResult = await rootManager.InitializeRoot()
             .ThenAsync(() => InitilizeSystemDatabase())
-            .ThenAsync(() => LogSystemInitializer.InitializeAsync(serviceContainer)); // Call new initializer
+            .ThenAsync(() => LogSystemInitializer.InitializeAsync(serviceContainer));
 
         return rootResult.IsSuccess ? new QueryResult("RosaDB successfully initialized") : rootResult.Error;
     }

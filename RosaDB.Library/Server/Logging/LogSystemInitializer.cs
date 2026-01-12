@@ -1,12 +1,7 @@
 using LightInject;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
-using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
-using RosaDB.Library.StorageEngine.Serializers;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace RosaDB.Library.Server.Logging
 {
@@ -30,18 +25,30 @@ namespace RosaDB.Library.Server.Logging
 
                 sessionState.CurrentDatabase = dbResult.Value;
 
-                var envResult = await cellManager.GetEnvironment(LogCellGroupName);
-                if (!envResult.TryGetValue(out var cellEnv)) return envResult.Error;
+                // 1. Ensure _sessions CellGroup exists
+                var cellGroupEnvResult = await cellManager.GetEnvironment(LogCellGroupName);
+                if (cellGroupEnvResult.IsFailure)
+                {
+                    var sessionIdColumn = Column.Create(LogCellInstanceId, DataType.TEXT, isIndex: true).Value;
+                    var createCellGroupResult = await databaseManager.CreateCell(LogCellGroupName, [sessionIdColumn!]);
+                    if (createCellGroupResult.IsFailure) return createCellGroupResult.Error;
+                }
 
-                var instanceHash = InstanceHasher.GenerateCellInstanceHash(new Dictionary<string, string> { { LogCellInstanceId, sessionState.SessionId.ToString() } });
-                var existingCell = await cellManager.GetCellInstance(LogCellGroupName, instanceHash);
+                // 2. Ensure _logs Table exists within _sessions CellGroup
+                var tableSchemaResult = await cellManager.GetColumnsFromTable(LogCellGroupName, LogTableName);
+                if (tableSchemaResult.IsFailure)
+                {
+                    var sessionIdCol = Column.Create(LogCellInstanceId, DataType.TEXT).Value;
+                    var messageCol = Column.Create("message", DataType.TEXT).Value;
+                    var timestampCol = Column.Create("timestamp", DataType.TEXT).Value;
+                    var levelCol = Column.Create("level", DataType.TEXT).Value;
 
-                if (existingCell.IsSuccess) return Result.Success();
+                    var table = Table.Create(LogTableName, [sessionIdCol!, messageCol!, timestampCol!, levelCol!]).Value;
+                    var createTableResult = await cellManager.CreateTable(LogCellGroupName, table!);
+                    if (createTableResult.IsFailure) return createTableResult.Error;
+                }
 
-                var rowCreateResult = Row.Create([LogCellInstanceId], cellEnv.Columns);
-                if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
-
-                return await cellManager.CreateCellInstance(LogCellGroupName, instanceHash, row, cellEnv.Columns);
+                return Result.Success();
             }
         }
     }
