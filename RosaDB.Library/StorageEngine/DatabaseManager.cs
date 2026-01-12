@@ -13,6 +13,19 @@ namespace RosaDB.Library.StorageEngine
         private readonly IFileSystem _fileSystem = fileSystem;
         private readonly IFolderManager _folderManager = folderManager;
 
+        public Result<Database> GetDatabase(string databaseName)
+        {
+            var dbResult = Database.Create(databaseName);
+            if (dbResult.IsFailure) return dbResult.Error;
+
+            var database = dbResult.Value;
+            var path = GetDatabasePath(database);
+
+            if (!_folderManager.DoesFolderExist(path)) return new Error(ErrorPrefixes.DataError, $"Database '{databaseName}' not found.");
+
+            return database;
+        }
+
         public async Task<Result> CreateDatabaseEnvironment(Database database)
         {
             DatabaseEnvironment env = new DatabaseEnvironment();

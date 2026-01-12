@@ -3,16 +3,19 @@ using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query;
 using RosaDB.Library.Query.Queries;
-using RosaDB.Library.StorageEngine.Interfaces;
-using RosaDB.Library.StorageEngine.Serializers;
+using RosaDB.Library.Server.Interfaces;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
 namespace RosaDB.Library.Server;
 
-public class ClientSession(TcpClient client, Scope scope)
+public class ClientSession
 {
+    private readonly TcpClient _client;
+    private readonly Scope _scope;
+    private readonly ISystemLogPublisher _logPublisher;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = false
@@ -26,15 +29,22 @@ public class ClientSession(TcpClient client, Scope scope)
         public double DurationMs { get; set; }
     }
 
+    public ClientSession(TcpClient client, Scope scope, ISystemLogPublisher logPublisher)
+    {
+        _client = client;
+        _scope = scope;
+        _logPublisher = logPublisher;
+    }
+
     public async Task HandleClient()
     {
-        var queryTokenizer = scope.GetInstance<QueryTokenizer>();
-        var queryPlanner = scope.GetInstance<QueryPlanner>();
-        var sessionId = await InitializeClientSession(scope);
+        var queryTokenizer = _scope.GetInstance<QueryTokenizer>();
+        var queryPlanner = _scope.GetInstance<QueryPlanner>();
+        var sessionId = InitializeClientSession(_scope);
         
-        await using var stream = client.GetStream();
+        await using var stream = _client.GetStream();
         await SendResponseAsync(stream, new QueryResult($"Session initialized with ID: {sessionId}"), TimeSpan.Zero);
-        while (client.Connected)
+        while (_client.Connected)
         {
             try
             {
@@ -52,6 +62,7 @@ public class ClientSession(TcpClient client, Scope scope)
                 DateTime start = DateTime.Now;
 
                 var query = Encoding.UTF8.GetString(queryBuffer, 0, bytesRead);
+                _logPublisher.Publish(RosaDB.Library.Server.Interfaces.LogLevel.Information, $"Executing query: {query}");
                 QueryResult result = await ExecuteQueries(query, queryTokenizer, queryPlanner);
 
                 DateTime end = DateTime.Now;
@@ -61,10 +72,12 @@ public class ClientSession(TcpClient client, Scope scope)
             }
             catch (IOException)
             {
+                _logPublisher.Publish(RosaDB.Library.Server.Interfaces.LogLevel.Error, "An IO exception occurred in the client session.");
                 await SendResponseAsync(stream, new CriticalError(), TimeSpan.FromSeconds(1));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logPublisher.Publish(RosaDB.Library.Server.Interfaces.LogLevel.Critical, $"An unhandled exception occurred: {ex.Message}");
                 await SendResponseAsync(stream, new CriticalError(), TimeSpan.FromSeconds(1));
             }
         }
@@ -168,26 +181,14 @@ public class ClientSession(TcpClient client, Scope scope)
         return lastResult;
     }
 
-    private async Task<Result<Guid>> InitializeClientSession(Scope scope)
+    private Guid InitializeClientSession(Scope scope)
     {
         var sessionState = scope.GetInstance<SessionState>();
-        var cellManager = scope.GetInstance<ICellManager>();
+        sessionState.SessionId = Guid.NewGuid();
 
-        sessionState.SessionId = Guid.CreateVersion7();
-        sessionState.CurrentDatabase = Database.Create("_system").Value;
+        // Publish the session creation event
+        _logPublisher.Publish(RosaDB.Library.Server.Interfaces.LogLevel.Information, $"New client session initialized.");
 
-        var columnResult = Column.Create("sessionId", DataType.TEXT, isIndex: true);
-        if (!columnResult.TryGetValue(out var sessionIdColumn)) return columnResult.Error;
-
-        Column[] schemaColumns = [sessionIdColumn];
-
-        var rowCreateResult = Row.Create([sessionState.SessionId.ToString()], schemaColumns);
-        if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
-
-        var instanceHash = InstanceHasher.GenerateCellInstanceHash(new Dictionary<string, string>{{ "sessionId", sessionState.SessionId.ToString() }});
-
-        var saveResult = await cellManager.CreateCellInstance("_logs", instanceHash, row, schemaColumns);
-        if(saveResult.IsFailure) return saveResult.Error;
         return sessionState.SessionId;
     }
 }

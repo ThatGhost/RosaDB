@@ -4,6 +4,7 @@ using RosaDB.Library.Query.Queries;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
+using LightInject;
 
 namespace RosaDB.Library.Query;
 
@@ -13,7 +14,8 @@ public class QueryPlanner(
     RootManager rootManager,
     SessionState sessionState,
     ILogManager logManager,
-    IIndexManager indexManager
+    IIndexManager indexManager,
+    IServiceContainer serviceContainer
     )
 {
     public Result<List<IQuery>> CreateQueryPlans(List<string[]> tokenLists)
@@ -55,7 +57,7 @@ public class QueryPlanner(
             "USE" => new UseQuery(tokens, sessionState, rootManager),
             "SELECT" => new SelectQuery(tokens, logManager, cellManager),
             "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager, sessionState),
-            "INITIALIZE" => new InitializeQuery(rootManager, cellManager, databaseManager, sessionState),
+            "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer), // Pass container
             "ALTER" => new AlterQuery(tokens, cellManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logManager),

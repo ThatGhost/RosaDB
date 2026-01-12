@@ -3,10 +3,12 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
+using LightInject; // New using
+using RosaDB.Library.Server.Logging; // New using
 
 namespace RosaDB.Library.Query.Queries;
 
-public class InitializeQuery(RootManager rootManager, ICellManager cellManager, IDatabaseManager databaseManager, SessionState sessionState) : IQuery
+public class InitializeQuery(RootManager rootManager, SessionState sessionState, IServiceContainer serviceContainer) : IQuery
 {
     private const string SystemDatabaseName = "_system";
     private const string SessionIdColumnName = "sessionId";
@@ -16,7 +18,7 @@ public class InitializeQuery(RootManager rootManager, ICellManager cellManager, 
     {
         var rootResult = await rootManager.InitializeRoot()
             .ThenAsync(() => InitilizeSystemDatabase())
-            .ThenAsync(() => CreateLoggingTableAndCell());
+            .ThenAsync(() => LogSystemInitializer.InitializeAsync(serviceContainer)); // Call new initializer
 
         return rootResult.IsSuccess ? new QueryResult("RosaDB successfully initialized") : rootResult.Error;
     }
@@ -30,26 +32,5 @@ public class InitializeQuery(RootManager rootManager, ICellManager cellManager, 
                 sessionState.CurrentDatabase = database;
                 return Task.FromResult(Result.Success());
             });
-    }
-
-    private async Task<Result> CreateLoggingTableAndCell()
-    {
-        return await Task.FromResult(Column.Create(SessionIdColumnName, DataType.TEXT, isIndex: true))
-            .ThenAsync<Column>(column => databaseManager.CreateCell(LogTableName, [column]))
-            .Then<Column[]>(() =>
-            {
-                var logColumnResult = Column.Create("message", DataType.TEXT);
-                if (logColumnResult.IsFailure) return logColumnResult.Error;
-
-                var sessionIdColumnResult = Column.Create(SessionIdColumnName, DataType.TEXT);
-                if (sessionIdColumnResult.IsFailure) return sessionIdColumnResult.Error;
-
-                var timestampColumnResult = Column.Create("timestamp", DataType.TEXT);
-                if (timestampColumnResult.IsFailure) return timestampColumnResult.Error;
-
-                return Result<Column[]>.Success([sessionIdColumnResult.Value, logColumnResult.Value, timestampColumnResult.Value]);
-            })
-            .Then(columns => Table.Create(LogTableName, columns))
-            .ThenAsync<Table>(table => cellManager.CreateTable(LogTableName, table));
     }
 }

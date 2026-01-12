@@ -1,4 +1,5 @@
 #nullable disable
+
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Serializers;
 
@@ -19,7 +20,11 @@ public class RowSerializerNullableTests
             Column.Create("IsActive", DataType.BOOLEAN).Value
         };
 
-        var values = new object?[] { 1, null, null, true };
+#pragma warning disable IDE0300 // Simplify collection initialization
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+        object[] values = new object?[] { 1, null, null, true };
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#pragma warning restore IDE0300 // Simplify collection initialization
         var originalRow = Row.Create(values, columns).Value;
 
         // Act
@@ -50,7 +55,9 @@ public class RowSerializerNullableTests
             Column.Create("C3", DataType.INT, isNullable: true).Value
         };
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         var values = new object?[] { 10, null, 30 };
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         var originalRow = Row.Create(values, columns).Value;
 
         // Act

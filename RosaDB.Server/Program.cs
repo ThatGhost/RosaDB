@@ -2,6 +2,7 @@ using RosaDB.Server;
 using RosaDB.Library.Websockets;
 using LightInject;
 using RosaDB.Library.Server;
+using RosaDB.Library.Server.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,16 @@ app.UseWebSockets();
 
 var container = new ServiceContainer();
 Installer.Install(container);
+
+// ---- START LOGGING SERVICE ----
+var logService = container.GetInstance<LogBackgroundService>();
+
+logService.Start();
+
+// Ensure the logger is stopped gracefully on application shutdown
+app.Lifetime.ApplicationStopping.Register(() => logService.Stop());
+// ---- END LOGGING SERVICE ----
+
 var tcpService = app.Services.GetRequiredService<TcpServerService>();
 
 tcpService!.serviceContainer = container;
