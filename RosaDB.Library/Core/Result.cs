@@ -122,7 +122,12 @@ public sealed class Result
     {
         return IsSuccess ? func() : new Result<T>(Error!);
     }
-    
+
+    public Result Then(Func<Result> func)
+    {
+        return IsSuccess ? func() : new Result(Error!);
+    }
+
     public Result Finally(Func<Result> func)
     {
         return IsSuccess ? func() : new Result(Error!);
@@ -142,6 +147,19 @@ public static class ResultExtensions
         return result.Then(func);
     }
 
+    public static async Task<Result<U>> Then<U>(this Task<Result> resultTask, Func<Result<U>> func)
+    {
+        var result = await resultTask;
+        return result.Then(func);
+    }
+
+    public static async Task<Result> Then<T>(this Task<Result<T>> resultTask, Func<T, Task<Result>> func)
+    {
+        var result = await resultTask;
+        if (result.IsFailure) return result.Error;
+        return await func(result.Value);
+    }
+
     public static async Task<Result<U>> ThenAsync<T, U>(this Task<Result<T>> resultTask, Func<T, Task<Result<U>>> func)
     {
         var result = await resultTask;
@@ -152,6 +170,18 @@ public static class ResultExtensions
     {
         var result = await resultTask;
         return await result.ThenAsync(func);
+    }
+
+    public static async Task<Result> ThenAsync(this Task<Result> resultTask, Func<Task<Result>> func)
+    {
+        var result = await resultTask;
+        return await func();
+    }
+
+    public static async Task<Result<T>> ThenAsync<T>(this Task<Result> resultTask, Func<Task<Result<T>>> func)
+    {
+        var result = await resultTask;
+        return await func();
     }
 
     public static async Task<TResult> MatchAsync<TResult>(
