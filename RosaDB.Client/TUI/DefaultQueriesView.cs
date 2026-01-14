@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using RosaDB.Client.TUI.Persistence;
 using Terminal.Gui;
 
 namespace RosaDB.Client.TUI
@@ -7,6 +9,8 @@ namespace RosaDB.Client.TUI
     public sealed class DefaultQueriesView : View
     {
         private readonly ListView _listView;
+        private readonly SavedQueriesManager _savedQueriesManager;
+        private List<string> _queries;
 
         public Action<string>? OnQuerySelected;
 
@@ -15,41 +19,55 @@ namespace RosaDB.Client.TUI
             Width = Dim.Fill();
             Height = Dim.Fill();
 
-            List<(string Name, string Query)> queries = [
-                ("Show Cells", "SHOW CELLS;"),
-                ("Show Tables in Group", "SHOW TABLES IN sales;"),
-                // DDL
-                ("Initialize RosaDB", "INITIALIZE;"),
-                ("Create Database", "CREATE DATABASE my_db;"),
-                ("Use Database", "USE my_db;"),
-                ("Create Cell Group", "CREATE CELL sales (name TEXT INDEX, region TEXT, is_active BOOLEAN);"),
-                ("Create Table for Group", "CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);"),
-                // Cell Instance Management
-                ("Insert Cell Instance", "INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');"),
-                ("Update Cell Instance", "UPDATE CELL sales USING name = 'q4' SET is_active = FALSE;"),
-                ("Delete Cell Instance", "DELETE CELL sales USING name = 'q4';"),
-                // DML
-                ("Select All from Group", "SELECT * FROM sales.transactions;"), // Cross-cell query
-                ("Select with Data Filter", "SELECT * FROM sales.transactions WHERE amount > 100;"),
-                ("Select with Cell Filter", "SELECT * FROM sales.transactions USING name = 'q4';"),
-                ("Select with Both Filters", "SELECT * FROM sales.transactions USING name = 'q4' WHERE amount > 100;"),
-                ("Insert Data", "INSERT INTO sales.transactions USING name = 'q4' (id, product, amount) VALUES (1, 'item', 50);"),
-            ];
+            _savedQueriesManager = new SavedQueriesManager();
 
-            _listView = new ListView(queries.ConvertAll(q => q.Name))
+            var savedQueriesLabel = new Label("Saved Queries:")
             {
                 X = 0,
                 Y = 0,
-                Width = Dim.Fill(),
-                Height = Dim.Fill(),
             };
 
+            _listView = new ListView()
+            {
+                X = 0,
+                Y = 1,
+                Width = Dim.Fill(),
+                Height = Dim.Fill() - 2,
+            };
+            
             _listView.OpenSelectedItem += (args) =>
             {
-                OnQuerySelected?.Invoke(queries[args.Item].Query);
+                if (_queries.Count > 0)
+                {
+                    OnQuerySelected?.Invoke(_queries[args.Item]);
+                }
             };
+            
+            var deleteButton = new Button("Delete Selected")
+            {
+                X = Pos.Center(),
+                Y = Pos.Bottom(_listView) + 1
+            };
+            
+            deleteButton.Clicked += () =>
+            {
+                if (_listView.SelectedItem >= 0 && _listView.SelectedItem < _queries.Count)
+                {
+                    var queryToDelete = _queries[_listView.SelectedItem];
+                    _savedQueriesManager.DeleteQuery(queryToDelete);
+                }
+            };
+            
+            Add(savedQueriesLabel, _listView, deleteButton);
 
-            Add(_listView);
+            SavedQueriesManager.QueriesChanged += LoadQueries;
+            LoadQueries();
+        }
+
+        private void LoadQueries()
+        {
+            _queries = _savedQueriesManager.GetQueries();
+            _listView.SetSource(_queries);
         }
     }
 }

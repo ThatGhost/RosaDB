@@ -1,12 +1,16 @@
 using System.Data;
+using RosaDB.Client.TUI.Persistence;
 using Terminal.Gui;
 
 namespace RosaDB.Client.TUI;
 
 public class QueryView : View
 {
+    private readonly SavedQueriesManager _savedQueriesManager;
+    
     public QueryView()
     {
+        _savedQueriesManager = new SavedQueriesManager();
         Width = Dim.Fill();
         Height = Dim.Fill();
 
@@ -53,19 +57,34 @@ public class QueryView : View
             Visible = false
         };
 
-        var sendButton = new Button("Send")
+        var newClientButton = new Button("Create new Client")
         {
-            X = Pos.Center(),
+            X = 1,
             Y = Pos.Bottom(tableView) + 1
         };
 
-        var newClientButton = new Button("Create new Client")
+        var sendButton = new Button("Send")
         {
-            X = Pos.Center(),
-            Y = Pos.Bottom(sendButton) + 1
+            X = Pos.Right(newClientButton) + 2,
+            Y = Pos.Bottom(tableView) + 1
         };
 
-        leftPane.Add(queryLabel, queryTextView, resultLabel, statusLabel, tableView, sendButton, newClientButton);
+        var saveQueryButton = new Button("Save Query")
+        {
+            X = Pos.Right(sendButton) + 2,
+            Y = Pos.Bottom(tableView) + 1
+        };
+        
+        saveQueryButton.Clicked += () =>
+        {
+            var query = queryTextView.Text.ToString();
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                _savedQueriesManager.SaveQuery(query);
+            }
+        };
+
+        leftPane.Add(queryLabel, queryTextView, resultLabel, statusLabel, tableView, sendButton, newClientButton, saveQueryButton);
 
         var separator = new LineView(Terminal.Gui.Graphs.Orientation.Vertical)
         {
