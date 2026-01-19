@@ -1,8 +1,4 @@
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 
 namespace RosaDB.Client.TUI.Persistence
 {
@@ -12,7 +8,7 @@ namespace RosaDB.Client.TUI.Persistence
         private static readonly string RosaDBDataPath = Path.Combine(AppDataPath, "RosaDB");
         private static readonly string SavedQueriesFilePath = Path.Combine(RosaDBDataPath, "saved_queries.json");
 
-        public static event Action QueriesChanged;
+        public static event Action? QueriesChanged;
 
         public SavedQueriesManager()
         {

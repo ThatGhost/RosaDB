@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using RosaDB.Client.TUI.Persistence;
 using Terminal.Gui;
 
@@ -10,7 +7,7 @@ namespace RosaDB.Client.TUI
     {
         private readonly ListView _listView;
         private readonly SavedQueriesManager _savedQueriesManager;
-        private List<string> _queries;
+        private List<string> _queries = [];
 
         public Action<string>? OnQuerySelected;
 
