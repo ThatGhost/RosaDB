@@ -55,14 +55,14 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 5. ~~**Multiline Queries:**~~
     ~~*   Introduce the ability to send multiline queries. this should be handled in the `QueryTokenizer` And the `QueryPlanner`.~~
 
-## Phase 5: Developer Experience and Server Enhancements
+## ~~Phase 5: Developer Experience and Server Enhancements~~
 
 1. ~~**Integrate Logging Framework:** Implement a robust logging framework (e.g., Serilog, NLog) across `RosaDB.Server` and `RosaDB.Library`, replacing existing `Console.WriteLine` calls with structured logging.~~
    *    ~~Add this to a special cell instance that users can `SUBSCRIBE` to using the websockets.~~
    *    ~~Add a session id to all sessions and make the logs identifiable by session id.~~ 
 2. ~~**TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
 3. ~~**Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`~~
-4. **Better seeder:** Add better seeding data. with lots of cell instances and maybe tables. Real-ish data.
+4. ~~**Better seeder:** Add better seeding data. with lots of cell instances and maybe tables. Real-ish data.~~
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
