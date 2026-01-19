@@ -86,3 +86,6 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 
 ## Phase 9: Missing features
 1.  **`ALTER TABLE` & `CELL` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
+2.  **Default Cell:** When a cell is not present in the query. Replace the cell with `default`. This will be used as a cell with one instance that can function as a regular database
+3.  **Foreign keys:** Implement foreign keys. they can link tables of the same cell or tables and cells.
+     * Example: `TABLE` Users in the default connects to the accounts `CELL`.
