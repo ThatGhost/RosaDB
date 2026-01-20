@@ -12,18 +12,18 @@ using System.IO.Abstractions.TestingHelpers;
 namespace RosaDB.Library.Tests
 {
     [TestFixture]
-    public class CellManagerTests
+    public class ContextManagerTests
     {
         private Mock<SessionState> _mockSessionState;
         private Mock<IFolderManager> _mockFolderManager;
         private Mock<IIndexManager> _mockIndexManager;
         private MockFileSystem _mockFileSystem;
-        private CellManager _cellManager;
+        private ContextManager _contextManager;
 
         private const string TestDbName = "TestDB";
-        private const string TestCellName = "TestCell";
+        private const string TestContextName = "TestContext";
         private const string _basePath = @"C:\rosadb";
-        private string _cellPath;
+        private string _contextPath;
         private string _envFilePath;
 
         [SetUp]
@@ -39,10 +39,10 @@ namespace RosaDB.Library.Tests
             if(dbResult.IsSuccess)
                 _mockSessionState.Setup(ss => ss.CurrentDatabase).Returns(dbResult.Value);
 
-            _cellPath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestCellName);
-            _envFilePath = _mockFileSystem.Path.Combine(_cellPath, "_env");
+            _contextPath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestContextName);
+            _envFilePath = _mockFileSystem.Path.Combine(_contextPath, "_env");
 
-            _cellManager = new CellManager(
+            _contextManager = new ContextManager(
                 _mockSessionState.Object,
                 _mockFileSystem,
                 _mockFolderManager.Object,
@@ -53,30 +53,30 @@ namespace RosaDB.Library.Tests
             _mockFileSystem.AddDirectory(_mockFileSystem.Path.Combine(_basePath, TestDbName));
         }
 
-        private void CreateFakeCellEnvironmentFile(CellEnvironment env)
+        private void CreateFakeContextEnvironmentFile(ContextEnvironment env)
         {
-            if (!_mockFileSystem.Directory.Exists(_cellPath))
-                _mockFileSystem.AddDirectory(_cellPath);
+            if (!_mockFileSystem.Directory.Exists(_contextPath))
+                _mockFileSystem.AddDirectory(_contextPath);
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
             _mockFileSystem.AddFile(_envFilePath, new MockFileData(bytes));
         }
 
         [Test]
-        public async Task CreateCellEnvironment_HappyPath_CreatesEnvFile()
+        public async Task CreateContextEnvironment_HappyPath_CreatesEnvFile()
         {
             // Arrange
             var columns = new Column[] { Column.Create("Id", DataType.INT).Value };
-            if (!_mockFileSystem.Directory.Exists(_cellPath))
-                _mockFileSystem.AddDirectory(_cellPath);
+            if (!_mockFileSystem.Directory.Exists(_contextPath))
+                _mockFileSystem.AddDirectory(_contextPath);
 
             // Act
-            var result = await _cellManager.CreateCellEnvironment(TestCellName, columns);
+            var result = await _contextManager.CreateContextEnvironment(TestContextName, columns);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             Assert.That(_mockFileSystem.File.Exists(_envFilePath), Is.True);
             var bytes = _mockFileSystem.File.ReadAllBytes(_envFilePath);
-            var env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
+            var env = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(env.Columns.Length, Is.EqualTo(1));
             Assert.That(env.Columns[0].Name, Is.EqualTo("Id"));
         }
@@ -85,18 +85,18 @@ namespace RosaDB.Library.Tests
         public async Task AddTables_HappyPath_AddsTableToEnvironment()
         {
             // Arrange
-            var initialEnv = new CellEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
-            CreateFakeCellEnvironmentFile(initialEnv);
+            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            CreateFakeContextEnvironmentFile(initialEnv);
             var newTableResult = Table.Create("NewTable", new[] { Column.Create("Col1", DataType.VARCHAR).Value });
             Assert.That(newTableResult.IsSuccess, Is.True);
 
             // Act
-            var result = await _cellManager.CreateTable(TestCellName, newTableResult.Value);
+            var result = await _contextManager.CreateTable(TestContextName, newTableResult.Value);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             var bytes = _mockFileSystem.File.ReadAllBytes(_envFilePath);
-            var updatedEnv = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
+            var updatedEnv = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(updatedEnv.Tables.Length, Is.EqualTo(1));
             Assert.That(updatedEnv.Tables[0].Name, Is.EqualTo("NewTable"));
         }
@@ -109,20 +109,20 @@ namespace RosaDB.Library.Tests
             var tableResult = Table.Create(tableName, Array.Empty<Column>());
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var initialEnv = new CellEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
-            CreateFakeCellEnvironmentFile(initialEnv);
+            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
-            var result = await _cellManager.DeleteTable(TestCellName, tableName);
+            var result = await _contextManager.DeleteTable(TestContextName, tableName);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             var bytes = _mockFileSystem.File.ReadAllBytes(_envFilePath);
-            var updatedEnv = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
+            var updatedEnv = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(updatedEnv.Tables, Is.Empty);
 
-            string tablePath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestCellName, tableName);
-            string trashPath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestCellName, "trash_" + tableName);
+            string tablePath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, tableName);
+            string trashPath = _mockFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, "trash_" + tableName);
             _mockFolderManager.Verify(fm => fm.RenameFolder(tablePath, trashPath), Times.Once);
             _mockFolderManager.Verify(fm => fm.DeleteFolder(trashPath), Times.Once);
         }
@@ -131,11 +131,11 @@ namespace RosaDB.Library.Tests
         public async Task DeleteTable_TableNotFound_ReturnsError()
         {
             // Arrange
-            var initialEnv = new CellEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
-            CreateFakeCellEnvironmentFile(initialEnv);
+            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
-            var result = await _cellManager.DeleteTable(TestCellName, "NonExistentTable");
+            var result = await _contextManager.DeleteTable(TestContextName, "NonExistentTable");
 
             // Assert
             Assert.That(result.IsFailure, Is.True);
@@ -146,11 +146,11 @@ namespace RosaDB.Library.Tests
         public async Task GetEnvironment_ReadsFromFile_WhenNotInCache()
         {
             // Arrange
-            var env = new CellEnvironment { Columns = new[] { Column.Create("Id", DataType.INT).Value }, Tables = Array.Empty<Table>() };
-            CreateFakeCellEnvironmentFile(env);
+            var env = new ContextEnvironment { Columns = new[] { Column.Create("Id", DataType.INT).Value }, Tables = Array.Empty<Table>() };
+            CreateFakeContextEnvironmentFile(env);
 
             // Act
-            var result = await _cellManager.GetEnvironment(TestCellName);
+            var result = await _contextManager.GetEnvironment(TestContextName);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
@@ -167,11 +167,11 @@ namespace RosaDB.Library.Tests
             var tableResult = Table.Create(tableName, columns);
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var env = new CellEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
-            CreateFakeCellEnvironmentFile(env);
+            var env = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            CreateFakeContextEnvironmentFile(env);
             
             // Act
-            var result = await _cellManager.GetColumnsFromTable(TestCellName, tableName);
+            var result = await _contextManager.GetColumnsFromTable(TestContextName, tableName);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);

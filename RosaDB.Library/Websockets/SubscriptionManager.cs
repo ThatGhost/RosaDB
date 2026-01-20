@@ -12,26 +12,26 @@ using System.Text.Json;
 
 namespace RosaDB.Library.Websockets;
 
-public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManager
+public class SubscriptionManager(IContextManager cellManager) : ISubscriptionManager
 {
     private readonly Dictionary<TableInstanceIdentifier, List<WebSocket>> _subscriptions = new();
 
     public async Task<QueryResult> HandleSubscribe(string[] tokens, WebSocket webSocket)
     {
-        if(tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse SUBSCRIBE action. Correct format is 'SUBSCRIBE <cell>.<table> USING <column> = <value>'");
+        if(tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse SUBSCRIBE action. Correct format is 'SUBSCRIBE <context>.<table> USING <column> = <value>'");
         if (tokens[0].ToUpperInvariant() != "SUBSCRIBE") return new Error(ErrorPrefixes.QueryParsingError, "Could not parse this query because query type is incorrect");
         string[] nameParts = tokens[1].Split(".");
-        if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse cell instance name. Correct format is '<cell>.<table>'");
+        if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse context instance name. Correct format is '<context>.<table>'");
 
-        string cellName = nameParts[0];
+        string contextName = nameParts[0];
         string tableName = nameParts[1];
 
-        if (!tokens[2].Equals("USING", StringComparison.InvariantCultureIgnoreCase)) return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'SUBSCRIBE <cell> USING <clause>'");
+        if (!tokens[2].Equals("USING", StringComparison.InvariantCultureIgnoreCase)) return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'SUBSCRIBE <context> USING <clause>'");
 
-        var cellInstanceResult = await GetCellInstance(cellName, tokens);
+        var cellInstanceResult = await GetContextInstance(contextName, tokens);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
 
-        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(cellName, tableName, cellInstanceResult.Value);
+        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(contextName, tableName, cellInstanceResult.Value);
         try
         {
             if (!_subscriptions.ContainsKey(tableIdentifier))
@@ -42,10 +42,10 @@ public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManage
         }
         catch
         {
-            return new Error(ErrorPrefixes.StateError, $"Failed to subscribe to {cellName}. You might already be subscribed.");
+            return new Error(ErrorPrefixes.StateError, $"Failed to subscribe to {contextName}. You might already be subscribed.");
         }
 
-        return new QueryResult($"Successfully subscribed to {cellName}.{tableName} instance");
+        return new QueryResult($"Successfully subscribed to {contextName}.{tableName} instance");
     }
 
     private Result<Dictionary<string, string>> ParseUsingClause(int startIndex, string[] tokens)
@@ -68,9 +68,9 @@ public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManage
         return usingProperties;
     }
 
-    private async Task<Result<string>> GetCellInstance(string cellName, string[] tokens)
+    private async Task<Result<string>> GetContextInstance(string contextName, string[] tokens)
     {
-        var cellEnvResult = await cellManager.GetEnvironment(cellName);
+        var cellEnvResult = await cellManager.GetEnvironment(contextName);
         if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
 
         var parsed = ParseUsingClause(3, tokens);
@@ -82,17 +82,17 @@ public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManage
         foreach (var kvp in parsed.Value)
         {
             var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in CellGroup '{cellName}'.");
-            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for CellGroup '{cellName}'.");
+            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ContextGroup '{contextName}'.");
+            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ContextGroup '{contextName}'.");
 
             usingIndexValues[col.Name] = kvp.Value;
         }
 
-        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
+        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed ContextGroup columns.");
 
-        var cellInstanceHash = InstanceHasher.GenerateCellInstanceHash(usingIndexValues);
+        var cellInstanceHash = InstanceHasher.GenerateContextInstanceHash(usingIndexValues);
 
-        var cellInstanceResult = await cellManager.GetCellInstance(cellName, cellInstanceHash);
+        var cellInstanceResult = await cellManager.GetContextInstance(contextName, cellInstanceHash);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
 
         return cellInstanceHash;
@@ -102,19 +102,19 @@ public class SubscriptionManager(ICellManager cellManager) : ISubscriptionManage
     {
         if (tokens[0].ToUpperInvariant() != "UNSUBSCRIBE") return new Error(ErrorPrefixes.QueryParsingError, "Could not parse this query because query type is incorrect");
         string[] nameParts = tokens[1].Split(".");
-        if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse cell instance name. Correct format is '<cell>.<table>'");
+        if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse context instance name. Correct format is '<context>.<table>'");
 
-        string cellName = nameParts[0];
+        string contextName = nameParts[0];
         string tableName = nameParts[1];
 
-        if (tokens[2].ToUpperInvariant() != "USING") return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'UNSUBSCRIBE <cell> USING <clause>'");
+        if (tokens[2].ToUpperInvariant() != "USING") return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'UNSUBSCRIBE <context> USING <clause>'");
 
-        var cellInstanceResult = await GetCellInstance(cellName, tokens);
+        var cellInstanceResult = await GetContextInstance(contextName, tokens);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
         
-        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(cellName, tableName, cellInstanceResult.Value);
-        if (!_subscriptions.ContainsKey(tableIdentifier)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {cellName}. You might not be subscribed.");
-        if (!_subscriptions[tableIdentifier].Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {cellName}. You might not be subscribed.");
+        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(contextName, tableName, cellInstanceResult.Value);
+        if (!_subscriptions.ContainsKey(tableIdentifier)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {contextName}. You might not be subscribed.");
+        if (!_subscriptions[tableIdentifier].Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {contextName}. You might not be subscribed.");
 
         return new QueryResult($"Succesfully unsubscribed to {nameParts} instance");
     }

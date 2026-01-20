@@ -2,16 +2,16 @@ using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Models;
 
-public class Cell
+public class Context
 {
     public string Name { get; init; } = string.Empty;
 
-    public static Result<Cell> Create(string name)
+    public static Result<Context> Create(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            return new Error(ErrorPrefixes.DataError, "Cell name cannot be empty.");
+            return new Error(ErrorPrefixes.DataError, "Context name cannot be empty.");
 
-        return new Cell()
+        return new Context()
         {
             Name = name
         };

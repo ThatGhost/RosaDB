@@ -5,13 +5,13 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries
 {
-    public class UpdateCellLogsQuery(ILogManager logManager, ICellManager cellManager)
+    public class UpdateContextLogsQuery(ILogManager logManager, IContextManager cellManager)
     {
-        public async Task<Result> Execute(string cellName, string tableName, object[] index, string data)
+        public async Task<Result> Execute(string contextName, string tableName, object[] index, string data)
         {
-            var columnResult = await cellManager.GetColumnsFromTable(cellName, tableName);
+            var columnResult = await cellManager.GetColumnsFromTable(contextName, tableName);
             if(!columnResult.TryGetValue(out var columns)) return columnResult.Error;
-            var logs = logManager.GetAllLogsForCellInstanceTable(cellName, tableName, index);
+            var logs = logManager.GetAllLogsForContextInstanceTable(contextName, tableName, index);
 
             int i = 0;
             await foreach (var log in logs)
@@ -26,7 +26,7 @@ namespace RosaDB.Library.MoqQueries
                 var bytesResult = RowSerializer.Serialize(row);
                 if(!bytesResult.TryGetValue(out var bytes)) return bytesResult.Error;
                 
-                logManager.Put(cellName, tableName, index, bytes, logId: log.Id);
+                logManager.Put(contextName, tableName, index, bytes, logId: log.Id);
                 i++;
             }
 

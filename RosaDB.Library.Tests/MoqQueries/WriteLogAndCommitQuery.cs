@@ -5,11 +5,11 @@ using RosaDB.Library.Core;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class WriteLogAndCommitQuery(ILogManager logManager, ICellManager cellManager)
+public class WriteLogAndCommitQuery(ILogManager logManager, IContextManager cellManager)
 {
-    public async Task<Result> Execute(string cell, string table, string data)
+    public async Task<Result> Execute(string context, string table, string data)
     {
-        var columnsResult = await cellManager.GetColumnsFromTable(cell, table);
+        var columnsResult = await cellManager.GetColumnsFromTable(context, table);
         if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
         var random = new Random();
@@ -23,7 +23,7 @@ public class WriteLogAndCommitQuery(ILogManager logManager, ICellManager cellMan
             var bytesResult = RowSerializer.Serialize(row);
             if(!bytesResult.TryGetValue(out var bytes)) return bytesResult.Error;
             
-            logManager.Put(cell, table, [random.Next(0,4)], bytes);
+            logManager.Put(context, table, [random.Next(0,4)], bytes);
         }
 
         await logManager.Commit();

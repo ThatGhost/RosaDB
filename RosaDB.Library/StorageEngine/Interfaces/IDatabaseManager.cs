@@ -9,7 +9,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
     {
         Result<Database> GetDatabase(string databaseName);
         Task<Result> CreateDatabaseEnvironment(Database database);
-        Task<Result> CreateCell(string cellName, Column[] columns);
-        Task<Result> DeleteCell(string cellName);
+        Task<Result> CreateContext(string contextName, Column[] columns);
+        Task<Result> DeleteContext(string contextName);
     }
 }

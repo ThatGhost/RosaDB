@@ -4,9 +4,9 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class CreateTableDefinition(ICellManager cellManager)
+public class CreateTableDefinition(IContextManager cellManager)
 {
-    public async Task<Result> Execute(string cellName, string tableName)
+    public async Task<Result> Execute(string contextName, string tableName)
     {
         var tableResult = Table.Create(tableName, new[]
         {
@@ -17,7 +17,7 @@ public class CreateTableDefinition(ICellManager cellManager)
 
         if (tableResult.IsFailure) return tableResult.Error;
         
-        var addTableResult = await cellManager.CreateTable(cellName, tableResult.Value);
+        var addTableResult = await cellManager.CreateTable(contextName, tableResult.Value);
         return addTableResult;
     }
 }

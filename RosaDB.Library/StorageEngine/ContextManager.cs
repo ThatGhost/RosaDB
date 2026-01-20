@@ -8,30 +8,30 @@ using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class CellManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager, IIndexManager indexManager) : ICellManager
+    public class ContextManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager, IIndexManager indexManager) : IContextManager
     {
-        private readonly Dictionary<string,CellEnvironment> _cachedEnvironment = new();
+        private readonly Dictionary<string,ContextEnvironment> _cachedEnvironment = new();
 
-        public async Task<Result> CreateCellEnvironment(string cellName, Column[] columns)
+        public async Task<Result> CreateContextEnvironment(string contextName, Column[] columns)
         {
-            CellEnvironment env = new CellEnvironment
+            ContextEnvironment env = new ContextEnvironment
             {
                 Columns = columns.ToArray()
             };
-            return await SaveEnvironment(env, cellName);
+            return await SaveEnvironment(env, contextName);
         }
 
-        public async Task<Result> UpdateCellEnvironment(string cellName, Column[] columns)
+        public async Task<Result> UpdateContextEnvironment(string contextName, Column[] columns)
         {
-            var envResult = await GetEnvironment(cellName);
+            var envResult = await GetEnvironment(contextName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
             env.Columns = columns;
 
-            return await SaveEnvironment(env, cellName);
+            return await SaveEnvironment(env, contextName);
         }
 
-        public Task<Result> CreateCellInstance(string cellGroupName, string instanceHash, Row instanceData, Column[] schema)
+        public Task<Result> CreateContextInstance(string contextGroupName, string instanceHash, Row instanceData, Column[] schema)
         {
             // 1. Save main data
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
@@ -39,11 +39,11 @@ namespace RosaDB.Library.StorageEngine
             var rowBytesResult = RowSerializer.Serialize(instanceData);
             if (!rowBytesResult.TryGetValue(out var rowBytes)) return Task.FromResult<Result>(rowBytesResult.Error);
 
-            var existsResult = indexManager.CellDataExists(cellGroupName, hashBytes);
+            var existsResult = indexManager.ContextDataExists(contextGroupName, hashBytes);
             if (existsResult.IsFailure) return Task.FromResult<Result>(existsResult.Error);
-            if (existsResult.Value) return Task.FromResult<Result>(new Error(ErrorPrefixes.DataError, "Cell instance already exists"));
+            if (existsResult.Value) return Task.FromResult<Result>(new Error(ErrorPrefixes.DataError, "Context instance already exists"));
             
-            var insertDataResult = indexManager.InsertCellData(cellGroupName, hashBytes, rowBytes);
+            var insertDataResult = indexManager.InsertContextData(contextGroupName, hashBytes, rowBytes);
             if (insertDataResult.IsFailure) return Task.FromResult<Result>(insertDataResult.Error);
 
             // 2. Update property indexes
@@ -53,21 +53,21 @@ namespace RosaDB.Library.StorageEngine
                 if (value != null)
                 {
                     var keyBytes = IndexKeyConverter.ToByteArray(value);
-                    var insertIndexResult = indexManager.InsertCellPropertyIndex(cellGroupName, col.Name, keyBytes, hashBytes);
+                    var insertIndexResult = indexManager.InsertContextPropertyIndex(contextGroupName, col.Name, keyBytes, hashBytes);
                     if (insertIndexResult.IsFailure) return Task.FromResult<Result>(insertIndexResult.Error);
                 }
             }
             return Task.FromResult(Result.Success());
         }
 
-        public async Task<Result<Row>> GetCellInstance(string cellGroupName, string instanceHash)
+        public async Task<Result<Row>> GetContextInstance(string contextGroupName, string instanceHash)
         {
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
-            var rowBytesResult = indexManager.GetCellData(cellGroupName, hashBytes);
+            var rowBytesResult = indexManager.GetContextData(contextGroupName, hashBytes);
             if (rowBytesResult.IsSuccess)
             {
-                var envResult = await GetEnvironment(cellGroupName);
+                var envResult = await GetEnvironment(contextGroupName);
                 if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
                 var rowResult = RowSerializer.Deserialize(rowBytesResult.Value, env.Columns);
@@ -77,12 +77,12 @@ namespace RosaDB.Library.StorageEngine
             return rowBytesResult.Error;
         }
 
-        public async Task<Result<IEnumerable<Row>>> GetAllCellInstances(string cellGroupName)
+        public async Task<Result<IEnumerable<Row>>> GetAllContextInstances(string contextGroupName)
         {
-            var allDataResult = indexManager.GetAllCellData(cellGroupName);
+            var allDataResult = indexManager.GetAllContextData(contextGroupName);
             if (allDataResult.IsFailure) return allDataResult.Error;
 
-            var envResult = await GetEnvironment(cellGroupName);
+            var envResult = await GetEnvironment(contextGroupName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
             var rows = new List<Row>();
@@ -95,20 +95,20 @@ namespace RosaDB.Library.StorageEngine
             return rows;
         }
 
-        public async Task<Result> CreateTable(string cellName, Table table)
+        public async Task<Result> CreateTable(string contextName, Table table)
         {
-            var env = await GetEnvironment(cellName);
-            if (!env.TryGetValue(out var cellEnviroument)) return env.Error;
+            var env = await GetEnvironment(contextName);
+            if (!env.TryGetValue(out var contextEnviroument)) return env.Error;
 
-            var cellTables = cellEnviroument.Tables.ToList();
-            cellTables.Add(table);
-            cellEnviroument.Tables = cellTables.ToArray();
-            var saveResult = await SaveEnvironment(cellEnviroument, cellName);
+            var contextTables = contextEnviroument.Tables.ToList();
+            contextTables.Add(table);
+            contextEnviroument.Tables = contextTables.ToArray();
+            var saveResult = await SaveEnvironment(contextEnviroument, contextName);
             if(saveResult.IsFailure) return saveResult.Error;
             
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, table.Name);
+            var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, table.Name);
             try
             {
                 if(!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath);
@@ -120,18 +120,18 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        public async Task<Result> DeleteTable(string cellName, string tableName)
+        public async Task<Result> DeleteTable(string contextName, string tableName)
         {
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            var envResult = await GetEnvironment(cellName);
+            var envResult = await GetEnvironment(contextName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
             var tableToDelete = env.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
-            if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in cell '{cellName}'.");
+            if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in context '{contextName}'.");
 
-            string tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
-            string trashPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "trash_" + tableName);
+            string tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, tableName);
+            string trashPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, "trash_" + tableName);
 
             try { folderManager.RenameFolder(tablePath, trashPath); }
             catch { return new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."); }
@@ -140,7 +140,7 @@ namespace RosaDB.Library.StorageEngine
 
             try
             {
-                var result = await SaveEnvironment(env, cellName);
+                var result = await SaveEnvironment(env, contextName);
                 if (result.IsFailure) return result.Error;
             }
             catch
@@ -152,7 +152,7 @@ namespace RosaDB.Library.StorageEngine
                 }
                 catch{ return new CriticalError(); }
                 
-                return new Error(ErrorPrefixes.FileError, "Failed to update cell definition. Deletion reverted.");
+                return new Error(ErrorPrefixes.FileError, "Failed to update context definition. Deletion reverted.");
             }
 
             try { folderManager.DeleteFolder(trashPath); }
@@ -161,77 +161,77 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        public async Task<Result<CellEnvironment>> GetEnvironment(string cellName)
+        public async Task<Result<ContextEnvironment>> GetEnvironment(string contextName)
         {
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
-            if (_cachedEnvironment.TryGetValue(cellName, out var env)) return env;
+            if (_cachedEnvironment.TryGetValue(contextName, out var env)) return env;
 
-            var filePathResult = GetCellFilePath(cellName, "_env");
+            var filePathResult = GetContextFilePath(contextName, "_env");
             if(filePathResult.IsFailure) return filePathResult.Error;
-            if (!fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            if (!fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
 
             var bytes = await ByteReaderWriter.ReadBytesFromFile(fileSystem, filePathResult.Value, CancellationToken.None);
-            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
             
-            env = ByteObjectConverter.ByteArrayToObject<CellEnvironment>(bytes);
-            if(env is null) return new Error(ErrorPrefixes.FileError, "Cell Environment does not exist");
+            env = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
+            if(env is null) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
 
-            _cachedEnvironment[cellName] = env;
+            _cachedEnvironment[contextName] = env;
             return env;
         }
 
-        private Result<string> GetCellFilePath(string cellName, string fileName)
+        private Result<string> GetContextFilePath(string contextName, string fileName)
         {
             if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
-            return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, fileName);
+            return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, fileName);
         }
         
-        private async Task<Result> SaveEnvironment(CellEnvironment env, string cellName)
+        private async Task<Result> SaveEnvironment(ContextEnvironment env, string contextName)
         {
-            var filePath = GetCellFilePath(cellName, "_env");
+            var filePath = GetContextFilePath(contextName, "_env");
             if(filePath.IsFailure) return filePath.Error;
 
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
 
             await ByteReaderWriter.WriteBytesToFile(fileSystem, filePath.Value, bytes, CancellationToken.None);
-            _cachedEnvironment[cellName] = env;
+            _cachedEnvironment[contextName] = env;
             return Result.Success();
         }
         
-        public async Task<Result<Column[]>> GetColumnsFromTable(string cellName, string tableName)
+        public async Task<Result<Column[]>> GetColumnsFromTable(string contextName, string tableName)
         {
-            var env = await GetEnvironment(cellName);
+            var env = await GetEnvironment(contextName);
             if(env.IsFailure) return env.Error;
 
             var table = env.Value.Tables.FirstOrDefault(t => t.Name == tableName);
-            if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in cell environment");
+            if(table is null) return new Error(ErrorPrefixes.StateError, "Table does not exist in context environment");
 
             return table.Columns.ToArray();
         }
 
-        public Task<Result> DropColumnAsync(string cellName, string columnName)
+        public Task<Result> DropColumnAsync(string contextName, string columnName)
         {
-            return GetEnvironment(cellName)
-                .Then<CellEnvironment, (CellEnvironment, Column[], Column[])>(env =>
+            return GetEnvironment(contextName)
+                .Then<ContextEnvironment, (ContextEnvironment, Column[], Column[])>(env =>
                 {
                     var oldColumns = env.Columns;
                     var columnToRemove = oldColumns.FirstOrDefault(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
                     if (columnToRemove == null)
-                        return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' does not exist in cell '{cellName}'.");
+                        return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' does not exist in context '{contextName}'.");
         
                     var newColumns = oldColumns.Where(c => c != columnToRemove).ToArray();
                     return (env, oldColumns, newColumns);
                 })
-                .Then<(CellEnvironment, Column[], Column[]), (CellEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>)>(data =>
+                .Then<(ContextEnvironment, Column[], Column[]), (ContextEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>)>(data =>
                 { 
-                    var cellData = indexManager.GetAllCellData(cellName);
-                    if (cellData.IsFailure) return cellData.Error;
-                    return (data.Item1, data.Item2, data.Item3, cellData.Value);
+                    var contextData = indexManager.GetAllContextData(contextName);
+                    if (contextData.IsFailure) return contextData.Error;
+                    return (data.Item1, data.Item2, data.Item3, contextData.Value);
                 })
-                .ThenAsync<(CellEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>), (CellEnvironment, Column[])>(async data =>
+                .ThenAsync<(ContextEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>), (ContextEnvironment, Column[])>(async data =>
                 {
-                    var migrationResult = await MigrateDroppedColumnData(cellName, data.Item2, data.Item3, data.Item4);
+                    var migrationResult = await MigrateDroppedColumnData(contextName, data.Item2, data.Item3, data.Item4);
                     return migrationResult.IsSuccess ? (data.Item1, data.Item3) : migrationResult.Error;
                 })
                 .ThenAsync(async data =>
@@ -239,13 +239,13 @@ namespace RosaDB.Library.StorageEngine
                     var env = data.Item1;
                     var newColumns = data.Item2;
                     env.Columns = newColumns;
-                    return await SaveEnvironment(env, cellName);
+                    return await SaveEnvironment(env, contextName);
                 });
         }
 
-        private async Task<Result> MigrateDroppedColumnData(string cellName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allCellData)
+        private async Task<Result> MigrateDroppedColumnData(string contextName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allContextData)
         {
-            foreach (var kvp in allCellData)
+            foreach (var kvp in allContextData)
             {
                 var migrationResult = 
                     RowSerializer.Deserialize(kvp.Value, oldColumns)
@@ -259,7 +259,7 @@ namespace RosaDB.Library.StorageEngine
                         return Row.Create(newValues, newColumns);
                     })
                     .Then(RowSerializer.Serialize)
-                    .Finally(newRowBytes => indexManager.InsertCellData(cellName, kvp.Key, newRowBytes));
+                    .Finally(newRowBytes => indexManager.InsertContextData(contextName, kvp.Key, newRowBytes));
 
                 if (migrationResult.IsFailure) return migrationResult.Error;
             }

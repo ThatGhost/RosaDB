@@ -12,7 +12,7 @@ namespace RosaDB.Library.Query.Queries;
 
 public class InsertQuery(
     string[] tokens,
-    ICellManager cellManager,
+    IContextManager cellManager,
     ILogManager logManager,
     IIndexManager indexManager,
     SessionState sessionState) : IQuery
@@ -23,7 +23,7 @@ public class InsertQuery(
 
         return tokens[1].ToUpperInvariant() switch
         {
-            "CELL" => await InsertCellAsync(),
+            "CELL" => await InsertContextAsync(),
             "INTO" => await InsertIntoAsync(),
             _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}"),
         };
@@ -33,14 +33,14 @@ public class InsertQuery(
     {
         return await ParseInsertInto()
             .ThenAsync(parsed => AssertUsingClause(parsed)
-            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.CellGroupName, parsed.TableName)
+            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.ContextGroupName, parsed.TableName)
             .ThenAsync(async tableSchemaColumns =>
             {
                 var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
                 
                 var rowResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
                     .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
-                    .Then(tableRow => CheckPrimaryKeys(parsed.CellGroupName, parsed.TableName, usingIndexValues, tableRow));
+                    .Then(tableRow => CheckPrimaryKeys(parsed.ContextGroupName, parsed.TableName, usingIndexValues, tableRow));
                 
                 if (rowResult.IsFailure) return rowResult.Error;
                 var row = rowResult.Value;
@@ -57,7 +57,7 @@ public class InsertQuery(
                     }
                 }
 
-                logManager.Put(parsed.CellGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
+                logManager.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
                 
                 if (!sessionState.IsInTransaction) return await logManager.Commit();
 
@@ -92,14 +92,14 @@ public class InsertQuery(
         return tableRow;
     }
 
-    private async Task<QueryResult> InsertCellAsync()
+    private async Task<QueryResult> InsertContextAsync()
     {
         // 1. PARSE
-        var parseResult = ParseInsertCell();
+        var parseResult = ParseInsertContext();
         if (!parseResult.TryGetValue(out var parsed)) return parseResult.Error;
 
         // 2. GET SCHEMA & VALIDATE
-        var envResult = await cellManager.GetEnvironment(parsed.CellGroupName);
+        var envResult = await cellManager.GetEnvironment(parsed.ContextGroupName);
         if (!envResult.TryGetValue(out var cellEnv)) return envResult.Error;
 
         var schemaColumns = cellEnv.Columns;
@@ -122,16 +122,16 @@ public class InsertQuery(
         }
 
         // 3. GENERATE HASH
-        var instanceHash = InstanceHasher.GenerateCellInstanceHash(indexValues);
+        var instanceHash = InstanceHasher.GenerateContextInstanceHash(indexValues);
 
         // 4. CREATE ROW and SAVE
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
         if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
 
-        var saveResult = await cellManager.CreateCellInstance(parsed.CellGroupName, instanceHash, row, schemaColumns);
+        var saveResult = await cellManager.CreateContextInstance(parsed.ContextGroupName, instanceHash, row, schemaColumns);
         if (saveResult.IsFailure) return saveResult.Error;
 
-        return new QueryResult("1 cell instance inserted successfully.", 1);
+        return new QueryResult("1 context instance inserted successfully.", 1);
     }
 
     private Result AddValuesToCollections(Column col, Dictionary<string, string> valueMap, object?[] rowValues, Dictionary<string, string> indexValues, int i)
@@ -151,9 +151,9 @@ public class InsertQuery(
         return Result.Success();
     }
 
-    private Result<(string CellGroupName, string[] Props, string[] Values)> ParseInsertCell()
+    private Result<(string ContextGroupName, string[] Props, string[] Values)> ParseInsertContext()
     {
-        // INSERT CELL <CellGroup> (<props>) VALUES (<vals>)
+        // INSERT CELL <ContextGroup> (<props>) VALUES (<vals>)
         if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CELL syntax.");
 
         var cellGroupName = tokens[2];
@@ -173,24 +173,24 @@ public class InsertQuery(
         return (cellGroupName, props, values);
     }
     
-    private Result<(string CellGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
+    private Result<(string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
     {
         // INSERT INTO <cellGroupName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
         if (tokens.Length < 10)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <cell>.<table> USING (...) (...) VALUES (...)");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <context>.<table> USING (...) (...) VALUES (...)");
 
         return Result.Success()
             .Then(() => ParseTableNamePart(3))
             .Then(parsedTableName => ParseUsingClausePart(parsedTableName.NextIndex)
             .Then(parsedUsing => ParseColumnsPart(parsedUsing.NextIndex)
             .Then(parsedColumns => ParseValuesPart(parsedColumns.NextIndex)
-            .Then<(string CellGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)>(parsedValues =>
+            .Then<(string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)>(parsedValues =>
             {
                 if (parsedColumns.Columns.Length != parsedValues.Values.Length)
                     return new Error(ErrorPrefixes.QueryParsingError, "Column count does not match value count.");
 
                 return (
-                    parsedTableName.CellGroupName,
+                    parsedTableName.ContextGroupName,
                     parsedTableName.TableName,
                     parsedUsing.UsingProperties,
                     parsedColumns.Columns,
@@ -199,11 +199,11 @@ public class InsertQuery(
             }))));
     }
 
-    private Result<(string CellGroupName, string TableName, int NextIndex)> ParseTableNamePart(int startIndex)
+    private Result<(string ContextGroupName, string TableName, int NextIndex)> ParseTableNamePart(int startIndex)
     {
         var fullTableName = tokens[startIndex -1].Split('.');
         if (fullTableName.Length != 2)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <cellName>.<tableName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <contextName>.<tableName>");
         
         var cellGroupName = fullTableName[0];
         var tableName = fullTableName[1];
@@ -296,9 +296,9 @@ public class InsertQuery(
         return -1;
     }
 
-    private async Task<Result<Object[]>> AssertUsingClause((string CellGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
+    private async Task<Result<Object[]>> AssertUsingClause((string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
     {
-        var cellEnvResult = await cellManager.GetEnvironment(parsed.CellGroupName);
+        var cellEnvResult = await cellManager.GetEnvironment(parsed.ContextGroupName);
         if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
 
         var cellSchemaColumns = cellEnv.Columns;
@@ -307,18 +307,18 @@ public class InsertQuery(
         foreach (var kvp in parsed.UsingProperties)
         {
             var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in CellGroup '{parsed.CellGroupName}'.");
-            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for CellGroup '{parsed.CellGroupName}'.");
+            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ContextGroup '{parsed.ContextGroupName}'.");
+            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ContextGroup '{parsed.ContextGroupName}'.");
 
             usingIndexValues[col.Name] = kvp.Value;
         }
 
-        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed CellGroup columns.");
+        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed ContextGroup columns.");
 
-        var cellInstanceHash = InstanceHasher.GenerateCellInstanceHash(usingIndexValues);
+        var cellInstanceHash = InstanceHasher.GenerateContextInstanceHash(usingIndexValues);
 
-        var getCellInstanceResult = await cellManager.GetCellInstance(parsed.CellGroupName, cellInstanceHash);
-        if (getCellInstanceResult.IsFailure) return getCellInstanceResult.Error;
+        var getContextInstanceResult = await cellManager.GetContextInstance(parsed.ContextGroupName, cellInstanceHash);
+        if (getContextInstanceResult.IsFailure) return getContextInstanceResult.Error;
         return usingIndexValues.Values.Cast<object>().ToArray();
     }
 

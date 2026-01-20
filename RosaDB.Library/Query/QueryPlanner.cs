@@ -10,7 +10,7 @@ namespace RosaDB.Library.Query;
 
 public class QueryPlanner(
     IDatabaseManager databaseManager, 
-    ICellManager cellManager, 
+    IContextManager contextManager, 
     RootManager rootManager,
     SessionState sessionState,
     ILogManager logManager,
@@ -52,13 +52,13 @@ public class QueryPlanner(
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, cellManager),
-            "DROP" => new DropQuery(tokens, rootManager, databaseManager, cellManager),
+            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, contextManager),
+            "DROP" => new DropQuery(tokens, rootManager, databaseManager, contextManager),
             "USE" => new UseQuery(tokens, sessionState, rootManager),
-            "SELECT" => new SelectQuery(tokens, logManager, cellManager),
-            "INSERT" => new InsertQuery(tokens, cellManager, logManager, indexManager, sessionState),
+            "SELECT" => new SelectQuery(tokens, logManager, contextManager),
+            "INSERT" => new InsertQuery(tokens, contextManager, logManager, indexManager, sessionState),
             "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer), // Pass container
-            "ALTER" => new AlterQuery(tokens, cellManager),
+            "ALTER" => new AlterQuery(tokens, contextManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logManager),
             "ROLLBACK" => new RollbackQuery(sessionState, logManager),

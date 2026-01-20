@@ -8,10 +8,10 @@ public interface IIndexManager
     void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value);
     Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, byte[] key);
 
-    Result InsertCellData(string cellName, byte[] key, byte[] value);
-    Result<byte[]> GetCellData(string cellName, byte[] key);
-    Result<bool> CellDataExists(string cellName, byte[] key);
+    Result InsertContextData(string contextName, byte[] key, byte[] value);
+    Result<byte[]> GetContextData(string contextName, byte[] key);
+    Result<bool> ContextDataExists(string contextName, byte[] key);
 
-    Result InsertCellPropertyIndex(string cellName, string propertyName, byte[] key, byte[] value);
-    Result<IEnumerable<KeyValuePair<byte[], byte[]>>> GetAllCellData(string cellName);
+    Result InsertContextPropertyIndex(string contextName, string propertyName, byte[] key, byte[] value);
+    Result<IEnumerable<KeyValuePair<byte[], byte[]>>> GetAllContextData(string contextName);
 }

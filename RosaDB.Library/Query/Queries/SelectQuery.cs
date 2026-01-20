@@ -7,17 +7,17 @@ using RosaDB.Library.Validation;
 
 namespace RosaDB.Library.Query.Queries
 {
-    public class SelectQuery(string[] tokens, ILogManager logManager, ICellManager cellManager) : IQuery
+    public class SelectQuery(string[] tokens, ILogManager logManager, IContextManager cellManager) : IQuery
     {
         public async ValueTask<QueryResult> Execute()
         {
             var (selectIndex, fromIndex, whereIndex, usingIndex) = ParseQueryTokens();
             
             var tableNameParts = tokens[fromIndex + 1].Split('.');
-            var cellName = tableNameParts[0];
+            var contextName = tableNameParts[0];
             var tableName = tableNameParts[1];
 
-            var columnsResult = await cellManager.GetColumnsFromTable(cellName, tableName);
+            var columnsResult = await cellManager.GetColumnsFromTable(contextName, tableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
             return new QueryResult(StreamRows(selectIndex, fromIndex, whereIndex, usingIndex, columns));
@@ -26,20 +26,20 @@ namespace RosaDB.Library.Query.Queries
         private async IAsyncEnumerable<Row> StreamRows(int selectIndex, int fromIndex, int whereIndex, int usingIndex, Column[] columns)
         {
             var tableNameParts = tokens[fromIndex + 1].Split('.');
-            var cellName = tableNameParts[0];
+            var contextName = tableNameParts[0];
             var tableName = tableNameParts[1];
 
             IAsyncEnumerable<Log> logs;
             if (usingIndex != -1)
             {
-                var cellEnv = await cellManager.GetEnvironment(cellName);
+                var cellEnv = await cellManager.GetEnvironment(contextName);
                 if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
-                var result = await ApplyUsing(tableName, cellName, whereIndex, usingIndex, cellEnv.Value);
+                var result = await ApplyUsing(tableName, contextName, whereIndex, usingIndex, cellEnv.Value);
                 if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
                 logs = result.Value;
             }
-            else logs = logManager.GetAllLogsForCellTable(cellName, tableName);
+            else logs = logManager.GetAllLogsForContextTable(contextName, tableName);
             
             if (logs is null) yield break;
 
@@ -89,7 +89,7 @@ namespace RosaDB.Library.Query.Queries
             return (selectIdx, fromIdx, whereIdx, usingIdx);
         }
 
-        private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string cellName, int whereIndex, int usingIndex, CellEnvironment cellEnv)
+        private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string contextName, int whereIndex, int usingIndex, ContextEnvironment cellEnv)
         {
             var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
             var usingTokens = tokens[(usingIndex + 1)..endIndex];
@@ -97,7 +97,7 @@ namespace RosaDB.Library.Query.Queries
             var usingValues = new Dictionary<string, (string value, string operation)>();
             for (int i = 0; i < usingTokens.Length; i += 4) usingValues[usingTokens[i]] = new(usingTokens[i + 2], usingTokens[i + 1]);
             
-            // check if all and only index columns are present for cell then use the cell instance
+            // check if all and only index columns are present for context then use the context instance
             var indexStringValues = usingValues.Keys.Where(u => cellEnv.IndexColumns.Select(i => i.Name).Contains(u)).ToArray();
             if (usingValues.Count == cellEnv.IndexColumns.Length && indexStringValues.Length == cellEnv.IndexColumns.Length)
             {   
@@ -109,26 +109,26 @@ namespace RosaDB.Library.Query.Queries
                     indexValues.Add(parseResult.Value);
                 }
                 
-                return Result<IAsyncEnumerable<Log>>.Success(logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues.ToArray()));
+                return Result<IAsyncEnumerable<Log>>.Success(logManager.GetAllLogsForContextInstanceTable(contextName, tableName, indexValues.ToArray()));
             }
             
-            // if it's not the indexes then get all the cell instances and concat all the conforming cells
-            var cellsResult = await cellManager.GetAllCellInstances(cellName);
+            // if it's not the indexes then get all the context instances and concat all the conforming cells
+            var cellsResult = await cellManager.GetAllContextInstances(contextName);
             if (cellsResult.IsFailure) return cellsResult.Error;
 
             List<Row> cellsThatApply = []; 
-            foreach (Row cell in cellsResult.Value)
+            foreach (Row context in cellsResult.Value)
             {
                 bool doesUsingApply = true;
                 foreach (var usingValue in usingValues)
                 {
-                    var columnIndex = Array.FindIndex(cell.Columns, c => c.Name.Equals(usingValue.Key, StringComparison.OrdinalIgnoreCase));
+                    var columnIndex = Array.FindIndex(context.Columns, c => c.Name.Equals(usingValue.Key, StringComparison.OrdinalIgnoreCase));
                     if (columnIndex == -1) { doesUsingApply = false; break; }
 
-                    var rowValue = cell.Values[columnIndex];
+                    var rowValue = context.Values[columnIndex];
                     if(rowValue == null) { doesUsingApply = false; break; }
                     
-                    var parsedValueResult = TokensToDataParser.Parse(usingValue.Value.value, cell.Columns[columnIndex].DataType);
+                    var parsedValueResult = TokensToDataParser.Parse(usingValue.Value.value, context.Columns[columnIndex].DataType);
                     if(parsedValueResult.IsFailure) { doesUsingApply = false; break; }
 
                     if (usingValue.Value.operation == "=") {
@@ -137,17 +137,17 @@ namespace RosaDB.Library.Query.Queries
                         doesUsingApply = false; break;
                     }
                 }
-                if(doesUsingApply) cellsThatApply.Add(cell);
+                if(doesUsingApply) cellsThatApply.Add(context);
             }
 
-            return Result<IAsyncEnumerable<Log>>.Success(TurnCellRowsToLogs(cellsThatApply, tableName, cellName, cellEnv));
+            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(cellsThatApply, tableName, contextName, cellEnv));
         }
 
-        private async IAsyncEnumerable<Log> TurnCellRowsToLogs(List<Row> cells, string tableName, string cellName, CellEnvironment cellEnv)
+        private async IAsyncEnumerable<Log> TurnContextRowsToLogs(List<Row> cells, string tableName, string contextName, ContextEnvironment cellEnv)
         {
-            foreach (var cell in cells)
+            foreach (var context in cells)
             {
-                await foreach (var log in logManager.GetAllLogsForCellInstanceTable(cellName, tableName, cellEnv.GetIndexValues(cell)))
+                await foreach (var log in logManager.GetAllLogsForContextInstanceTable(contextName, tableName, cellEnv.GetIndexValues(context)))
                 {
                     yield return log;
                 }

@@ -8,7 +8,7 @@ using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class DatabaseManager(SessionState sessionState, ICellManager cellManager, IFileSystem fileSystem, IFolderManager folderManager) : IDatabaseManager
+    public class DatabaseManager(SessionState sessionState, IContextManager contextManager, IFileSystem fileSystem, IFolderManager folderManager) : IDatabaseManager
     {
         private readonly IFileSystem _fileSystem = fileSystem;
         private readonly IFolderManager _folderManager = folderManager;
@@ -34,7 +34,7 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
         
-        public async Task<Result> CreateCell(string cellName, Column[] columns)
+        public async Task<Result> CreateContext(string contextName, Column[] columns)
         {
             try
             {
@@ -43,51 +43,51 @@ namespace RosaDB.Library.StorageEngine
 
                 var envResult = await GetEnvironment(sessionState.CurrentDatabase);
                 if (!envResult.TryGetValue(out var env)) return envResult.Error;
-                if (env.Cells.Any(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase)))
-                    return new Error(ErrorPrefixes.FileError, $"Cell '{cellName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
+                if (env.Contexts.Any(c => c.Name.Equals(contextName, StringComparison.OrdinalIgnoreCase)))
+                    return new Error(ErrorPrefixes.FileError, $"Context '{contextName}' already exists in database '{sessionState.CurrentDatabase.Name}'.");
 
-                var newCell = Cell.Create(cellName);
-                if (newCell.IsFailure) return newCell.Error;
+                var newContext = Context.Create(contextName);
+                if (newContext.IsFailure) return newContext.Error;
 
-                env.Cells.Add(newCell.Value);
+                env.Contexts.Add(newContext.Value);
                 await SaveEnvironment(env, sessionState.CurrentDatabase);
 
-                _folderManager.CreateFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                _folderManager.CreateFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), contextName));
 
-                var cellEnvResult = await cellManager.CreateCellEnvironment(cellName, columns);
-                if (cellEnvResult.IsFailure) return (await WipeCell(cellName)).IsFailure ? new CriticalError() : cellEnvResult.Error;
+                var contextEnvResult = await contextManager.CreateContextEnvironment(contextName, columns);
+                if (contextEnvResult.IsFailure) return (await WipeContext(contextName)).IsFailure ? new CriticalError() : contextEnvResult.Error;
                 
                 return Result.Success();
             }
             catch
             {
-                return (await WipeCell(cellName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Cell creation failed");
+                return (await WipeContext(contextName)).IsFailure ? new CriticalError() : new Error(ErrorPrefixes.FileError, "Context creation failed");
             }
         }
         
-        public async Task<Result> DeleteCell(string cellName)
+        public async Task<Result> DeleteContext(string contextName)
         {
             if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
             var envResult = await GetEnvironment(sessionState.CurrentDatabase);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
             
-            var cell = env.Cells.FirstOrDefault(c => c.Name.Equals(cellName, StringComparison.OrdinalIgnoreCase));
-            if (cell == null) return new Error(ErrorPrefixes.FileError, "Cell not found");
+            var context = env.Contexts.FirstOrDefault(c => c.Name.Equals(contextName, StringComparison.OrdinalIgnoreCase));
+            if (context == null) return new Error(ErrorPrefixes.FileError, "Context not found");
             
-            string folderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName);
-            string trashFolderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+cellName);
+            string folderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), contextName);
+            string trashFolderPath = _fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), "trash_"+contextName);
             
             try { _folderManager.RenameFolder(folderPath, trashFolderPath); }
-            catch { return new Error(ErrorPrefixes.FileError, "Could not prepare cell for deletion (Folder Rename Failed)."); }
+            catch { return new Error(ErrorPrefixes.FileError, "Could not prepare context for deletion (Folder Rename Failed)."); }
             
-            env.Cells.Remove(cell);
+            env.Contexts.Remove(context);
             
             try { await SaveEnvironment(env, sessionState.CurrentDatabase); }
             catch 
             { 
                 try
                 {
-                    env.Cells.Add(cell);
+                    env.Contexts.Add(context);
                     _folderManager.RenameFolder(trashFolderPath, folderPath);
                 }
                 catch { return new CriticalError(); }
@@ -101,19 +101,19 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
         
-        private async Task<Result> WipeCell(string cellName)
+        private async Task<Result> WipeContext(string contextName)
         {
             try
             {
                 if (sessionState.CurrentDatabase is null) return new Error(ErrorPrefixes.StateError, "Database not set");
                 var env = await GetEnvironment(sessionState.CurrentDatabase);
                 
-                if (env.IsSuccess) env.Value.Cells.RemoveAll(c => c.Name == cellName);
+                if (env.IsSuccess) env.Value.Contexts.RemoveAll(c => c.Name == contextName);
                 else return env.Error;
                 
                 await SaveEnvironment(env.Value, sessionState.CurrentDatabase);
                 
-                _folderManager.DeleteFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), cellName));
+                _folderManager.DeleteFolder(_fileSystem.Path.Combine(GetDatabasePath(sessionState.CurrentDatabase), contextName));
                 
                 return Result.Success();
             }

@@ -4,9 +4,9 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class CreateCellQuery(IDatabaseManager databaseManager)
+public class CreateContextQuery(IDatabaseManager databaseManager)
 {
-    public async Task<Result> Execute(string cellName, List<Column>? columns = null)
+    public async Task<Result> Execute(string contextName, List<Column>? columns = null)
     {
         if (columns == null)
         {
@@ -14,6 +14,6 @@ public class CreateCellQuery(IDatabaseManager databaseManager)
             if(!columnResult.TryGetValue(out var column)) return columnResult.Error;
             columns = [column];
         }
-        return await databaseManager.CreateCell(cellName, columns.ToArray());
+        return await databaseManager.CreateContext(contextName, columns.ToArray());
     }
 }

@@ -14,8 +14,8 @@ public class IndexManager(
     SessionState sessionState) : IIndexManager, IDisposable
 {
     private readonly Dictionary<string, BPlusTree<byte[], LogLocation>> _activeIndexes = new();
-    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellInstanceStores = new();
-    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeCellPropertyIndexes = new();
+    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeContextInstanceStores = new();
+    private readonly Dictionary<string, BPlusTree<byte[], byte[]>> _activeContextPropertyIndexes = new();
 
     public void Insert(TableInstanceIdentifier identifier, string columnName, byte[] key, LogLocation value)
     {
@@ -25,7 +25,7 @@ public class IndexManager(
 
     public Result<LogLocation> Search(TableInstanceIdentifier identifier, string columnName, byte[] key)
     {
-        var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
+        var indexKey = $"{identifier.ContextName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
 
         if (!_activeIndexes.TryGetValue(indexKey, out var btree))
         {
@@ -37,9 +37,9 @@ public class IndexManager(
         return new Error(ErrorPrefixes.DataError, $"Key '{key}' not found in index '{indexKey}'.");
     }
 
-    public Result InsertCellData(string cellName, byte[] key, byte[] value)
+    public Result InsertContextData(string contextName, byte[] key, byte[] value)
     {
-        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        var treeResult = GetOrCreateContextInstanceStore(contextName);
         if (treeResult.IsFailure) return treeResult.Error;
 
         var tree = treeResult.Value;
@@ -48,26 +48,26 @@ public class IndexManager(
         return Result.Success();
     }
 
-    public Result<byte[]> GetCellData(string cellName, byte[] key)
+    public Result<byte[]> GetContextData(string contextName, byte[] key)
     {
-        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        var treeResult = GetOrCreateContextInstanceStore(contextName);
         if (treeResult.IsFailure) return treeResult.Error;
 
         if (treeResult.Value.TryGetValue(key, out var value)) return value;
-        return new Error(ErrorPrefixes.DataError, "Cell instance not found.");
+        return new Error(ErrorPrefixes.DataError, "Context instance not found.");
     }
 
-    public Result<bool> CellDataExists(string cellName, byte[] key)
+    public Result<bool> ContextDataExists(string contextName, byte[] key)
     {
-        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        var treeResult = GetOrCreateContextInstanceStore(contextName);
         if (treeResult.IsFailure) return treeResult.Error;
 
         return treeResult.Value.ContainsKey(key);
     }
 
-    public Result InsertCellPropertyIndex(string cellName, string propertyName, byte[] key, byte[] value)
+    public Result InsertContextPropertyIndex(string contextName, string propertyName, byte[] key, byte[] value)
     {
-        var treeResult = GetOrCreateCellPropertyIndex(cellName, propertyName);
+        var treeResult = GetOrCreateContextPropertyIndex(contextName, propertyName);
         if (treeResult.IsFailure) return treeResult.Error;
 
         var tree = treeResult.Value;
@@ -76,9 +76,9 @@ public class IndexManager(
         return Result.Success();
     }
 
-    public Result<IEnumerable<KeyValuePair<byte[], byte[]>>> GetAllCellData(string cellName)
+    public Result<IEnumerable<KeyValuePair<byte[], byte[]>>> GetAllContextData(string contextName)
     {
-        var treeResult = GetOrCreateCellInstanceStore(cellName);
+        var treeResult = GetOrCreateContextInstanceStore(contextName);
         
         if (treeResult.IsFailure) return treeResult.Error;
         return treeResult.Value;
@@ -87,12 +87,12 @@ public class IndexManager(
     public void Dispose()
     {
         foreach (var btree in _activeIndexes.Values) btree.Dispose();
-        foreach (var btree in _activeCellInstanceStores.Values) btree.Dispose();
-        foreach (var btree in _activeCellPropertyIndexes.Values) btree.Dispose();
+        foreach (var btree in _activeContextInstanceStores.Values) btree.Dispose();
+        foreach (var btree in _activeContextPropertyIndexes.Values) btree.Dispose();
         
         _activeIndexes.Clear();
-        _activeCellInstanceStores.Clear();
-        _activeCellPropertyIndexes.Clear();
+        _activeContextInstanceStores.Clear();
+        _activeContextPropertyIndexes.Clear();
     }
     
     private string GetIndexPath(TableInstanceIdentifier identifier, string columnName)
@@ -104,7 +104,7 @@ public class IndexManager(
                 folderManager.BasePath,
                 sessionState.CurrentDatabase!.Name,
                 "indexes",
-                identifier.CellName,
+                identifier.ContextName,
                 identifier.TableName,
                 "_TABLE_", // Special folder for table-wide indexes
                 $"{columnName}.idx"); // Simpler file name for table-wide indexes
@@ -119,7 +119,7 @@ public class IndexManager(
                 folderManager.BasePath,
                 sessionState.CurrentDatabase!.Name,
                 "indexes",
-                identifier.CellName,
+                identifier.ContextName,
                 identifier.TableName,
                 hashPrefix,
                 $"{identifier.InstanceHash}_{columnName}.idx");
@@ -129,7 +129,7 @@ public class IndexManager(
 
     private BPlusTree<byte[], LogLocation> GetOrCreateBPlusTree(TableInstanceIdentifier identifier, string columnName)
     {
-        var indexKey = $"{identifier.CellName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
+        var indexKey = $"{identifier.ContextName}_{identifier.TableName}_{identifier.InstanceHash}_{columnName}";
 
         if (_activeIndexes.TryGetValue(indexKey, out var btree)) return btree;
 
@@ -151,14 +151,14 @@ public class IndexManager(
         return btree;
     }
 
-    private Result<BPlusTree<byte[], byte[]>> GetOrCreateCellInstanceStore(string cellName)
+    private Result<BPlusTree<byte[], byte[]>> GetOrCreateContextInstanceStore(string contextName)
     {
         if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
         
-        var key = $"{sessionState.CurrentDatabase.Name}_{cellName}";
-        if (_activeCellInstanceStores.TryGetValue(key, out var tree)) return tree;
+        var key = $"{sessionState.CurrentDatabase.Name}_{contextName}";
+        if (_activeContextInstanceStores.TryGetValue(key, out var tree)) return tree;
 
-        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, "_idx");
+        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, "_idx");
 
         var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
         {
@@ -166,18 +166,18 @@ public class IndexManager(
             FileName = filePath
         };
         var newTree = new BPlusTree<byte[], byte[]>(options);
-        _activeCellInstanceStores[key] = newTree;
+        _activeContextInstanceStores[key] = newTree;
         return newTree;
     }
 
-    private Result<BPlusTree<byte[], byte[]>> GetOrCreateCellPropertyIndex(string cellName, string propertyName)
+    private Result<BPlusTree<byte[], byte[]>> GetOrCreateContextPropertyIndex(string contextName, string propertyName)
     {
         if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
         
-        var key = $"{sessionState.CurrentDatabase.Name}_{cellName}_{propertyName}";
-        if (_activeCellPropertyIndexes.TryGetValue(key, out var tree)) return tree;
+        var key = $"{sessionState.CurrentDatabase.Name}_{contextName}_{propertyName}";
+        if (_activeContextPropertyIndexes.TryGetValue(key, out var tree)) return tree;
 
-        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, $"_pidx_{propertyName}");
+        var filePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, $"_pidx_{propertyName}");
 
         var options = new BPlusTree<byte[], byte[]>.OptionsV2(PrimitiveSerializer.Bytes, PrimitiveSerializer.Bytes, new ByteArrayComparer())
         {
@@ -185,7 +185,7 @@ public class IndexManager(
             FileName = filePath
         };
         var newTree = new BPlusTree<byte[], byte[]>(options);
-        _activeCellPropertyIndexes[key] = newTree;
+        _activeContextPropertyIndexes[key] = newTree;
         return newTree;
     }
 }

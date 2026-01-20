@@ -15,7 +15,7 @@ public class LogManager(
     IFileSystem fileSystem,
     IFolderManager folderManager,
     IIndexManager indexManager,
-    ICellManager cellManager,
+    IContextManager contextManager,
     ISubscriptionManager subscriptionManager) : ILogManager
 {
     private const long MaxSegmentSize = 1024 * 1024;
@@ -36,7 +36,7 @@ public class LogManager(
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
-            Result<Column[]> columnsResult = await cellManager.GetColumnsFromTable(identifier.CellName, identifier.TableName);
+            Result<Column[]> columnsResult = await contextManager.GetColumnsFromTable(identifier.ContextName, identifier.TableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
             Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
@@ -68,25 +68,25 @@ public class LogManager(
         _writeAheadLogs.Clear();
     }
     
-    public void Put(string cellName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
+    public void Put(string contextName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
     {
-        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, tableIndex);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, tableIndex);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
         Log log = new() { TupleData = data, Id = finalLogId, IndexValues = indexValues };
         PutLog(log, identifier);
     }
 
-    public void Delete(string cellName, string tableName, object[] indexValues, long logId)
+    public void Delete(string contextName, string tableName, object[] indexValues, long logId)
     {
-        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
         Log log = new() { Id = logId, IsDeleted = true };
         PutLog(log, identifier);
     }
     
-    public async Task<Result<Log>> FindLastestLog(string cellName, string tableName, object[] indexValues, long id)
+    public async Task<Result<Log>> FindLastestLog(string contextName, string tableName, object[] indexValues, long id)
     {
-        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
         
         if (_writeAheadLogs.TryGetValue(identifier, out var logs))
         {
@@ -197,7 +197,7 @@ public class LogManager(
 
         return fileSystem.Path.Combine(
             folderManager.BasePath, sessionState.CurrentDatabase.Name, 
-            identifier.CellName, identifier.TableName, 
+            identifier.ContextName, identifier.TableName, 
             hashPrefix,
             $"{identifier.InstanceHash}_{segmentNumber}.dat");
     }
@@ -248,11 +248,11 @@ public class LogManager(
         return log;
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellTable(string cellName, string tableName)
+    public async IAsyncEnumerable<Log> GetAllLogsForContextTable(string contextName, string tableName)
     {
         if (sessionState.CurrentDatabase is null) yield break;
 
-        var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, cellName, tableName);
+        var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, tableName);
         if (!fileSystem.Directory.Exists(tablePath)) yield break;
 
         var dataFiles = fileSystem.Directory.GetFiles(tablePath, "*.dat", SearchOption.AllDirectories);
@@ -280,10 +280,10 @@ public class LogManager(
         }
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForCellInstanceTable(string cellName, string tableName, object?[] indexValues)
+    public async IAsyncEnumerable<Log> GetAllLogsForContextInstanceTable(string contextName, string tableName, object?[] indexValues)
     {
         if (sessionState.CurrentDatabase is null) throw new Exception();
-        var identifier = InstanceHasher.CreateIdentifier(cellName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
 
         var allLogs = new List<Log>();
 
@@ -293,7 +293,7 @@ public class LogManager(
         }
         
         var dbPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name);
-        var instancePath = fileSystem.Path.Combine(dbPath, identifier.CellName, identifier.TableName, identifier.InstanceHash.Substring(0, 2));
+        var instancePath = fileSystem.Path.Combine(dbPath, identifier.ContextName, identifier.TableName, identifier.InstanceHash.Substring(0, 2));
 
         if (fileSystem.Directory.Exists(instancePath))
         {

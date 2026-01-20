@@ -6,7 +6,7 @@ using RosaDB.Library.Models;
 
 namespace RosaDB.Library.Models.Environments;
 
-public class CellEnvironment
+public class ContextEnvironment
 {
     public int Version { get; set; } = Constants.Version;
     public Column[] Columns { get; set; } = [];

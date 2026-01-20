@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
+public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -14,7 +14,7 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
         switch (tokens[1].ToUpperInvariant())
         {
             case "CELL":
-                return await ExecuteAlterCell();
+                return await ExecuteAlterContext();
             case "TABLE":
                 return new Error(ErrorPrefixes.QueryParsingError, "ALTER TABLE is not implemented.");
             default:
@@ -22,7 +22,7 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
         }
     }
 
-    private async Task<QueryResult> ExecuteAlterCell()
+    private async Task<QueryResult> ExecuteAlterContext()
     {
         if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER CELL syntax.");
         
@@ -41,11 +41,11 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
     
     private async Task<QueryResult> ExecuteAddColumn()
     {
-        // Expecting: ALTER CELL <cellName> ADD COLUMN <colName> <colType>
+        // Expecting: ALTER CELL <contextName> ADD COLUMN <colName> <colType>
         if (tokens.Length != 7 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <cellName> ADD COLUMN <colName> <colType>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <contextName> ADD COLUMN <colName> <colType>");
 
-        var cellName = tokens[2];
+        var contextName = tokens[2];
         var columnName = tokens[5];
         var columnTypeStr = tokens[6];
 
@@ -54,30 +54,30 @@ public class AlterQuery(string[] tokens, ICellManager cellManager) : IQuery
         var newColumn = Column.Create(columnName, columnType, false);
         if (newColumn.IsFailure) return newColumn.Error;
 
-        var getEnvResult = await cellManager.GetEnvironment(cellName);
+        var getEnvResult = await cellManager.GetEnvironment(contextName);
         if (!getEnvResult.TryGetValue(out var env)) return getEnvResult.Error;
 
         var currentColumns = env.Columns.ToList();
         if (currentColumns.Any(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase)))
-            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in cell '{cellName}'.");
+            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in context '{contextName}'.");
         
         currentColumns.Add(newColumn.Value);
         
-        var result = await cellManager.UpdateCellEnvironment(cellName, currentColumns.ToArray());
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to cell {cellName}.");
+        var result = await cellManager.UpdateContextEnvironment(contextName, currentColumns.ToArray());
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to context {contextName}.");
     }
 
     private async Task<QueryResult> ExecuteDropColumn()
     {
-        // Expecting: ALTER CELL <cellName> DROP COLUMN <colName>
+        // Expecting: ALTER CELL <contextName> DROP COLUMN <colName>
         if (tokens.Length != 6 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <cellName> DROP COLUMN <colName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <contextName> DROP COLUMN <colName>");
 
-        var cellName = tokens[2];
+        var contextName = tokens[2];
         var columnName = tokens[5];
 
-        var result = await cellManager.DropColumnAsync(cellName, columnName);
+        var result = await cellManager.DropColumnAsync(contextName, columnName);
 
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from cell {cellName}.");
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from context {contextName}.");
     }
 }

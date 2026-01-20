@@ -10,7 +10,7 @@ public class CreateQuery(
     string[] tokens,
     RootManager rootManager,
     IDatabaseManager databaseManager,
-    ICellManager cellManager)
+    IContextManager contextManager)
     : IQuery
 {
     public async ValueTask<QueryResult> Execute()
@@ -35,7 +35,7 @@ public class CreateQuery(
         );
     }
 
-    private async Task<QueryResult> CREATE_CELL(string cellName, string[] columnTokens)
+    private async Task<QueryResult> CREATE_CELL(string contextName, string[] columnTokens)
     {
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
         
@@ -43,9 +43,9 @@ public class CreateQuery(
             async columns =>
             {
                 foreach (var c in columns) if (c.IsPrimaryKey) return new Error(ErrorPrefixes.QueryParsingError, "Primary key columns are not allowed. Use the INDEX keyword instead");
-                var result = await databaseManager.CreateCell(cellName, columns);
+                var result = await databaseManager.CreateContext(contextName, columns);
                 return result.Match(
-                    () => new QueryResult($"Successfully created cell: {cellName}"),
+                    () => new QueryResult($"Successfully created context: {contextName}"),
                     error => error
                 );
             }, 
@@ -56,9 +56,9 @@ public class CreateQuery(
     private async Task<QueryResult> CREATE_TABLE(string nameComposite, string[] columnTokens)
     {
         string[] names = nameComposite.Split('.');
-        if (names.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format, Expected: <cellName>.<tableName>");
+        if (names.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format, Expected: <contextName>.<tableName>");
         
-        string cellName = names[0];
+        string contextName = names[0];
         string tableName = names[1];
         
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
@@ -68,7 +68,7 @@ public class CreateQuery(
             {
                 var tableResult = Table.Create(tableName, columns);
                 if (!tableResult.TryGetValue(out var table)) return tableResult.Error;
-                var result = await cellManager.CreateTable(cellName, table);
+                var result = await contextManager.CreateTable(contextName, table);
                 return result.Match(
                     () => new QueryResult($"Successfully created Table: {tableName}"),
                     error => error

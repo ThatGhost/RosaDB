@@ -3,13 +3,13 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class GetCellLogsQuery(ILogManager logManager, ICellManager cellManager)
+public class GetContextLogsQuery(ILogManager logManager, IContextManager cellManager)
 {
-    public async Task<List<string>> Execute(string cellName, string tableName, object[] indexValues)
+    public async Task<List<string>> Execute(string contextName, string tableName, object[] indexValues)
     {
-        var logs = logManager.GetAllLogsForCellInstanceTable(cellName, tableName, indexValues);
+        var logs = logManager.GetAllLogsForContextInstanceTable(contextName, tableName, indexValues);
 
-        var cellFromDb = await cellManager.GetColumnsFromTable(cellName, tableName);
+        var cellFromDb = await cellManager.GetColumnsFromTable(contextName, tableName);
         if(cellFromDb.IsFailure) return [];
 
         List<string> data = new List<string>();

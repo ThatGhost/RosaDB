@@ -93,12 +93,12 @@ namespace RosaDB.Client.TUI
                 await SendQuery("CREATE CELL catalog (id INT INDEX, name TEXT);");
                 await SendQuery("CREATE TABLE catalog.products (id INT PRIMARY KEY, name TEXT, category TEXT, price TEXT);");
 
-                await SeedUserCellInstances();
+                await SeedUserContextInstances();
                 await SeedUserTables();
-                await SeedWarehouseCellInstances();
+                await SeedWarehouseContextInstances();
                 await SeedWarehouseTables();
                 await SeedCatalog();
-                await SeedProductCellInstances();
+                await SeedProductContextInstances();
                 await SeedProductTables();
                 await SeedProductDailyStats();
             }
@@ -254,7 +254,7 @@ namespace RosaDB.Client.TUI
             }
         }
 
-        private async Task SeedProductCellInstances()
+        private async Task SeedProductContextInstances()
         {
             Log("Creating product instances...");
             await SendQuery("INSERT CELL products (id) VALUES (1);");
@@ -287,7 +287,7 @@ namespace RosaDB.Client.TUI
             }
         }
 
-        private async Task SeedWarehouseCellInstances()
+        private async Task SeedWarehouseContextInstances()
         {
             Log("Creating warehouse instances...");
             await SendQuery("INSERT CELL warehouses (id, name, location) VALUES (1, 'Main Warehouse', 'New York');");
@@ -330,7 +330,7 @@ namespace RosaDB.Client.TUI
             }
         }
 
-        private async Task SeedUserCellInstances()
+        private async Task SeedUserContextInstances()
         {
             Log("Creating user instances...");
             await SendQuery("INSERT CELL users (id, name, age) VALUES (1, 'Alice Smith', 30);");

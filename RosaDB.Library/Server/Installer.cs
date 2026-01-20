@@ -27,7 +27,7 @@ public static class Installer
         container.RegisterScoped<SessionState>();
         container.RegisterScoped<ILogManager, LogManager>();
         container.RegisterScoped<IIndexManager, IndexManager>();
-        container.RegisterScoped<ICellManager, CellManager>();
+        container.RegisterScoped<IContextManager, ContextManager>();
         container.RegisterScoped<WebsocketQueryPlanner>();
         
         container.Register<TcpClient, Scope, ClientSession>((factory, client, scope) => new ClientSession(client, scope, scope.GetInstance<ISystemLogPublisher>()));
