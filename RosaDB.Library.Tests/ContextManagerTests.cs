@@ -19,8 +19,8 @@ namespace RosaDB.Library.Tests
         private Mock<SessionState> _mockSessionState;
         private Mock<IFolderManager> _mockFolderManager;
         private Mock<IIndexManager> _mockIndexManager;
-        private Mock<IFileSystem> _mockFileSystem; // Changed to Mock<IFileSystem>
-        private MockFileSystem _concreteFileSystem; // Added for operations directly on MockFileSystem
+        private Mock<IFileSystem> _mockFileSystem;
+        private MockFileSystem _concreteFileSystem; 
         private ContextManager _contextManager;
 
         private const string TestDbName = "TestDB";
@@ -34,8 +34,8 @@ namespace RosaDB.Library.Tests
         {
             _mockSessionState = new Mock<SessionState>();
             _mockFolderManager = new Mock<IFolderManager>();
-            _mockFileSystem = new Mock<IFileSystem>(); // Changed to new Mock<IFileSystem>()
-            _concreteFileSystem = new MockFileSystem(); // Initialize concrete MockFileSystem
+            _mockFileSystem = new Mock<IFileSystem>(); 
+            _concreteFileSystem = new MockFileSystem();
             _mockIndexManager = new Mock<IIndexManager>();
 
             _mockFolderManager.Setup(fm => fm.BasePath).Returns(_basePath);
@@ -52,20 +52,18 @@ namespace RosaDB.Library.Tests
 
             _contextManager = new ContextManager(
                 _mockSessionState.Object,
-                _mockFileSystem.Object, // Use .Object here
+                _mockFileSystem.Object,
                 _mockFolderManager.Object,
                 _mockIndexManager.Object
             );
 
-            // Ensure the base DB directory exists for tests
-            _concreteFileSystem.AddDirectory(_concreteFileSystem.Path.Combine(_basePath, TestDbName)); // Use concreteFileSystem here
+            _concreteFileSystem.AddDirectory(_concreteFileSystem.Path.Combine(_basePath, TestDbName));
         }
 
         private void CreateFakeContextEnvironmentFile(ContextEnvironment env)
         {
-            // Ensure the directory exists in the concrete file system
             if (!_concreteFileSystem.Directory.Exists(_contextPath))
-                _concreteFileSystem.Directory.CreateDirectory(_contextPath); // Use CreateDirectory here
+                _concreteFileSystem.Directory.CreateDirectory(_contextPath);
 
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
             _concreteFileSystem.AddFile(_envFilePath, new MockFileData(bytes));
@@ -75,8 +73,7 @@ namespace RosaDB.Library.Tests
         public async Task CreateContextEnvironment_HappyPath_CreatesEnvFile()
         {
             // Arrange
-            var columns = new Column[] { Column.Create("Id", DataType.INT).Value };
-            // Ensure the context path exists for the MockFileSystem
+            var columns = new[] { Column.Create("Id", DataType.INT).Value };
             _concreteFileSystem.AddDirectory(_contextPath);
 
             // Act
@@ -85,7 +82,7 @@ namespace RosaDB.Library.Tests
             // Assert
             Assert.That(result.IsSuccess, Is.True);
             Assert.That(_concreteFileSystem.File.Exists(_envFilePath), Is.True);
-            var bytes = _concreteFileSystem.File.ReadAllBytes(_envFilePath);
+            var bytes = await _concreteFileSystem.File.ReadAllBytesAsync(_envFilePath);
             var env = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(env.Columns.Length, Is.EqualTo(1));
             Assert.That(env.Columns[0].Name, Is.EqualTo("Id"));
@@ -95,9 +92,9 @@ namespace RosaDB.Library.Tests
         public async Task AddTables_HappyPath_AddsTableToEnvironment()
         {
             // Arrange
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [] };
             CreateFakeContextEnvironmentFile(initialEnv);
-            var newTableResult = Table.Create("NewTable", new[] { Column.Create("Col1", DataType.VARCHAR).Value });
+            var newTableResult = Table.Create("NewTable", [Column.Create("Col1", DataType.VARCHAR).Value]);
             Assert.That(newTableResult.IsSuccess, Is.True);
 
             // Act
@@ -105,7 +102,7 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
-            var bytes = _concreteFileSystem.File.ReadAllBytes(_envFilePath);
+            var bytes = await _concreteFileSystem.File.ReadAllBytesAsync(_envFilePath);
             var updatedEnv = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(updatedEnv.Tables.Length, Is.EqualTo(1));
             Assert.That(updatedEnv.Tables[0].Name, Is.EqualTo("NewTable"));
@@ -116,10 +113,10 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var tableName = "TableToDelete";
-            var tableResult = Table.Create(tableName, Array.Empty<Column>());
+            var tableResult = Table.Create(tableName, []);
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [table] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
@@ -127,7 +124,7 @@ namespace RosaDB.Library.Tests
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
-            var bytes = _concreteFileSystem.File.ReadAllBytes(_envFilePath);
+            var bytes = await _concreteFileSystem.File.ReadAllBytesAsync(_envFilePath);
             var updatedEnv = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(updatedEnv.Tables, Is.Empty);
 
@@ -141,7 +138,7 @@ namespace RosaDB.Library.Tests
         public async Task DeleteTable_TableNotFound_ReturnsError()
         {
             // Arrange
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
@@ -156,7 +153,7 @@ namespace RosaDB.Library.Tests
         public async Task GetEnvironment_ReadsFromFile_WhenNotInCache()
         {
             // Arrange
-            var env = new ContextEnvironment { Columns = new[] { Column.Create("Id", DataType.INT).Value }, Tables = Array.Empty<Table>() };
+            var env = new ContextEnvironment { Columns = [Column.Create("Id", DataType.INT).Value], Tables = [] };
             CreateFakeContextEnvironmentFile(env);
 
             // Act
@@ -178,7 +175,7 @@ namespace RosaDB.Library.Tests
             var tableResult = Table.Create(tableName, columns);
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var env = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            var env = new ContextEnvironment { Columns = [], Tables = [table] };
             CreateFakeContextEnvironmentFile(env);
             
             // Act
@@ -194,18 +191,18 @@ namespace RosaDB.Library.Tests
         public async Task UpdateContextEnvironment_HappyPath_UpdatesEnvFile()
         {
             // Arrange
-            var initialColumns = new Column[] { Column.Create("Id", DataType.INT).Value };
-            var initialEnv = new ContextEnvironment { Columns = initialColumns, Tables = Array.Empty<Table>() };
+            Column[] initialColumns = [Column.Create("Id", DataType.INT).Value];
+            var initialEnv = new ContextEnvironment { Columns = initialColumns, Tables = [] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
-            var updatedColumns = new Column[] { Column.Create("Id", DataType.INT).Value, Column.Create("Name", DataType.VARCHAR).Value };
+            Column[] updatedColumns = [Column.Create("Id", DataType.INT).Value, Column.Create("Name", DataType.VARCHAR).Value];
 
             // Act
             var result = await _contextManager.UpdateContextEnvironment(TestContextName, updatedColumns);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
-            var bytes = _concreteFileSystem.File.ReadAllBytes(_envFilePath);
+            var bytes = await _concreteFileSystem.File.ReadAllBytesAsync(_envFilePath);
             var env = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
             Assert.That(env.Columns.Length, Is.EqualTo(2));
             Assert.That(env.Columns[1].Name, Is.EqualTo("Name"));
@@ -215,7 +212,7 @@ namespace RosaDB.Library.Tests
         public async Task UpdateContextEnvironment_EnvNotFound_ReturnsError()
         {
             // Arrange
-            var updatedColumns = new Column[] { Column.Create("Id", DataType.INT).Value };
+            var updatedColumns = new[] { Column.Create("Id", DataType.INT).Value };
 
             // Act
             var result = await _contextManager.UpdateContextEnvironment("NonExistentContext", updatedColumns);
@@ -230,7 +227,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var columns = new[] { Column.Create("Id", DataType.INT, isPrimaryKey: true).Value, Column.Create("Name", DataType.VARCHAR).Value };
-            var row = Row.Create(new object[] { 1, "Test" }, columns).Value;
+            var row = Row.Create([1, "Test"], columns).Value;
             var instanceHash = "hash1";
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
@@ -252,7 +249,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var row = Row.Create(new object[] { 1 }, columns).Value;
+            var row = Row.Create([1], columns).Value;
             var instanceHash = "hash1";
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
@@ -271,7 +268,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var row = Row.Create(new object[] { 1 }, columns).Value;
+            var row = Row.Create([1], columns).Value;
             var instanceHash = "hash1";
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
             var error = new Error(ErrorPrefixes.FileError, "Insert failed");
@@ -292,7 +289,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var columns = new[] { Column.Create("Id", DataType.INT, isPrimaryKey: true).Value };
-            var row = Row.Create(new object[] { 1 }, columns).Value;
+            var row = Row.Create([1], columns).Value;
             var instanceHash = "hash1";
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
             var error = new Error(ErrorPrefixes.FileError, "Index failed");
@@ -316,11 +313,11 @@ namespace RosaDB.Library.Tests
             var instanceHash = "hash1";
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var row = Row.Create(new object[] { 123 }, columns).Value;
+            var row = Row.Create([123], columns).Value;
             var rowBytesResult = RowSerializer.Serialize(row);
             Assert.That(rowBytesResult.IsSuccess, Is.True);
             var rowBytes = rowBytesResult.Value;
-            var env = new ContextEnvironment { Columns = columns, Tables = Array.Empty<Table>() };
+            var env = new ContextEnvironment { Columns = columns, Tables = [] };
             CreateFakeContextEnvironmentFile(env);
 
             _mockIndexManager.Setup(im => im.GetContextData(TestContextName, hashBytes)).Returns(Result<byte[]>.Success(rowBytes));
@@ -377,7 +374,7 @@ namespace RosaDB.Library.Tests
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
             var corruptedRowBytes = new byte[] { 1, 2 }; // Corrupted data
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var env = new ContextEnvironment { Columns = columns, Tables = Array.Empty<Table>() };
+            var env = new ContextEnvironment { Columns = columns, Tables = [] };
             CreateFakeContextEnvironmentFile(env);
 
             _mockIndexManager.Setup(im => im.GetContextData(TestContextName, hashBytes)).Returns(Result<byte[]>.Success(corruptedRowBytes));
@@ -397,11 +394,11 @@ namespace RosaDB.Library.Tests
             var instanceHash1 = "hash1";
             var instanceHash2 = "hash2";
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var row1 = Row.Create(new object[] { 1 }, columns).Value;
-            var row2 = Row.Create(new object[] { 2 }, columns).Value;
+            var row1 = Row.Create([1], columns).Value;
+            var row2 = Row.Create([2], columns).Value;
             var rowBytes1 = RowSerializer.Serialize(row1).Value;
             var rowBytes2 = RowSerializer.Serialize(row2).Value;
-            var env = new ContextEnvironment { Columns = columns, Tables = Array.Empty<Table>() };
+            var env = new ContextEnvironment { Columns = columns, Tables = [] };
             CreateFakeContextEnvironmentFile(env);
 
             var allContextData = new Dictionary<byte[], byte[]>
@@ -442,7 +439,7 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var instanceHash1 = "hash1";
-            var row1 = Row.Create(new object[] { 1 }, new[] { Column.Create("Id", DataType.INT).Value }).Value;
+            var row1 = Row.Create([1], [Column.Create("Id", DataType.INT).Value]).Value;
             var rowBytes1 = RowSerializer.Serialize(row1).Value;
 
             var allContextData = new Dictionary<byte[], byte[]>
@@ -468,11 +465,11 @@ namespace RosaDB.Library.Tests
             var instanceHash1 = "hash1";
             var instanceHash2 = "hash2";
             var columns = new[] { Column.Create("Id", DataType.INT).Value };
-            var row1 = Row.Create(new object[] { 1 }, columns).Value;
+            var row1 = Row.Create([1], columns).Value;
             var rowBytes1 = RowSerializer.Serialize(row1).Value;
             var corruptedRowBytes = new byte[] { 1, 2 }; // Corrupted data
 
-            var env = new ContextEnvironment { Columns = columns, Tables = Array.Empty<Table>() };
+            var env = new ContextEnvironment { Columns = columns, Tables = [] };
             CreateFakeContextEnvironmentFile(env);
 
             var allContextData = new Dictionary<byte[], byte[]>
@@ -496,7 +493,7 @@ namespace RosaDB.Library.Tests
         public async Task CreateTable_GetEnvironmentFails_ReturnsError()
         {
             // Arrange
-            var newTableResult = Table.Create("NewTable", new[] { Column.Create("Col1", DataType.VARCHAR).Value });
+            var newTableResult = Table.Create("NewTable", [Column.Create("Col1", DataType.VARCHAR).Value]);
             Assert.That(newTableResult.IsSuccess, Is.True);
             
             // Act
@@ -513,9 +510,9 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockSessionState.Setup(ss => ss.CurrentDatabase).Returns((Database)null);
-            var newTableResult = Table.Create("NewTable", new[] { Column.Create("Col1", DataType.VARCHAR).Value });
+            var newTableResult = Table.Create("NewTable", [Column.Create("Col1", DataType.VARCHAR).Value]);
             Assert.That(newTableResult.IsSuccess, Is.True);
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
@@ -531,9 +528,9 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var tableName = "NewTable";
-            var newTableResult = Table.Create(tableName, new[] { Column.Create("Col1", DataType.VARCHAR).Value });
+            var newTableResult = Table.Create(tableName, [Column.Create("Col1", DataType.VARCHAR).Value]);
             Assert.That(newTableResult.IsSuccess, Is.True);
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = Array.Empty<Table>() };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             _mockFileSystem.Setup(fs => fs.Directory.CreateDirectory(It.IsAny<string>())).Throws<IOException>();
@@ -552,10 +549,10 @@ namespace RosaDB.Library.Tests
             // Arrange
             _mockSessionState.Setup(ss => ss.CurrentDatabase).Returns((Database)null);
             var tableName = "TableToDelete";
-            var tableResult = Table.Create(tableName, Array.Empty<Column>());
+            var tableResult = Table.Create(tableName, []);
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [table] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             // Act
@@ -571,7 +568,6 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var tableName = "TableToDelete";
-            // Do NOT create fake context environment file, so GetEnvironment will fail
 
             // Act
             var result = await _contextManager.DeleteTable("NonExistentContext", tableName);
@@ -586,10 +582,10 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             var tableName = "TableToDelete";
-            var tableResult = Table.Create(tableName, Array.Empty<Column>());
+            var tableResult = Table.Create(tableName, []);
             Assert.That(tableResult.IsSuccess, Is.True);
             var table = tableResult.Value;
-            var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
+            var initialEnv = new ContextEnvironment { Columns = [], Tables = [table] };
             CreateFakeContextEnvironmentFile(initialEnv);
 
             string tablePath = _concreteFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, tableName);
@@ -604,71 +600,5 @@ namespace RosaDB.Library.Tests
             Assert.That(result.Error.Prefix, Is.EqualTo(ErrorPrefixes.FileError));
             Assert.That(result.Error.Message, Is.EqualTo("Could not prepare table for deletion (Folder Rename Failed)."));
         }
-
-        // [Test]
-        // public async Task DeleteTable_SaveEnvironmentFails_RollsBack_ReturnsError()
-        // {
-        //     // Arrange
-        //     var tableName = "TableToDelete";
-        //     var tableResult = Table.Create(tableName, Array.Empty<Column>());
-        //     Assert.That(tableResult.IsSuccess, Is.True);
-        //     var table = tableResult.Value;
-        //     var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
-            
-        //     // Explicitly set up GetEnvironment to succeed
-        //     var serializedEnv = ByteObjectConverter.ObjectToByteArray(initialEnv);
-            
-        //     // Ensure the file path for the environment is correct
-        //     var expectedEnvFilePath = _mockFileSystem.Object.Path.Combine(_basePath, TestDbName, TestContextName, "_env");
-
-        //     _mockFileSystem.Setup(fs => fs.File.Exists(expectedEnvFilePath)).Returns(true);
-        //     _mockFileSystem.Setup(fs => fs.File.ReadAllBytes(expectedEnvFilePath)).Returns(serializedEnv);
-
-        //     string tablePath = _concreteFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, tableName);
-        //     string trashPath = _concreteFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, "trash_" + tableName);
-
-        //     // Mock SaveEnvironment to fail by making WriteBytesToFile (used by SaveEnvironment) throw an exception
-        //     _mockFileSystem.Setup(fs => fs.File.WriteAllBytes(It.IsAny<string>(), It.IsAny<byte[]>())).Throws<IOException>();
-
-        //     // Act
-        //     var result = await _contextManager.DeleteTable(TestContextName, tableName);
-
-        //     // Assert
-        //     Assert.That(result.IsFailure, Is.True);
-        //     Assert.That(result.Error.Message, Is.EqualTo("Failed to update context definition. Deletion reverted."));
-        //     // Verify that rename folder was called twice (once for initial rename, once for rollback)
-        //     _mockFolderManager.Verify(fm => fm.RenameFolder(It.IsAny<string>(), It.IsAny<string>()), Times.Exactly(2));
-        // }
-        
-        // [Test]
-        // public async Task DeleteTable_DeleteFolderFails_ReturnsSuccess()
-        // {
-        //     // Arrange
-        //     var tableName = "TableToDelete";
-        //     var tableResult = Table.Create(tableName, Array.Empty<Column>());
-        //     Assert.That(tableResult.IsSuccess, Is.True);
-        //     var table = tableResult.Value;
-        //     var initialEnv = new ContextEnvironment { Columns = Array.Empty<Column>(), Tables = new[] { table } };
-            
-        //     // Explicitly set up GetEnvironment to succeed
-        //     var serializedEnv = ByteObjectConverter.ObjectToByteArray(initialEnv);
-        //     var expectedEnvFilePath = _mockFileSystem.Object.Path.Combine(_basePath, TestDbName, TestContextName, "_env");
-        //     _mockFileSystem.Setup(fs => fs.File.Exists(expectedEnvFilePath)).Returns(true);
-        //     _mockFileSystem.Setup(fs => fs.File.ReadAllBytes(expectedEnvFilePath)).Returns(serializedEnv);
-
-        //     string tablePath = _concreteFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, tableName);
-        //     string trashPath = _concreteFileSystem.Path.Combine(_basePath, TestDbName, TestContextName, "trash_" + tableName);
-            
-        //     // Mock DeleteFolder to throw an exception
-        //     _mockFolderManager.Setup(fm => fm.DeleteFolder(trashPath)).Throws<IOException>();
-
-        //     // Act
-        //     var result = await _contextManager.DeleteTable(TestContextName, tableName);
-
-        //     // Assert
-        //     Assert.That(result.IsSuccess, Is.True);
-        //     _mockFolderManager.Verify(fm => fm.RenameFolder(tablePath, trashPath), Times.Once);
-        //     _mockFolderManager.Verify(fm => fm.DeleteFolder(trashPath), Times.Once); // Still verify it was called
-        // }
     }
 }
