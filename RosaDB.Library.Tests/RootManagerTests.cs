@@ -8,6 +8,7 @@ using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using System.IO.Abstractions.TestingHelpers;
+using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Tests
 {
@@ -85,7 +86,7 @@ namespace RosaDB.Library.Tests
             var dbName = "TestDB";
             CreateFakeEnvironmentFile(new RootEnvironment());
             _mockDatabaseManager.Setup(dm => dm.CreateDatabaseEnvironment(It.IsAny<Database>()))
-                .ReturnsAsync(Core.Result.Success());
+                .ReturnsAsync(Result.Success());
 
             // Act
             var result = await _rootManager.CreateDatabase(dbName);
