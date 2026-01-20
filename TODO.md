@@ -64,7 +64,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. ~~**Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`~~
 4. ~~**Better seeder:** Add better seeding data. with lots of context instances and maybe tables. Real-ish data.~~
 
-## Phase 5.5: Change `CELL` to `CONTEXT`
+## ~~Phase 5.5: Change `CELL` to `CONTEXT`~~
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
