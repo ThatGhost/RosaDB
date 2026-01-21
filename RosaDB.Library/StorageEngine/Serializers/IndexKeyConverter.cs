@@ -25,5 +25,38 @@ namespace RosaDB.Library.StorageEngine.Serializers
                 _ => Encoding.UTF8.GetBytes(value.ToString() ?? string.Empty) // Fallback for other types
             };
         }
+
+        public static object? FromByteArray(byte[] bytes, Models.DataType type)
+        {
+            if (bytes.Length == 0)
+            {
+                return null;
+            }
+            
+            switch (type)
+            {
+                case Models.DataType.INT:
+                    return BitConverter.ToInt32(bytes, 0);
+                case Models.DataType.BIGINT:
+                case Models.DataType.LONG:
+                    return BitConverter.ToInt64(bytes, 0);
+                case Models.DataType.VARCHAR:
+                case Models.DataType.TEXT:
+                case Models.DataType.CHAR:
+                case Models.DataType.CHARACTER:
+                    return Encoding.UTF8.GetString(bytes);
+                case Models.DataType.BOOLEAN:
+                    return BitConverter.ToBoolean(bytes, 0);
+                case Models.DataType.FLOAT:
+                    return BitConverter.ToSingle(bytes, 0);
+                case Models.DataType.SMALLINT:
+                    return (short)BitConverter.ToInt32(bytes, 0); // Matching ToByteArray logic
+                case Models.DataType.DECIMAL:
+                case Models.DataType.NUMBER:
+                    return decimal.Parse(Encoding.UTF8.GetString(bytes), CultureInfo.InvariantCulture);
+                default:
+                    throw new NotSupportedException($"Unsupported data type for byte conversion: {type}");
+            }
+        }
     }
 }

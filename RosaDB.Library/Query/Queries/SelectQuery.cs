@@ -1,6 +1,7 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
+using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.Validation;
@@ -11,11 +12,8 @@ namespace RosaDB.Library.Query.Queries
     {
         public async ValueTask<QueryResult> Execute()
         {
-            var (selectIndex, fromIndex, whereIndex, usingIndex) = ParseQueryTokens();
-            
-            var tableNameParts = tokens[fromIndex + 1].Split('.');
-            var contextName = tableNameParts[0];
-            var tableName = tableNameParts[1];
+            var (selectIndex, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
+            var (contextName, tableName) = TokensToContextAndTableParser.TokensToContextAndName(tokens[fromIndex + 1]);
 
             var columnsResult = await cellManager.GetColumnsFromTable(contextName, tableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
@@ -35,7 +33,7 @@ namespace RosaDB.Library.Query.Queries
                 var cellEnv = await cellManager.GetEnvironment(contextName);
                 if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
-                var result = await ApplyUsing(tableName, contextName, whereIndex, usingIndex, cellEnv.Value);
+                var result = await UsingClauseProcessor.Process(tokens, cellManager, logManager, cellEnv.Value);
                 if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
                 logs = result.Value;
             }
@@ -54,10 +52,7 @@ namespace RosaDB.Library.Query.Queries
             IAsyncEnumerable<Row> finalStream = hasProjection ? ApplyProjection(filteredStream, projectionTokens, columns) : filteredStream;
 
             // 3. Yield from the final stream
-            await foreach (var row in finalStream)
-            {
-                yield return row;
-            }
+            await foreach (var row in finalStream) yield return row;
         }
 
         private async IAsyncEnumerable<Row> GetFilteredStream(IAsyncEnumerable<Log> logs, Func<Row, bool> whereFunction, Column[] columns)
@@ -65,95 +60,10 @@ namespace RosaDB.Library.Query.Queries
             await foreach (var log in logs)
             {
                 var rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-                if (rowResult.IsSuccess && whereFunction(rowResult.Value))
-                {
-                    yield return rowResult.Value;
-                }
+                if (rowResult.IsSuccess && whereFunction(rowResult.Value)) yield return rowResult.Value;
             }
         }
 
-        private (int selectIndex, int fromIndex, int whereIndex, int usingIndex) ParseQueryTokens()
-        {
-            int selectIdx = -1;
-            int fromIdx = -1;
-            int whereIdx = -1;
-            int usingIdx = -1;
-
-            for (int i = 0; i < tokens.Length; i++)
-            {
-                if (tokens[i].Equals("SELECT", StringComparison.OrdinalIgnoreCase)) selectIdx = i;
-                else if (tokens[i].Equals("FROM", StringComparison.OrdinalIgnoreCase)) fromIdx = i;
-                else if (tokens[i].Equals("WHERE", StringComparison.OrdinalIgnoreCase)) whereIdx = i;
-                else if (tokens[i].Equals("USING", StringComparison.OrdinalIgnoreCase)) usingIdx = i;
-            }
-            return (selectIdx, fromIdx, whereIdx, usingIdx);
-        }
-
-        private async Task<Result<IAsyncEnumerable<Log>>> ApplyUsing(string tableName, string contextName, int whereIndex, int usingIndex, ContextEnvironment cellEnv)
-        {
-            var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
-            var usingTokens = tokens[(usingIndex + 1)..endIndex];
-
-            var usingValues = new Dictionary<string, (string value, string operation)>();
-            for (int i = 0; i < usingTokens.Length; i += 4) usingValues[usingTokens[i]] = new(usingTokens[i + 2], usingTokens[i + 1]);
-            
-            // check if all and only index columns are present for context then use the context instance
-            var indexStringValues = usingValues.Keys.Where(u => cellEnv.IndexColumns.Select(i => i.Name).Contains(u)).ToArray();
-            if (usingValues.Count == cellEnv.IndexColumns.Length && indexStringValues.Length == cellEnv.IndexColumns.Length)
-            {   
-                var indexValues = new List<object>();
-                foreach (var cellEnvIndexColumn in cellEnv.IndexColumns)
-                {
-                    var parseResult = TokensToDataParser.Parse(usingValues[cellEnvIndexColumn.Name].value, cellEnvIndexColumn.DataType);
-                    if (parseResult.IsFailure) return parseResult.Error;
-                    indexValues.Add(parseResult.Value);
-                }
-                
-                return Result<IAsyncEnumerable<Log>>.Success(logManager.GetAllLogsForContextInstanceTable(contextName, tableName, indexValues.ToArray()));
-            }
-            
-            // if it's not the indexes then get all the context instances and concat all the conforming cells
-            var cellsResult = await cellManager.GetAllContextInstances(contextName);
-            if (cellsResult.IsFailure) return cellsResult.Error;
-
-            List<Row> cellsThatApply = []; 
-            foreach (Row context in cellsResult.Value)
-            {
-                bool doesUsingApply = true;
-                foreach (var usingValue in usingValues)
-                {
-                    var columnIndex = Array.FindIndex(context.Columns, c => c.Name.Equals(usingValue.Key, StringComparison.OrdinalIgnoreCase));
-                    if (columnIndex == -1) { doesUsingApply = false; break; }
-
-                    var rowValue = context.Values[columnIndex];
-                    if(rowValue == null) { doesUsingApply = false; break; }
-                    
-                    var parsedValueResult = TokensToDataParser.Parse(usingValue.Value.value, context.Columns[columnIndex].DataType);
-                    if(parsedValueResult.IsFailure) { doesUsingApply = false; break; }
-
-                    if (usingValue.Value.operation == "=") {
-                        if (!rowValue.Equals(parsedValueResult.Value)) { doesUsingApply = false; break; }
-                    } else {
-                        doesUsingApply = false; break;
-                    }
-                }
-                if(doesUsingApply) cellsThatApply.Add(context);
-            }
-
-            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(cellsThatApply, tableName, contextName, cellEnv));
-        }
-
-        private async IAsyncEnumerable<Log> TurnContextRowsToLogs(List<Row> cells, string tableName, string contextName, ContextEnvironment cellEnv)
-        {
-            foreach (var context in cells)
-            {
-                await foreach (var log in logManager.GetAllLogsForContextInstanceTable(contextName, tableName, cellEnv.GetIndexValues(context)))
-                {
-                    yield return log;
-                }
-            }
-        }
-        
         private Func<Row, bool> ConvertWHEREToFunction(int whereIndex, int usingIndex, Column[] allColumns)
         {
             if (whereIndex == -1) return _ => true;
@@ -193,12 +103,15 @@ namespace RosaDB.Library.Query.Queries
                     var rowValue = row.Values[columnIndex];
                     if (rowValue == null) return false;
 
-                    if (op == "=") return DataComparer.CompareEquals(rowValue,parsedValue);
-                    else if (op == ">") return DataComparer.CompareGreaterThan(rowValue, parsedValue);
-                    else if (op == "<") return DataComparer.CompareLessThan(rowValue, parsedValue);
-                    else if (op == ">=") return DataComparer.CompareGreaterThanOrEqual(rowValue, parsedValue);
-                    else if (op == "<=") return DataComparer.CompareLessThanOrEqual(rowValue, parsedValue);
-                    else return false;
+                    return op switch
+                    {
+                        "=" => DataComparer.CompareEquals(rowValue, parsedValue),
+                        ">" => DataComparer.CompareGreaterThan(rowValue, parsedValue),
+                        "<" => DataComparer.CompareLessThan(rowValue, parsedValue),
+                        ">=" => DataComparer.CompareGreaterThanOrEqual(rowValue, parsedValue),
+                        "<=" => DataComparer.CompareLessThanOrEqual(rowValue, parsedValue),
+                        _ => false
+                    };
                 }
                 return true;
             };
