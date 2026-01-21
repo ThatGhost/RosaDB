@@ -6,6 +6,8 @@ public class Row
 {
     private Dictionary<string, int> _columnIndexMap { get; } = [];
     
+    public Dictionary<string, int> ColumnIndexMap => _columnIndexMap;
+    
     public static Result<Row> Create(object?[] values, Column[] columns)
     {
         if (values.Length != columns.Length) return new Error(ErrorPrefixes.DataError, "Value count must match column count.");

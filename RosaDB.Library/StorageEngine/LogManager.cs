@@ -77,7 +77,7 @@ public class LogManager(
         PutLog(log, identifier);
     }
 
-    public void Delete(string contextName, string tableName, object[] indexValues, long logId)
+    public void Delete(string contextName, string tableName, object?[] indexValues, long logId)
     {
         var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
         Log log = new() { Id = logId, IsDeleted = true };
@@ -212,31 +212,6 @@ public class LogManager(
         if (!segmentFilePathResult.TryGetValue(out var segmentFilePath)) return segmentFilePathResult.Error;
 
         if (!fileSystem.File.Exists(segmentFilePath))
-            return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
-
-        await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        stream.Seek(logLocation.Offset, SeekOrigin.Begin);
-        
-        var log = await LogSerializer.DeserializeAsync(stream);
-        if (log is null) return new Error(ErrorPrefixes.FileError, "Failed to deserialize log from disk.");
-        
-        return log;
-    }
-
-    public async Task<Result<Log>> GetLogAtLocation(LogLocation logLocation)
-    {
-        if (sessionState.CurrentDatabase is null)
-        {
-            return new Error(ErrorPrefixes.StateError, "Database not set");
-        }
-
-        var dbPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name);
-        var allSegmentFiles = fileSystem.Directory.GetFiles(dbPath, "*.dat", SearchOption.AllDirectories);
-
-        string segmentFileName = $"_{logLocation.SegmentNumber}.dat";
-        var segmentFilePath = allSegmentFiles.FirstOrDefault(f => f.EndsWith(segmentFileName));
-
-        if (segmentFilePath == null || !fileSystem.File.Exists(segmentFilePath))
             return new Error(ErrorPrefixes.FileError, $"Segment file not found for log location: {logLocation.SegmentNumber}.");
 
         await using var stream = fileSystem.FileStream.New(segmentFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);

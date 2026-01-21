@@ -3,7 +3,6 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
-using RosaDB.Library.Validation;
 using RosaDB.Library.Server;
 
 namespace RosaDB.Library.Query.Queries;

@@ -1,28 +1,10 @@
-using System.Collections.Generic;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 
-namespace RosaDB.Library.Validation
+namespace RosaDB.Library.Query.TokenParsers
 {
     public class TokensToDataParser
     {
-        public Result<List<object>> ParseData(string[] data, DataType[] dataType)
-        {
-            var parsedData = new List<object>();
-            if (data.Length != dataType.Length) 
-                return new Error(ErrorPrefixes.QueryParsingError, "The number of data items does not match the number of data types.");
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                var value = data[i];
-                var type = dataType[i];
-                var result = Parse(value, type);
-                if (result.IsFailure) return result.Error;
-                parsedData.Add(result.Value);
-            }
-            return parsedData;
-        }
-
         public static Result<object> Parse(string value, DataType type)
         {
             switch (type)

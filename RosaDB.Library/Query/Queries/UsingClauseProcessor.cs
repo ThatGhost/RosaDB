@@ -3,7 +3,6 @@ using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine.Interfaces;
-using RosaDB.Library.Validation;
 
 namespace RosaDB.Library.Query.Queries
 {

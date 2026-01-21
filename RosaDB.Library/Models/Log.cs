@@ -8,5 +8,5 @@ public class Log
     public byte[] TupleData { get; set; } = [];
     
     // Transient property to avoid deserialization during commit
-    public List<(string Name, byte[] Value, bool IsPrimaryKey)>? IndexValues { get; set; }
+    public List<(string Name, byte[] Value, bool IsPrimaryKey)>? IndexValues { get; init; }
 }
