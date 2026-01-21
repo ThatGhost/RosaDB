@@ -1,11 +1,9 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
-using RosaDB.Library.StorageEngine;
+using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.Validation;
-using System.Security.Cryptography;
-using System.Text;
 using RosaDB.Library.Server;
 
 namespace RosaDB.Library.Query.Queries;
@@ -158,14 +156,14 @@ public class InsertQuery(
 
         var cellGroupName = tokens[2];
 
-        var propsResult = ParseParenthesizedList(3, out int propsEnd);
+        var propsResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, 3, out int propsEnd);
         if (!propsResult.TryGetValue(out var props))
             return propsResult.Error;
 
-        var valuesIndex = FindKeywordIndex("VALUES", propsEnd);
+        var valuesIndex = TokenToKeywordIndex.Find(tokens, "VALUES", propsEnd);
         if (valuesIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
 
-        var valuesResult = ParseParenthesizedList(valuesIndex + 1, out _);
+        var valuesResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, valuesIndex + 1, out _);
         if (!valuesResult.TryGetValue(out var values)) return valuesResult.Error;
 
         if (props.Length != values.Length) return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
@@ -213,7 +211,7 @@ public class InsertQuery(
 
     private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)
     {
-        var usingIndex = FindKeywordIndex("USING", startIndex);
+        var usingIndex = TokenToKeywordIndex.Find(tokens, "USING", startIndex);
         if (usingIndex == -1)
             return new Error(ErrorPrefixes.QueryParsingError, "Missing USING clause in INSERT INTO.");
         
@@ -226,7 +224,7 @@ public class InsertQuery(
     
     private Result<(string[] Columns, int NextIndex)> ParseColumnsPart(int startIndex)
     {
-        var columnsResult = ParseParenthesizedList(startIndex, out int columnsEnd);
+        var columnsResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, startIndex, out int columnsEnd);
         if(!columnsResult.TryGetValue(out var columns))
             return columnsResult.Error;
 
@@ -235,10 +233,10 @@ public class InsertQuery(
 
     private Result<(string[] Values, int NextIndex)> ParseValuesPart(int startIndex)
     {
-        var valuesIndex = FindKeywordIndex("VALUES", startIndex);
+        var valuesIndex = TokenToKeywordIndex.Find(tokens, "VALUES", startIndex);
         if (valuesIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing VALUES keyword.");
 
-        var valuesResult = ParseParenthesizedList(valuesIndex + 1, out int valuesEnd);
+        var valuesResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, valuesIndex + 1, out int valuesEnd);
         if(!valuesResult.TryGetValue(out var values))
             return valuesResult.Error;
 
@@ -271,29 +269,6 @@ public class InsertQuery(
         }
         
         return usingProperties;
-    }
-
-    private Result<string[]> ParseParenthesizedList(int startIndex, out int endIndex)
-    {
-        endIndex = -1;
-        if (startIndex >= tokens.Length) return new Error(ErrorPrefixes.QueryParsingError, "Unexpected end of query.");
-
-        var openParenIndex = Array.IndexOf(tokens, "(", startIndex);
-        if (openParenIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing opening parenthesis.");
-
-        var closeParenIndex = Array.IndexOf(tokens, ")", openParenIndex);
-        if (closeParenIndex == -1) return new Error(ErrorPrefixes.QueryParsingError, "Missing closing parenthesis.");
-
-        endIndex = closeParenIndex;
-        var listTokens = tokens[(openParenIndex + 1)..closeParenIndex].Where(t => t != ",").ToArray();
-        return listTokens;
-    }
-
-    private int FindKeywordIndex(string keyword, int startIndex = 0)
-    {
-        for (int i = startIndex; i < tokens.Length; i++)
-            if (tokens[i].Equals(keyword, StringComparison.OrdinalIgnoreCase)) return i;
-        return -1;
     }
 
     private async Task<Result<Object[]>> AssertUsingClause((string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
