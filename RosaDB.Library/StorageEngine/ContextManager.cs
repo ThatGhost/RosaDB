@@ -180,24 +180,6 @@ namespace RosaDB.Library.StorageEngine
             _cachedEnvironment[contextName] = env;
             return env;
         }
-
-        private Result<string> GetContextFilePath(string contextName, string fileName)
-        {
-            if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
-            return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, fileName);
-        }
-        
-        private async Task<Result> SaveEnvironment(ContextEnvironment env, string contextName)
-        {
-            var filePath = GetContextFilePath(contextName, "_env");
-            if(filePath.IsFailure) return filePath.Error;
-
-            var bytes = ByteObjectConverter.ObjectToByteArray(env);
-
-            await ByteReaderWriter.WriteBytesToFile(fileSystem, filePath.Value, bytes, CancellationToken.None);
-            _cachedEnvironment[contextName] = env;
-            return Result.Success();
-        }
         
         public async Task<Result<Column[]>> GetColumnsFromTable(string contextName, string tableName)
         {
@@ -241,6 +223,24 @@ namespace RosaDB.Library.StorageEngine
                     env.Columns = newColumns;
                     return await SaveEnvironment(env, contextName);
                 });
+        }
+        
+        private Result<string> GetContextFilePath(string contextName, string fileName)
+        {
+            if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+            return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, fileName);
+        }
+        
+        private async Task<Result> SaveEnvironment(ContextEnvironment env, string contextName)
+        {
+            var filePath = GetContextFilePath(contextName, "_env");
+            if(filePath.IsFailure) return filePath.Error;
+
+            var bytes = ByteObjectConverter.ObjectToByteArray(env);
+
+            await ByteReaderWriter.WriteBytesToFile(fileSystem, filePath.Value, bytes, CancellationToken.None);
+            _cachedEnvironment[contextName] = env;
+            return Result.Success();
         }
 
         private async Task<Result> MigrateDroppedColumnData(string contextName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allContextData)
