@@ -57,7 +57,7 @@ public class QueryPlanner(
             "USE" => new UseQuery(tokens, sessionState, rootManager),
             "SELECT" => new SelectQuery(tokens, logManager, contextManager),
             "INSERT" => new InsertQuery(tokens, contextManager, logManager, indexManager, sessionState),
-            "DELETE" => new DeleteQuery(tokens, contextManager, logManager),
+            "DELETE" => new DeleteQuery(tokens, contextManager, logManager, sessionState),
             "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer),
             "ALTER" => new AlterQuery(tokens, contextManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 

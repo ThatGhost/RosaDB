@@ -1,6 +1,7 @@
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Query.TokenParsers;
+using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
@@ -9,7 +10,8 @@ namespace RosaDB.Library.Query.Queries;
 public class DeleteQuery(
     string[] tokens,
     IContextManager cellManager,
-    ILogManager logManager) : IQuery
+    ILogManager logManager,
+    SessionState sessionState) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -80,6 +82,8 @@ public class DeleteQuery(
                 }
             }
         }
+
+        if (!sessionState.IsInTransaction) await logManager.Commit();
         
         return new QueryResult("Delete was successful", count);
     }
