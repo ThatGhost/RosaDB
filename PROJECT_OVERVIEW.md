@@ -38,8 +38,8 @@ This project encapsulates all the fundamental logic for the database.
 The database's logical structure follows a hierarchical model:
 
 -   **`Database`**: The top-level container for a specific database instance.
--   **`ContextGroup`**: A logical category of contexts, defined by a `CREATE CELL` statement, which specifies the schema for context instance properties.
--   **`ContextInstance`**: A specific partition within a `ContextGroup`, created with `INSERT CELL`.
+-   **`ContextGroup`**: A logical category of contexts, defined by a `CREATE CONTEXT` statement, which specifies the schema for context instance properties.
+-   **`ContextInstance`**: A specific partition within a `ContextGroup`, created with `INSERT CONTEXT`.
 -   **`Table`**: Standard relational concept. Table schemas are defined at the `ContextGroup` level.
 -   **`Column`**: Defines the name and `DataType` for data within a `Table`.
 -   **`Row`**: Represents a single record within a `Table`.
@@ -104,23 +104,23 @@ FROM <ContextGroup>.<TableName>
 
 The custom syntax extends to DDL for managing the lifecycle of database objects.
 
--   **`CREATE CELL <ContextGroup> (<props>);`**: Defines a new context group and the schema for its instances.
-    *   *Example:* `CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT);`
--   **`INSERT CELL <ContextGroup> (<props>) VALUES (<vals>);`**: Creates a new instance of a context.
-    *   *Example:* `INSERT CELL sales (name, region) VALUES ('q4', 'EMEA');`
--   **`UPDATE CELL <ContextGroup> USING <filter> SET ...;`**: Updates properties of a context instance.
--   **`DELETE CELL <ContextGroup> USING <filter>;`**: Deletes a context instance and all its data.
+-   **`CREATE CONTEXT <ContextGroup> (<props>);`**: Defines a new context group and the schema for its instances.
+    *   *Example:* `CREATE CONTEXT sales (name TEXT PRIMARY KEY, region TEXT);`
+-   **`INSERT CONTEXT <ContextGroup> (<props>) VALUES (<vals>);`**: Creates a new instance of a context.
+    *   *Example:* `INSERT CONTEXT sales (name, region) VALUES ('q4', 'EMEA');`
+-   **`UPDATE CONTEXT <ContextGroup> USING <filter> SET ...;`**: Updates properties of a context instance.
+-   **`DELETE CONTEXT <ContextGroup> USING <filter>;`**: Deletes a context instance and all its data.
 -   **`CREATE TABLE <ContextGroup>.<TableName> (<cols>);`**: Defines a table schema for an entire context group.
     *   *Example:* `CREATE TABLE sales.transactions (id INT PRIMARY KEY, amount INT);`
--   **`ALTER CELL ...`**: Modifies the schema of a `ContextGroup`.
-    -   **`ALTER CELL <ContextGroup> ADD COLUMN <colName> <colType>;`**: Adds a new, nullable column to the `ContextGroup` schema. This is a fast, metadata-only operation. Old rows will have a `null` value for this column when read.
-    -   **`ALTER CELL <ContextGroup> DROP COLUMN <colName>;`**: Removes a column from the `ContextGroup` schema. **This is a slow, blocking operation** as it requires a full data migration. Every row in every instance of the `ContextGroup` is rewritten to conform to the new schema.
+-   **`ALTER CONTEXT ...`**: Modifies the schema of a `ContextGroup`.
+    -   **`ALTER CONTEXT <ContextGroup> ADD COLUMN <colName> <colType>;`**: Adds a new, nullable column to the `ContextGroup` schema. This is a fast, metadata-only operation. Old rows will have a `null` value for this column when read.
+    -   **`ALTER CONTEXT <ContextGroup> DROP COLUMN <colName>;`**: Removes a column from the `ContextGroup` schema. **This is a slow, blocking operation** as it requires a full data migration. Every row in every instance of the `ContextGroup` is rewritten to conform to the new schema.
 -   **`ALTER TABLE...`**: Syntax for altering table schemas is planned but not yet implemented.
 
 #### 3.4.3. Metadata & Discoverability
 
 The following commands are available for discovering the database schema:
--   **`SHOW CELL GROUPS;`**: Lists all defined context groups.
+-   **`SHOW CONTEXT GROUPS;`**: Lists all defined context groups.
 -   **`SHOW TABLES IN <ContextGroup>;`**: Lists all table schemas defined for a specific context group.
 -   Queryable metadata tables (e.g., `system.contexts`) are planned for more advanced introspection.
 

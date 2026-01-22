@@ -76,21 +76,21 @@ namespace RosaDB.Client.TUI
                 await SendQuery("INITIALIZE;");
                 await SendQuery("CREATE DATABASE seededDatabase;");
                 await SendQuery("USE seededDatabase;");
-                await SendQuery("CREATE CELL users (id INT INDEX, name TEXT, age INT);");
+                await SendQuery("CREATE CONTEXT users (id INT INDEX, name TEXT, age INT);");
                 await SendQuery("CREATE TABLE users.addresses (id INT PRIMARY KEY, street TEXT, city TEXT, zip_code TEXT);");
                 await SendQuery("CREATE TABLE users.transactions (id INT PRIMARY KEY, amount TEXT, date TEXT);");
-                await SendQuery("CREATE CELL warehouses (id INT INDEX, name TEXT, location TEXT);");
+                await SendQuery("CREATE CONTEXT warehouses (id INT INDEX, name TEXT, location TEXT);");
                 await SendQuery("CREATE TABLE warehouses.inventory (id INT PRIMARY KEY, product_name TEXT, quantity INT, aisle INT);");
                 await SendQuery("CREATE TABLE warehouses.shipments (id INT PRIMARY KEY, user_id INT, transaction_id INT, status TEXT);");
                 
-                await SendQuery("CREATE CELL products (id INT INDEX);");
+                await SendQuery("CREATE CONTEXT products (id INT INDEX);");
                 await SendQuery("CREATE TABLE products.details (id INT PRIMARY KEY, description TEXT);");
                 await SendQuery("CREATE TABLE products.reviews (id INT PRIMARY KEY, user_id INT, rating INT, comment TEXT);");
                 await SendQuery("CREATE TABLE products.daily_stats (day TEXT PRIMARY KEY, page_views INT, units_sold INT);");
                 await SendQuery("CREATE TABLE products.daily_referrals (id INT PRIMARY KEY, day TEXT, source_url TEXT, view_count INT);");
                 await SendQuery("CREATE TABLE products.daily_sales_by_region (id INT PRIMARY KEY, day TEXT, region_name TEXT, units_sold INT);");
 
-                await SendQuery("CREATE CELL catalog (id INT INDEX, name TEXT);");
+                await SendQuery("CREATE CONTEXT catalog (id INT INDEX, name TEXT);");
                 await SendQuery("CREATE TABLE catalog.products (id INT PRIMARY KEY, name TEXT, category TEXT, price TEXT);");
 
                 await SeedUserContextInstances();
@@ -192,7 +192,7 @@ namespace RosaDB.Client.TUI
             await SendQuery("BEGIN TRANSACTION;");
             try
             {
-                await SendQuery("INSERT CELL catalog (id, name) VALUES (1, 'main_catalog');");
+                await SendQuery("INSERT CONTEXT catalog (id, name) VALUES (1, 'main_catalog');");
                 await SendQuery("INSERT INTO catalog.products USING id = 1 (id, name, category, price) VALUES (1, 'Laptop Pro X', 'Electronics', '1200.00');");
                 await SendQuery("INSERT INTO catalog.products USING id = 1 (id, name, category, price) VALUES (2, 'Mechanical Keyboard', 'Electronics', '80.00');");
                 await SendQuery("INSERT INTO catalog.products USING id = 1 (id, name, category, price) VALUES (3, 'Wireless Mouse', 'Electronics', '35.00');");
@@ -257,10 +257,10 @@ namespace RosaDB.Client.TUI
         private async Task SeedProductContextInstances()
         {
             Log("Creating product instances...");
-            await SendQuery("INSERT CELL products (id) VALUES (1);");
-            await SendQuery("INSERT CELL products (id) VALUES (2);");
-            await SendQuery("INSERT CELL products (id) VALUES (3);");
-            await SendQuery("INSERT CELL products (id) VALUES (4);");
+            await SendQuery("INSERT CONTEXT products (id) VALUES (1);");
+            await SendQuery("INSERT CONTEXT products (id) VALUES (2);");
+            await SendQuery("INSERT CONTEXT products (id) VALUES (3);");
+            await SendQuery("INSERT CONTEXT products (id) VALUES (4);");
         }
 
         private async Task SeedWarehouseTables()
@@ -290,9 +290,9 @@ namespace RosaDB.Client.TUI
         private async Task SeedWarehouseContextInstances()
         {
             Log("Creating warehouse instances...");
-            await SendQuery("INSERT CELL warehouses (id, name, location) VALUES (1, 'Main Warehouse', 'New York');");
-            await SendQuery("INSERT CELL warehouses (id, name, location) VALUES (2, 'West Coast Hub', 'Los Angeles');");
-            await SendQuery("INSERT CELL warehouses (id, name, location) VALUES (3, 'East Coast Depot', 'Boston');");
+            await SendQuery("INSERT CONTEXT warehouses (id, name, location) VALUES (1, 'Main Warehouse', 'New York');");
+            await SendQuery("INSERT CONTEXT warehouses (id, name, location) VALUES (2, 'West Coast Hub', 'Los Angeles');");
+            await SendQuery("INSERT CONTEXT warehouses (id, name, location) VALUES (3, 'East Coast Depot', 'Boston');");
         }
 
         private async Task SeedUserTables()
@@ -333,11 +333,11 @@ namespace RosaDB.Client.TUI
         private async Task SeedUserContextInstances()
         {
             Log("Creating user instances...");
-            await SendQuery("INSERT CELL users (id, name, age) VALUES (1, 'Alice Smith', 30);");
-            await SendQuery("INSERT CELL users (id, name, age) VALUES (2, 'Bob Johnson', 25);");
-            await SendQuery("INSERT CELL users (id, name, age) VALUES (3, 'Charlie Brown', 35);");
-            await SendQuery("INSERT CELL users (id, name, age) VALUES (4, 'David Williams', 40);");
-            await SendQuery("INSERT CELL users (id, name, age) VALUES (5, 'Eve Jones', 28);");
+            await SendQuery("INSERT CONTEXT users (id, name, age) VALUES (1, 'Alice Smith', 30);");
+            await SendQuery("INSERT CONTEXT users (id, name, age) VALUES (2, 'Bob Johnson', 25);");
+            await SendQuery("INSERT CONTEXT users (id, name, age) VALUES (3, 'Charlie Brown', 35);");
+            await SendQuery("INSERT CONTEXT users (id, name, age) VALUES (4, 'David Williams', 40);");
+            await SendQuery("INSERT CONTEXT users (id, name, age) VALUES (5, 'Eve Jones', 28);");
         }
 
         private void Log(string message, string? time = null)

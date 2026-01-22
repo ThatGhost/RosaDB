@@ -20,7 +20,7 @@ public class CreateQuery(
         return tokens[1].ToUpperInvariant() switch
         {
             "DATABASE" => await CREATE_DATABASE(tokens[2]),
-            "CELL" => await CREATE_CELL(tokens[2], tokens[3..]),
+            "CONTEXT" => await CREATE_CONTEXT(tokens[2], tokens[3..]),
             "TABLE" => await CREATE_TABLE(tokens[2], tokens[3..]),
             _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown CREATE target: {tokens[1]}")
         };
@@ -35,7 +35,7 @@ public class CreateQuery(
         );
     }
 
-    private async Task<QueryResult> CREATE_CELL(string contextName, string[] columnTokens)
+    private async Task<QueryResult> CREATE_CONTEXT(string contextName, string[] columnTokens)
     {
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
         

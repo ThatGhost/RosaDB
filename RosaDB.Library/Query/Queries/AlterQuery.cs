@@ -13,18 +13,18 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
 
         switch (tokens[1].ToUpperInvariant())
         {
-            case "CELL":
+            case "CONTEXT":
                 return await ExecuteAlterContext();
             case "TABLE":
                 return new Error(ErrorPrefixes.QueryParsingError, "ALTER TABLE is not implemented.");
             default:
-                return new Error(ErrorPrefixes.QueryParsingError, "Unsupported ALTER statement. Expected CELL or TABLE.");
+                return new Error(ErrorPrefixes.QueryParsingError, "Unsupported ALTER statement. Expected CONTEXT or TABLE.");
         }
     }
 
     private async Task<QueryResult> ExecuteAlterContext()
     {
-        if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER CELL syntax.");
+        if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER CONTEXT syntax.");
         
         switch (tokens[3].ToUpperInvariant())
         {
@@ -41,9 +41,9 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
     
     private async Task<QueryResult> ExecuteAddColumn()
     {
-        // Expecting: ALTER CELL <contextName> ADD COLUMN <colName> <colType>
+        // Expecting: ALTER CONTEXT <contextName> ADD COLUMN <colName> <colType>
         if (tokens.Length != 7 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <contextName> ADD COLUMN <colName> <colType>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CONTEXT <contextName> ADD COLUMN <colName> <colType>");
 
         var contextName = tokens[2];
         var columnName = tokens[5];
@@ -69,9 +69,9 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
 
     private async Task<QueryResult> ExecuteDropColumn()
     {
-        // Expecting: ALTER CELL <contextName> DROP COLUMN <colName>
+        // Expecting: ALTER CONTEXT <contextName> DROP COLUMN <colName>
         if (tokens.Length != 6 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CELL <contextName> DROP COLUMN <colName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CONTEXT <contextName> DROP COLUMN <colName>");
 
         var contextName = tokens[2];
         var columnName = tokens[5];

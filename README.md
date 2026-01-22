@@ -4,14 +4,14 @@
 
 **RosaDB is a reactive, partitioned datastore written in C# for modern, real-time applications.**
 
-It combines a unique, cell-based architecture with a powerful real-time subscription model, making it an ideal backend for multi-tenant SaaS applications, IoT platforms, collaborative tools, and online games.
+It combines a unique, context-based architecture with a powerful real-time subscription model, making it an ideal backend for multi-tenant SaaS applications, IoT platforms, collaborative tools, and online games.
 
 ## Key Features
 
--   **Cell-based Architecture**: Data is partitioned into logical groups called "Cells," allowing for fine-grained organization, data isolation, and powerful querying capabilities.
--   **Real-time Subscriptions**: Clients can subscribe to data changes (`INSERT`, `UPDATE`, `DELETE`) within a specific cell instance via WebSockets, enabling reactive application development without a separate message bus.
+-   **Context-based Architecture**: Data is partitioned into logical groups called "Contexts," allowing for fine-grained organization, data isolation, and powerful querying capabilities.
+-   **Real-time Subscriptions**: Clients can subscribe to data changes (`INSERT`, `UPDATE`, `DELETE`) within a specific context instance via WebSockets, enabling reactive application development without a separate message bus.
 -   **Log-Structured Storage**: An append-only storage engine provides efficient writes and clear data lineage.
--   **Custom, Expressive SQL Dialect**: A query language designed from the ground up to make working with cells and subscriptions intuitive and powerful.
+-   **Custom, Expressive SQL Dialect**: A query language designed from the ground up to make working with contexts and subscriptions intuitive and powerful.
 
 ## Getting Started
 
@@ -45,16 +45,16 @@ dotnet run --project RosaDB.Client/RosaDB.Client.csproj
 
 ## Query Language at a Glance
 
-RosaDB uses a custom SQL dialect designed around its cell-based architecture.
+RosaDB uses a custom SQL dialect designed around its context-based architecture.
 
-**1. Define a Cell Group (Schema for Cells)**
+**1. Define a Context Group (Schema for Contexts)**
 ```sql
-CREATE CELL sales (name TEXT PRIMARY KEY, region TEXT);
+CREATE CONTEXT sales (name TEXT PRIMARY KEY, region TEXT);
 ```
 
-**2. Create a specific Cell Instance**
+**2. Create a specific Context Instance**
 ```sql
-INSERT CELL sales (name, region) VALUES ('q4-2025', 'EMEA');
+INSERT CONTEXT sales (name, region) VALUES ('q4-2025', 'EMEA');
 ```
 
 **3. Define a Table Schema for the Group**
@@ -62,17 +62,17 @@ INSERT CELL sales (name, region) VALUES ('q4-2025', 'EMEA');
 CREATE TABLE sales.transactions (id INT PRIMARY KEY, product TEXT, amount INT);
 ```
 
-**4. Insert Data into a specific Cell Instance**
+**4. Insert Data into a specific Context Instance**
 ```sql
 INSERT INTO sales.transactions USING name = 'q4-2025' (product, amount) VALUES ('Laptop', 1200);
 ```
 
-**5. Query Data from a specific Cell Instance**
+**5. Query Data from a specific Context Instance**
 ```sql
 SELECT * FROM sales.transactions USING name = 'q4-2025' WHERE amount > 1000;
 ```
 
-**6. Query Data across ALL Cell Instances in a Group**
+**6. Query Data across ALL Context Instances in a Group**
 ```sql
 SELECT AVG(amount) FROM sales.transactions WHERE product = 'Laptop';
 ```

@@ -20,7 +20,7 @@ public class InsertQuery(
 
         return tokens[1].ToUpperInvariant() switch
         {
-            "CELL" => await InsertContextAsync(),
+            "CONTEXT" => await InsertContextAsync(),
             "INTO" => await InsertIntoAsync(),
             _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}"),
         };
@@ -115,7 +115,7 @@ public class InsertQuery(
         if (indexValues.Count != requiredIndexCols.Count)
         {
              var missingCols = string.Join(", ", requiredIndexCols.Select(c => c.Name).Except(indexValues.Keys));
-             return new Error(ErrorPrefixes.DataError, $"INSERT CELL requires values for all indexed columns. Missing: {missingCols}");
+             return new Error(ErrorPrefixes.DataError, $"INSERT CONTEXT requires values for all indexed columns. Missing: {missingCols}");
         }
 
         // 3. GENERATE HASH
@@ -150,8 +150,8 @@ public class InsertQuery(
 
     private Result<(string ContextGroupName, string[] Props, string[] Values)> ParseInsertContext()
     {
-        // INSERT CELL <ContextGroup> (<props>) VALUES (<vals>)
-        if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CELL syntax.");
+        // INSERT CONTEXT <ContextGroup> (<props>) VALUES (<vals>)
+        if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CONTEXT syntax.");
 
         var cellGroupName = tokens[2];
 

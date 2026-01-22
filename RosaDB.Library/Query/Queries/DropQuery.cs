@@ -18,7 +18,7 @@ public class DropQuery(
         return tokens[1].ToUpperInvariant() switch
         {
             "DATABASE" => await DROP_DATABASE(tokens[2]),
-            "CELL" => await DROP_CELL(tokens[2]),
+            "CONTEXT" => await DROP_CONTEXT(tokens[2]),
             "TABLE" => await DROP_TABLE(tokens[2..]),
             _ => new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported"),
         };
@@ -32,7 +32,7 @@ public class DropQuery(
         return new QueryResult($"Database: {name} was deleted successfully");
     }
 
-    private async Task<QueryResult> DROP_CELL(string name)
+    private async Task<QueryResult> DROP_CONTEXT(string name)
     {
         var result = await databaseManager.DeleteContext(name);
         if (result.IsFailure) return result.Error;

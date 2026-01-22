@@ -47,7 +47,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. ~~**Context Metadata:**~~
     ~~*   Add a `Dictionary<string, object> Metadata` property to the `Context` model (`Context.cs`).~~
     ~~*   Update `ContextEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
-    ~~*   Implement an `ALTER CELL` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from context metadata.~~ (Only added ADD and DROP Column for now)
+    ~~*   Implement an `ALTER CONTEXT` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from context metadata.~~ (Only added ADD and DROP Column for now)
 4. ~~**Implement Transactions:**~~
     ~~*   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.~~
     ~~*   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.~~
@@ -64,7 +64,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 3. ~~**Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`~~
 4. ~~**Better seeder:** Add better seeding data. with lots of context instances and maybe tables. Real-ish data.~~
 
-## ~~Phase 5.5: Change `CELL` to `CONTEXT`~~
+## ~~Phase 5.5: Change `CONTEXT` to `CONTEXT`~~
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
@@ -87,7 +87,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 ## Phase 8: User management and Connection strings
 
 ## Phase 9: Missing features
-1.  **`ALTER TABLE` & `CELL` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
+1.  **`ALTER TABLE` & `CONTEXT` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
 2.  **Default Context:** When a context is not present in the query. Replace the context with `default`. This will be used as a context with one instance that can function as a regular database
 3.  **Foreign keys:** Implement foreign keys. they can link tables of the same context or tables and contexts.
-     * Example: `TABLE` Users in the default connects to the accounts `CELL`.
+     * Example: `TABLE` Users in the default connects to the accounts `CONTEXT`.
