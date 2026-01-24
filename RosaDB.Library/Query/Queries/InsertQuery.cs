@@ -125,7 +125,7 @@ public class InsertQuery(
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
         if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
 
-        var saveResult = await cellManager.CreateContextInstance(parsed.ContextGroupName, instanceHash, row, schemaColumns);
+        var saveResult = cellManager.CreateContextInstance(parsed.ContextGroupName, instanceHash, row, schemaColumns);
         if (saveResult.IsFailure) return saveResult.Error;
 
         return new QueryResult("1 context instance inserted successfully.", 1);

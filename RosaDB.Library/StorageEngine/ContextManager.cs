@@ -31,33 +31,32 @@ namespace RosaDB.Library.StorageEngine
             return await SaveEnvironment(env, contextName);
         }
 
-        public Task<Result> CreateContextInstance(string contextGroupName, string instanceHash, Row instanceData, Column[] schema)
+        public Result CreateContextInstance(string contextGroupName, string instanceHash, Row instanceData, Column[] schema)
         {
             // 1. Save main data
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
             var rowBytesResult = RowSerializer.Serialize(instanceData);
-            if (!rowBytesResult.TryGetValue(out var rowBytes)) return Task.FromResult<Result>(rowBytesResult.Error);
+            if (!rowBytesResult.TryGetValue(out var rowBytes)) return rowBytesResult.Error;
 
             var existsResult = indexManager.ContextDataExists(contextGroupName, hashBytes);
-            if (existsResult.IsFailure) return Task.FromResult<Result>(existsResult.Error);
-            if (existsResult.Value) return Task.FromResult<Result>(new Error(ErrorPrefixes.DataError, "Context instance already exists"));
+            if (existsResult.IsFailure) return existsResult.Error;
+            if (existsResult.Value) return new Error(ErrorPrefixes.DataError, "Context instance already exists");
             
             var insertDataResult = indexManager.InsertContextData(contextGroupName, hashBytes, rowBytes);
-            if (insertDataResult.IsFailure) return Task.FromResult<Result>(insertDataResult.Error);
+            if (insertDataResult.IsFailure) return insertDataResult.Error;
 
             // 2. Update property indexes
             foreach (var col in schema.Where(c => c.IsIndex || c.IsPrimaryKey))
             {
                 var value = instanceData[col.Name];
-                if (value != null)
-                {
-                    var keyBytes = IndexKeyConverter.ToByteArray(value);
-                    var insertIndexResult = indexManager.InsertContextPropertyIndex(contextGroupName, col.Name, keyBytes, hashBytes);
-                    if (insertIndexResult.IsFailure) return Task.FromResult<Result>(insertIndexResult.Error);
-                }
+                if (value == null) continue;
+                
+                var keyBytes = IndexKeyConverter.ToByteArray(value);
+                var insertIndexResult = indexManager.InsertContextPropertyIndex(contextGroupName, col.Name, keyBytes, hashBytes);
+                if (insertIndexResult.IsFailure) return insertIndexResult.Error;
             }
-            return Task.FromResult(Result.Success());
+            return Result.Success();
         }
 
         public async Task<Result<Row>> GetContextInstance(string contextGroupName, string instanceHash)
@@ -65,18 +64,16 @@ namespace RosaDB.Library.StorageEngine
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
             var rowBytesResult = indexManager.GetContextData(contextGroupName, hashBytes);
-            if (rowBytesResult.IsSuccess)
-            {
-                var envResult = await GetEnvironment(contextGroupName);
-                if (!envResult.TryGetValue(out var env)) return envResult.Error;
+            if (!rowBytesResult.IsSuccess) return rowBytesResult.Error;
+            
+            var envResult = await GetEnvironment(contextGroupName);
+            if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
-                var rowResult = RowSerializer.Deserialize(rowBytesResult.Value, env.Columns);
-                return rowResult;
-            }
+            return RowSerializer.Deserialize(rowBytesResult.Value, env.Columns);
 
-            return rowBytesResult.Error;
         }
 
+        // TODO change to streaming of rows
         public async Task<Result<IEnumerable<Row>>> GetAllContextInstances(string contextGroupName)
         {
             var allDataResult = indexManager.GetAllContextData(contextGroupName);
@@ -97,26 +94,23 @@ namespace RosaDB.Library.StorageEngine
 
         public async Task<Result> CreateTable(string contextName, Table table)
         {
+            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
+            
             var env = await GetEnvironment(contextName);
             if (!env.TryGetValue(out var contextEnviroument)) return env.Error;
 
             var contextTables = contextEnviroument.Tables.ToList();
             contextTables.Add(table);
             contextEnviroument.Tables = contextTables.ToArray();
+            
             var saveResult = await SaveEnvironment(contextEnviroument, contextName);
             if(saveResult.IsFailure) return saveResult.Error;
             
-            if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
-
             var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, table.Name);
-            try
-            {
-                if(!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath);
-            }
-            catch (Exception ex)
-            {
-                return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}");
-            }
+            
+            try { if(!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath); }
+            catch (Exception ex) { return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}"); }
+            
             return Result.Success();
         }
 

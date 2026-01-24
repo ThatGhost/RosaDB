@@ -7,6 +7,7 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.Query.Queries;
 
+// TODO needs a complete rework
 public class DeleteQuery(
     string[] tokens,
     IContextManager cellManager,

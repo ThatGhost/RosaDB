@@ -84,10 +84,16 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 5. ~~**Allocation Optimization:** Review and optimize memory allocation patterns to minimize fragmentation and improve garbage collection efficiency.~~
 6. **Websockets dedicated thread:** Websockets and its callbacks should run on its own separate thread to not interfere with regular queries.
 
-## Phase 8: User management and Connection strings
+## Phase 8: User/Settings management and Connection strings
 
 ## Phase 9: Missing features
 1.  **`ALTER TABLE` & `CONTEXT` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
 2.  **Default Context:** When a context is not present in the query. Replace the context with `default`. This will be used as a context with one instance that can function as a regular database
 3.  **Foreign keys:** Implement foreign keys. they can link tables of the same context or tables and contexts.
      * Example: `TABLE` Users in the default connects to the accounts `CONTEXT`.
+4. **Rework `DELETE` Query**: Query now get all the instances and uses a crude method. 
+     * If the indexes are present only use the indexes
+     * Stream the Context instances
+     * Smarter lookups if possible
+     * Make it work for context instances as well.
+5. **Rework the `LogManager` ... again**: The `LogManager` should be split in reading and writing. And rework the instance hash out of the parameters
