@@ -1,6 +1,6 @@
 # RosaDB Development Plan
 
-This document outlines a sequential development plan for RosaDB, based on a detailed review of the codebase.
+This document outlines a sequential development plan for RosaDB.
 
 ## ~~Phase 1: Foundations & Parser Enhancement~~
 
@@ -87,7 +87,7 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
 5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.
 6. **Add `UPDATE` Query:** Add the ability to update rows or contexts.
-    *   Take into account transactionsH
+    *   Take into account transactions
 
 ## Phase 7: Optimization
 1. **Performance Profiling:** Use profiling tools to identify bottlenecks in query execution and data storage.
