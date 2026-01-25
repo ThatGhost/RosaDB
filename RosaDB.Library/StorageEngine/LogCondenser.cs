@@ -1,7 +1,5 @@
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Interfaces;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace RosaDB.Library.StorageEngine
 {
@@ -24,12 +22,12 @@ namespace RosaDB.Library.StorageEngine
             return condensedLogs.Values.ToList();
         }
 
-        public List<Log> Condense(IEnumerable<Log> logs)
+        public async Task<List<Log>> Condense(IAsyncEnumerable<Log> logs)
         {
             var condensedLogs = new Dictionary<long, Log>();
             var deletedIds = new HashSet<long>();
 
-            foreach (var log in logs)
+            await foreach (var log in logs)
             {
                 if (deletedIds.Contains(log.Id))
                     continue;

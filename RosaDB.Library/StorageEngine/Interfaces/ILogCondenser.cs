@@ -7,6 +7,6 @@ namespace RosaDB.Library.StorageEngine.Interfaces
     {
         List<Log> Condense(Queue<Log> logs);
 
-        List<Log> Condense(IEnumerable<Log> logs);
+        Task<List<Log>> Condense(IAsyncEnumerable<Log> logs);
     }
 }
