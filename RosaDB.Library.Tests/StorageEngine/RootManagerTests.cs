@@ -1,16 +1,16 @@
 #nullable disable
 
+using System.IO.Abstractions.TestingHelpers;
 using Moq;
+using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
-using System.IO.Abstractions.TestingHelpers;
-using RosaDB.Library.Core;
 
-namespace RosaDB.Library.Tests
+namespace RosaDB.Library.Tests.StorageEngine
 {
     [TestFixture]
     public class RootManagerTests

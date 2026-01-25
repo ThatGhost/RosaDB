@@ -3,7 +3,7 @@
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Serializers;
 
-namespace RosaDB.Library.Tests;
+namespace RosaDB.Library.Tests.StorageEngine;
 
 [TestFixture]
 public class RowSerializerNullableTests

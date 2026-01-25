@@ -68,6 +68,19 @@ This document outlines a sequential development plan for RosaDB, based on a deta
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
+   * ~~ContextManager~~
+   * DatabaseManager
+   * FolderManager
+   * IndexManager
+   * LogManager
+   * SelectQuery
+   * DeleteQuery
+   * InsertQuery
+   * UpdateQuery
+   * AlterQuery
+   * DropQuery
+   * UseQuery
+   * Transactions
 2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
 3. ~~**Add `DELETE` Query:** Add the ability to delete rows or contexts.~~
     *   ~~Take into account transactions~~

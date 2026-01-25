@@ -1,15 +1,10 @@
 #nullable disable
 
-using NUnit.Framework;
+using System.Text;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Serializers;
-using System;
-using System.IO;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace RosaDB.Library.Tests
+namespace RosaDB.Library.Tests.StorageEngine
 {
     [TestFixture]
     public class LogSerializerTests

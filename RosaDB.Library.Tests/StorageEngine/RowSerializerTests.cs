@@ -1,11 +1,9 @@
 #nullable disable
 
-using NUnit.Framework;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine.Serializers;
-using System.Text;
 
-namespace RosaDB.Library.Tests
+namespace RosaDB.Library.Tests.StorageEngine
 {
     [TestFixture]
     public class RowSerializerTests
