@@ -22,6 +22,13 @@ public static class ByteObjectConverter
     
     public static T? ByteArrayToObject<T>(byte[] bytes)
     {
-        return JsonSerializer.Deserialize<T>(bytes[4..]);
+        try
+        {
+            return JsonSerializer.Deserialize<T>(bytes[4..]);
+        }
+        catch
+        {
+            return default;
+        }
     } 
 }

@@ -107,9 +107,20 @@ namespace RosaDB.Library.StorageEngine
             if(saveResult.IsFailure) return saveResult.Error;
             
             var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, table.Name);
-            
-            try { if(!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath); }
-            catch (Exception ex) { return new Error(ErrorPrefixes.FileError, $"Failed to create directory for table '{table.Name}': {ex.Message}"); }
+
+            try
+            {
+                if (!fileSystem.Directory.Exists(tablePath)) fileSystem.Directory.CreateDirectory(tablePath);
+            }
+            catch
+            {
+                // If you can't make folder, revert enviroument
+                contextTables.Remove(table);
+                contextEnviroument.Tables = contextTables.ToArray();
+                var result = await SaveEnvironment(contextEnviroument, contextName);
+                
+                return result.IsFailure ? result.Error : new Error(ErrorPrefixes.FileError, $"Failed to create directory for table");
+            }
             
             return Result.Success();
         }
@@ -121,7 +132,7 @@ namespace RosaDB.Library.StorageEngine
             var envResult = await GetEnvironment(contextName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
 
-            var tableToDelete = env.Tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+            var tableToDelete = env.Tables.FirstOrDefault(t => t.Name.Equals(tableName));
             if (tableToDelete == null) return new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in context '{contextName}'.");
 
             string tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, tableName);
@@ -142,7 +153,6 @@ namespace RosaDB.Library.StorageEngine
                 try
                 {
                     folderManager.RenameFolder(trashPath, tablePath);
-                    envResult.Value.Tables = envResult.Value.Tables.Append(tableToDelete).ToArray();
                 }
                 catch{ return new CriticalError(); }
                 

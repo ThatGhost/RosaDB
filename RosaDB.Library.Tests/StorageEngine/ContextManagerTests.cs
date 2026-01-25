@@ -64,7 +64,7 @@ public class ContextManagerTests
         // Assert
         Utils.AssertSuccess(result);
         _fileSystemMock.Verify(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, It.IsAny<string>()), Times.Once);
-        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(ContextFilePath, It.IsAny<Byte[]>(), CancellationToken.None), Times.Once);
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<Byte[]>(), CancellationToken.None), Times.Once);
     }
     
     [Test]
@@ -179,19 +179,353 @@ public class ContextManagerTests
         Utils.AssertSuccess(result);
     }
 
+    [Test]
+    public async Task CreateTable_ShouldSucceed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        Table table = Table.Create("table", _columns).Value;
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "table")).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Directory.Exists(FilePath)).Returns(false);
+        
+        // Act
+        var result = await _contextManager.CreateTable(_contextName, table);
+
+        // Assert
+        Utils.AssertSuccess(result);
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        _fileSystemMock.Verify(f => f.Directory.CreateDirectory(FilePath), Times.Once);
+    }
+    
+    [Test]
+    public async Task CreateTable_ShouldSucceed_FolderAlreadyExists()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        Table table = Table.Create("table", _columns).Value;
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "table")).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Directory.Exists(FilePath)).Returns(true);
+        
+        // Act
+        var result = await _contextManager.CreateTable(_contextName, table);
+
+        // Assert
+        Utils.AssertSuccess(result);
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()));
+        _fileSystemMock.Verify(f => f.Directory.CreateDirectory(FilePath), Times.Never);
+    }
+    
+    [Test]
+    public async Task CreateTable_ShouldFail_CreateFolderFailed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        Table table = Table.Create("table", _columns).Value;
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "table")).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Directory.Exists(FilePath)).Returns(false);
+        _fileSystemMock.Setup(f => f.Directory.CreateDirectory(FilePath)).Throws(new Exception());
+        
+        // Act
+        var result = await _contextManager.CreateTable(_contextName, table);
+
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, $"Failed to create directory for table"));
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _fileSystemMock.Verify(f => f.Directory.CreateDirectory(FilePath), Times.Once);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldSucceed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, tableName)).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "trash_"+tableName)).Returns(FilePath + "trash");
+        
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertSuccess(result);
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        _folderManagerMock.Verify(f => f.DeleteFolder(FilePath + "trash"), Times.Once);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldFail_NoSuchTable()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        SetupContextEnviroument();
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.DataError, $"Table '{tableName}' not found in context '{_contextName}'."));
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        _folderManagerMock.Verify(f => f.DeleteFolder(FilePath + "trash"), Times.Never);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldFail_RenameFailed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, tableName)).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "trash_"+tableName)).Returns(FilePath + "trash");
+        _folderManagerMock.Setup(f => f.RenameFolder(FilePath, FilePath+"trash")).Throws(new Exception());
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, "Could not prepare table for deletion (Folder Rename Failed)."));
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        _folderManagerMock.Verify(f => f.DeleteFolder(FilePath + "trash"), Times.Never);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldFail_FailedToRevert()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        string tableNameTrash = "table_trash";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, tableName)).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "trash_"+tableName)).Returns(tableNameTrash);
+        _fileSystemMock.Setup(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>())).Throws(new Exception());
+        _folderManagerMock.Setup(f => f.RenameFolder(tableNameTrash, FilePath)).Throws(new Exception());
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertFailure(result, new CriticalError());
+        _folderManagerMock.Verify(f => f.DeleteFolder(tableNameTrash), Times.Never);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldFail_FailedWriteButSuccessfullRevert()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        string tableNameTrash = "table_trash";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, tableName)).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "trash_"+tableName)).Returns(tableNameTrash);
+        _fileSystemMock.Setup(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>())).Throws(new Exception());
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, "Failed to update context definition. Deletion reverted."));
+        _folderManagerMock.Verify(f => f.DeleteFolder(tableNameTrash), Times.Never);
+    }
+    
+    [Test]
+    public async Task DeleteTable_ShouldSucceed_WhenRenameFails()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, tableName)).Returns(FilePath);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, "trash_"+tableName)).Returns(FilePath + "trash");
+        _folderManagerMock.Setup(f => f.DeleteFolder(FilePath+"trash")).Throws(new Exception());
+        
+        // Act
+        var result = await _contextManager.DeleteTable(_contextName, tableName);
+
+        // Assert
+        Utils.AssertSuccess(result);
+        _fileSystemMock.Verify(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Test]
+    public async Task GetEnvironment_ShouldSucceed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        
+        // Act
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertSuccess(result);
+    }
+    
+    [Test]
+    public async Task GetEnvironment_ShouldFail_DatabaseNotSet()
+    {
+        // Arrange
+        SetupContextFilePath();
+        _sessionStateMock.Setup(s => s.CurrentDatabase).Returns((Database)null);
+        
+        // Act
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertFailure(result, new DatabaseNotSetError());
+        _fileSystemMock.Verify(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>()), Times.Never);
+    }
+    
+    [Test]
+    public async Task GetEnvironment_ShouldFail_FileDoesNotExist()
+    {
+        // Arrange
+        SetupContextFilePath();
+        _fileSystemMock.Setup(f => f.File.Exists(FilePath)).Returns(false);
+        
+        // Act
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, "Context Environment does not exist"));
+        _fileSystemMock.Verify(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>()), Times.Never);
+    }
+    
+    [Test]
+    public async Task GetEnvironment_ShouldFail_ReadReturnsEmptyByteArray()
+    {
+        // Arrange
+        SetupContextFilePath();
+        _fileSystemMock.Setup(f => f.File.Exists(FilePath)).Returns(true);
+        _fileSystemMock.Setup(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>())).Returns(Task.FromResult<byte[]>([]));
+        
+        // Act
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, "Context Environment does not exist"));
+    }
+    
+    [Test]
+    public async Task GetEnvironment_ShouldFail_MalformedObject()
+    {
+        // Arrange
+        SetupContextFilePath();
+        _fileSystemMock.Setup(f => f.File.Exists(FilePath)).Returns(true);
+        _fileSystemMock.Setup(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>())).Returns(Task.FromResult<byte[]>([0x00,0x01]));
+        
+        // Act
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.FileError, "Context Environment does not exist"));
+        _fileSystemMock.Verify(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>()), Times.Once);
+    }
+    
+    [Test]
+    public async Task GetEnvironment_ShouldSucceed_FromCache()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        
+        // Act
+        await _contextManager.GetEnvironment(_contextName);
+        var result = await _contextManager.GetEnvironment(_contextName);
+        
+        // Assert
+        Utils.AssertSuccess(result);
+        _fileSystemMock.Verify(f => f.File.ReadAllBytesAsync(FilePath, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Test]
+    public async Task GetColumnsFromTable_ShouldSucceed()
+    {
+        // Arrange
+        SetupContextFilePath();
+        string tableName = "table";
+        Table table = Table.Create(tableName, _columns).Value;
+        SetupContextEnviroument(new ContextEnvironment()
+        {
+            Version = 1,
+            Columns = _columns,
+            Tables = [table]
+        });
+        
+        // Act
+        var result = await _contextManager.GetColumnsFromTable(_contextName, tableName);
+        
+        // Assert
+        Utils.AssertSuccess(result);
+        Assert.That(result.Value, Is.Not.Null);
+        Assert.That(result.Value.Length, Is.EqualTo(3));
+        Assert.That(result.Value[0].Name, Is.EqualTo(_columns[0].Name));
+    }
+    
+    [Test]
+    public async Task GetColumnsFromTable_ShouldFail_NoSuchTable()
+    {
+        // Arrange
+        SetupContextFilePath();
+        SetupContextEnviroument();
+        
+        // Act
+        var result = await _contextManager.GetColumnsFromTable(_contextName, "Table Does Not Exist");
+        
+        // Assert
+        Utils.AssertFailure(result, new Error(ErrorPrefixes.StateError, "Table does not exist in context environment"));
+    }
+
     private readonly string basePath = "basepath";
-    private readonly string ContextFilePath = "completeFilePath";
+    private readonly string FilePath = "completeFilePath";
     private void SetupContextFilePath()
     {
         _folderManagerMock.Setup(f => f.BasePath).Returns(basePath);
-        _fileSystemMock.Setup(f => f.File.WriteAllBytesAsync(ContextFilePath, It.IsAny<Byte[]>(), CancellationToken.None)).Returns(Task.CompletedTask);
-        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, It.IsAny<string>())).Returns(ContextFilePath);
+        _fileSystemMock.Setup(f => f.File.WriteAllBytesAsync(FilePath, It.IsAny<Byte[]>(), CancellationToken.None)).Returns(Task.CompletedTask);
+        _fileSystemMock.Setup(f => f.Path.Combine(basePath, Utils.DatabaseName, _contextName, It.IsAny<string>())).Returns(FilePath);
     }
 
-    private void SetupContextEnviroument()
+    private void SetupContextEnviroument(ContextEnvironment env = null)
     {
         SetupContextFilePath();
         _fileSystemMock.Setup(f => f.File.Exists(It.IsAny<string>())).Returns(true);
-        _fileSystemMock.Setup(f => f.File.ReadAllBytesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ByteObjectConverter.ObjectToByteArray(_mockEnviroument)));
+        _fileSystemMock.Setup(f => f.File.ReadAllBytesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ByteObjectConverter.ObjectToByteArray(env ?? _mockEnviroument)));
     }
 }
