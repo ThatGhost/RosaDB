@@ -18,7 +18,7 @@ namespace RosaDB.Library.Tests.StorageEngine
     [TestFixture]
     public class LogManagerTests
     {
-        private Mock<LogCondenser> _mockLogCondenser;
+        private Mock<ILogCondenser> _mockLogCondenser;
         private Mock<SessionState> _mockSessionState;
         private MockFileSystem _mockFileSystem;
         private Mock<IFolderManager> _mockFolderManager;
@@ -42,7 +42,7 @@ namespace RosaDB.Library.Tests.StorageEngine
         [SetUp]
         public void Setup()
         {
-            _mockLogCondenser = new Mock<LogCondenser>();
+            _mockLogCondenser = new Mock<ILogCondenser>();
             _mockSessionState = new Mock<SessionState>();
             _mockFileSystem = new MockFileSystem();
             _mockFolderManager = new Mock<IFolderManager>();

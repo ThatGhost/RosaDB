@@ -10,7 +10,7 @@ namespace RosaDB.Library.StorageEngine;
 
 // TODO split LogManager into reader and writer
 public class LogManager(
-    LogCondenser logCondenser,
+    ILogCondenser logCondenser,
     SessionState sessionState,
     IFileSystem fileSystem,
     IFolderManager folderManager,
