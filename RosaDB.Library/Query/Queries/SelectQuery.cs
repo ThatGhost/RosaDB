@@ -20,9 +20,7 @@ namespace RosaDB.Library.Query.Queries
 
         private async IAsyncEnumerable<Row> StreamRows(int selectIndex, int fromIndex, int whereIndex, int usingIndex, Column[] columns)
         {
-            var tableNameParts = tokens[fromIndex + 1].Split('.');
-            var contextName = tableNameParts[0];
-            var tableName = tableNameParts[1];
+            var (contextName, tableName) = TokensToContextAndTableParser.TokensToContextAndName(tokens[fromIndex + 1]);
 
             IAsyncEnumerable<Log> logs;
             if (usingIndex != -1)

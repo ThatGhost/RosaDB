@@ -82,7 +82,7 @@ This document outlines a sequential development plan for RosaDB.
    * UseQuery
    * Transactions
 2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
-3. ~~**Add `DELETE` Query:** Add the ability to delete rows or contexts.~~
+3. **Add `DELETE` Query:** Add the ability to delete rows or contexts.
     *   ~~Take into account transactions~~
 4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
 5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.

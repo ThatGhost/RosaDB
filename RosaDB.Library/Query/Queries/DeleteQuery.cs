@@ -7,7 +7,6 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.Query.Queries;
 
-// TODO needs a complete rework
 public class DeleteQuery(
     string[] tokens,
     IContextManager cellManager,
@@ -21,72 +20,46 @@ public class DeleteQuery(
 
         var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
         var (contextName, tableName) = TokensToContextAndTableParser.TokensToContextAndName(tokens[fromIndex + 1]);
-
-        var cellEnvResult = await cellManager.GetEnvironment(contextName);
-        if (cellEnvResult.IsFailure) throw new InvalidOperationException(cellEnvResult.Error.Message);
-        var cellEnv = cellEnvResult.Value;
-
         var columnsResult = await cellManager.GetColumnsFromTable(contextName, tableName);
         if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
-
-        var contextInstancesResult = await cellManager.GetAllContextInstances(contextName);
-        if (!contextInstancesResult.TryGetValue(out var allContextInstances)) return contextInstancesResult.Error;
-
-        var instancesToProcess = allContextInstances as Row[] ?? allContextInstances.ToArray();
-        IEnumerable<Row> contextInstancesToProcess = instancesToProcess;
-
-        // Filter context instances if USING clause is present
+        
+        IAsyncEnumerable<Log> logs;
         if (usingIndex != -1)
         {
-            var endIndex = whereIndex != -1 ? whereIndex : tokens.Length;
-            var usingTokens = tokens[(usingIndex + 1)..endIndex];
-            var usingValues = new Dictionary<string, string>();
-            for (int i = 0; i < usingTokens.Length; i += 4)
-            {
-                if (i + 2 < usingTokens.Length && usingTokens[i + 1] == "=")
-                {
-                    usingValues[usingTokens[i]] = usingTokens[i + 2];
-                }
-            }
-
-            contextInstancesToProcess = instancesToProcess.Where(instance => {
-                foreach (var usingValue in usingValues)
-                {
-                    var colIndex = Array.FindIndex(instance.Columns, c => c.Name.Equals(usingValue.Key, StringComparison.OrdinalIgnoreCase));
-                    if (colIndex == -1) return false;
-
-                    var instanceValue = instance.Values[colIndex]?.ToString();
-                    if (instanceValue == null || !instanceValue.Equals(usingValue.Value, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            });
+            var cellEnv = await cellManager.GetEnvironment(contextName);
+            if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
+                
+            var result = await UsingClauseProcessor.Process(tokens, cellManager, logManager, cellEnv.Value);
+            if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
+            logs = result.Value;
         }
+        else logs = logManager.GetAllLogsForContextTable(contextName, tableName);
+            
+        if (logs is null) return new Error(ErrorPrefixes.DataError, "No logs found");
+
+        // 1. Get filtered stream
+        var whereFunction = ConvertWHEREToFunction(whereIndex, usingIndex, columns);
+        var filteredStream = GetFilteredStream(logs, whereFunction, columns);
 
         int count = 0;
-        var whereFunction = ConvertWHEREToFunction(whereIndex, usingIndex, columns);
-
-        foreach (var instance in contextInstancesToProcess)
+        await foreach ((Row, Log) tuple in filteredStream)
         {
-            var contextIndexValues = cellEnv.GetIndexValues(instance);
-            var logsForInstance = logManager.GetAllLogsForContextInstanceTable(contextName, tableName, contextIndexValues);
-
-            await foreach (var log in logsForInstance)
-            {
-                var rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-                if (rowResult.IsSuccess && whereFunction(rowResult.Value))
-                {
-                    logManager.Delete(contextName, tableName, contextIndexValues, log.Id);
-                    count++;
-                }
-            }
+            logManager.Delete(contextName, tableName, tuple.Item1.ToIndexDictionary().Select(d => d.Value).ToArray(), tuple.Item2.Id);
+            count++;
         }
-
+        
         if (!sessionState.IsInTransaction) await logManager.Commit();
         
         return new QueryResult("Delete was successful", count);
+    }
+    
+    private async IAsyncEnumerable<(Row, Log)> GetFilteredStream(IAsyncEnumerable<Log> logs, Func<Row, bool> whereFunction, Column[] columns)
+    {
+        await foreach (var log in logs)
+        {
+            var rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+            if (rowResult.IsSuccess && whereFunction(rowResult.Value)) yield return (rowResult.Value, log);
+        }
     }
     
     private Func<Row, bool> ConvertWHEREToFunction(int whereIndex, int usingIndex, Column[] allColumns)

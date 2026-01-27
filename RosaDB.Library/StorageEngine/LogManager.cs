@@ -134,12 +134,13 @@ public class LogManager(
 
         foreach ((Log log, byte[] bytes) in serializedLogs)
         {
-            Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
-            if (!rowResult.TryGetValue(out var row)) return -1;
-
             await segmentStream.WriteAsync(bytes, CancellationToken.None);
             indexManager.Insert(identifier, "LogId", IndexKeyConverter.ToByteArray(log.Id), new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
-
+            
+            if (log.IsDeleted) continue;
+            
+            Result<Row> rowResult = RowSerializer.Deserialize(log.TupleData, columns);
+            if (!rowResult.TryGetValue(out var row)) return -1;
             if (log.IndexValues != null)
             {
                 foreach (var (name, val, isPk) in log.IndexValues)
@@ -163,7 +164,7 @@ public class LogManager(
                         byte[] keyBytes = IndexKeyConverter.ToByteArray(val);
                         TableInstanceIdentifier indexIdentifier;
 
-                        if (col.IsIndex && !col.IsPrimaryKey) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
+                        if (col is { IsIndex: true, IsPrimaryKey: false }) indexIdentifier = identifier with { InstanceHash = "_TABLE_" };
                         else indexIdentifier = identifier;
 
                         indexManager.Insert(indexIdentifier, col.Name, keyBytes, new LogLocation(metadata.CurrentSegmentNumber, currentOffset));
@@ -233,24 +234,22 @@ public class LogManager(
         var dataFiles = fileSystem.Directory.GetFiles(tablePath, "*.dat", SearchOption.AllDirectories);
 
         var seenLogIds = new HashSet<long>();
-        var allLogs = new List<Log>();
 
         foreach (var dataFile in dataFiles)
         {
             await using var stream = fileSystem.FileStream.New(dataFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var logsInFile = new List<Log>();
             while (stream.Position < stream.Length)
             {
                 var log = await LogSerializer.DeserializeAsync(stream);
                 if (log is null) break;
-                allLogs.Add(log);
+                logsInFile.Add(log);
             }
-        }
 
-        foreach (var log in allLogs.OrderByDescending(l => l.Date))
-        {
-            if (seenLogIds.Add(log.Id) && !log.IsDeleted)
+            foreach (var log in logsInFile.AsEnumerable().Reverse())
             {
-                yield return log;
+                if (seenLogIds.Add(log.Id) && !log.IsDeleted)
+                    yield return log;
             }
         }
     }

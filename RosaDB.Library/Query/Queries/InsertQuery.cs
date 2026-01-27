@@ -66,9 +66,9 @@ public class InsertQuery(
             );
     }
     
-    private Result<Row> CheckPrimaryKeys(string cellGroupName, string tableName, object[] usingIndexValues, Row tableRow)
+    private Result<Row> CheckPrimaryKeys(string contextName, string tableName, object[] usingIndexValues, Row tableRow)
     {
-        var identifier = InstanceHasher.CreateIdentifier(cellGroupName, tableName, usingIndexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, usingIndexValues);
 
         foreach (var col in tableRow.Columns)
         {
@@ -153,7 +153,7 @@ public class InsertQuery(
         // INSERT CONTEXT <ContextGroup> (<props>) VALUES (<vals>)
         if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CONTEXT syntax.");
 
-        var cellGroupName = tokens[2];
+        var contextName = tokens[2];
 
         var propsResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, 3, out int propsEnd);
         if (!propsResult.TryGetValue(out var props))
@@ -167,12 +167,12 @@ public class InsertQuery(
 
         if (props.Length != values.Length) return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
 
-        return (cellGroupName, props, values);
+        return (contextName, props, values);
     }
     
     private Result<(string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
     {
-        // INSERT INTO <cellGroupName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
+        // INSERT INTO <contextName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
         if (tokens.Length < 10)
             return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <context>.<table> USING (...) (...) VALUES (...)");
 
@@ -202,10 +202,10 @@ public class InsertQuery(
         if (fullTableName.Length != 2)
             return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <contextName>.<tableName>");
         
-        var cellGroupName = fullTableName[0];
+        var contextName = fullTableName[0];
         var tableName = fullTableName[1];
 
-        return (cellGroupName, tableName, startIndex);
+        return (contextName, tableName, startIndex);
     }
 
     private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)

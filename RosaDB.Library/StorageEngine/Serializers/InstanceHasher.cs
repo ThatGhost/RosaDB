@@ -12,6 +12,12 @@ public static class InstanceHasher
         return new TableInstanceIdentifier(contextName, tableName, hash);
     }
     
+    public static string GenerateContextInstanceHash(Dictionary<string, string> indexValues)
+    {
+        var combinedIndex = string.Join("::", indexValues.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(combinedIndex)));
+    }
+    
     public static string GenerateContextInstanceHash(IReadOnlyDictionary<string, string> indexValues)
     {
         var combinedIndex = string.Join("::", indexValues.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value));

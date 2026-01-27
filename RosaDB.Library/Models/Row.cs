@@ -32,4 +32,15 @@ public class Row
     public object? this[int index] => index < 0 || index >= Values.Length ? null : Values[index];
 
     public object? this[string columnName] => _columnIndexMap.TryGetValue(columnName, out int index) ? Values[index] : null;
+
+    public Dictionary<string, object?> ToIndexDictionary()
+    {
+        Dictionary<string, object?> indexes = [];
+        for (int i = 0; i < Columns.Length; i++)
+        {
+            if(Columns[i].IsIndex) indexes.Add(Columns[i].Name, Values[i]);
+        }
+
+        return indexes;
+    }
 }

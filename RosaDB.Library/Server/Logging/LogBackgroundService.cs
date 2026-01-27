@@ -13,7 +13,7 @@ namespace RosaDB.Library.Server.Logging
         public void Start()
         {
             _cancellationTokenSource = new CancellationTokenSource();
-            _backgroundTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
+            //_backgroundTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
         }
 
         public void Stop()
