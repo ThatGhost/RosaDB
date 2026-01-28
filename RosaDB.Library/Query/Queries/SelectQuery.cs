@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Serializers;
 
 namespace RosaDB.Library.Query.Queries
 {
-    public class SelectQuery(string[] tokens, ILogManager logManager, IContextManager cellManager) : IQuery
+    public class SelectQuery(string[] tokens, ILogReader logReader, IContextManager cellManager) : IQuery
     {
         public async ValueTask<QueryResult> Execute()
         {
@@ -28,11 +28,11 @@ namespace RosaDB.Library.Query.Queries
                 var cellEnv = await cellManager.GetEnvironment(contextName);
                 if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
-                var result = await UsingClauseProcessor.Process(tokens, cellManager, logManager, cellEnv.Value);
+                var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
                 if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
                 logs = result.Value;
             }
-            else logs = logManager.GetAllLogsForContextTable(contextName, tableName);
+            else logs = logReader.GetAllLogsForContextTable(contextName, tableName);
             
             if (logs is null) yield break;
 

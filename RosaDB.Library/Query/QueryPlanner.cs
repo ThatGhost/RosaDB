@@ -13,7 +13,8 @@ public class QueryPlanner(
     IContextManager contextManager, 
     RootManager rootManager,
     SessionState sessionState,
-    ILogManager logManager,
+    ILogReader logReader,
+    ILogWriter logWriter,
     IIndexManager indexManager,
     IServiceContainer serviceContainer
     )
@@ -55,14 +56,14 @@ public class QueryPlanner(
             "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, contextManager),
             "DROP" => new DropQuery(tokens, rootManager, databaseManager, contextManager),
             "USE" => new UseQuery(tokens, sessionState, rootManager),
-            "SELECT" => new SelectQuery(tokens, logManager, contextManager),
-            "INSERT" => new InsertQuery(tokens, contextManager, logManager, indexManager, sessionState),
-            "DELETE" => new DeleteQuery(tokens, contextManager, logManager, sessionState),
+            "SELECT" => new SelectQuery(tokens, logReader, contextManager),
+            "INSERT" => new InsertQuery(tokens, contextManager, logWriter, indexManager, sessionState),
+            "DELETE" => new DeleteQuery(tokens, contextManager, logReader, logWriter, sessionState),
             "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer),
             "ALTER" => new AlterQuery(tokens, contextManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
-            "COMMIT" => new CommitQuery(sessionState, logManager),
-            "ROLLBACK" => new RollbackQuery(sessionState, logManager),
+            "COMMIT" => new CommitQuery(sessionState, logWriter),
+            "ROLLBACK" => new RollbackQuery(sessionState, logWriter),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unknown query type"),
         };
     }

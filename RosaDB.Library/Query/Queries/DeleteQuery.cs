@@ -10,7 +10,8 @@ namespace RosaDB.Library.Query.Queries;
 public class DeleteQuery(
     string[] tokens,
     IContextManager cellManager,
-    ILogManager logManager,
+    ILogReader logReader,
+    ILogWriter logWriter,
     SessionState sessionState) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
@@ -29,11 +30,11 @@ public class DeleteQuery(
             var cellEnv = await cellManager.GetEnvironment(contextName);
             if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
-            var result = await UsingClauseProcessor.Process(tokens, cellManager, logManager, cellEnv.Value);
+            var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
             if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
             logs = result.Value;
         }
-        else logs = logManager.GetAllLogsForContextTable(contextName, tableName);
+        else logs = logReader.GetAllLogsForContextTable(contextName, tableName);
             
         if (logs is null) return new Error(ErrorPrefixes.DataError, "No logs found");
 
@@ -44,11 +45,11 @@ public class DeleteQuery(
         int count = 0;
         await foreach ((Row, Log) tuple in filteredStream)
         {
-            logManager.Delete(contextName, tableName, tuple.Item1.ToIndexDictionary().Select(d => d.Value).ToArray(), tuple.Item2.Id);
+            logWriter.Delete(contextName, tableName, tuple.Item1.ToIndexDictionary().Select(d => d.Value).ToArray(), tuple.Item2.Id);
             count++;
         }
         
-        if (!sessionState.IsInTransaction) await logManager.Commit();
+        if (!sessionState.IsInTransaction) await logWriter.Commit();
         
         return new QueryResult("Delete was successful", count);
     }

@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class CommitQuery(SessionState sessionState, ILogManager logManager) : IQuery
+public class CommitQuery(SessionState sessionState, ILogWriter logWriter) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -14,7 +14,7 @@ public class CommitQuery(SessionState sessionState, ILogManager logManager) : IQ
             return new Error(ErrorPrefixes.StateError, "No transaction is currently in progress.");
         }
 
-        var commitResult = await logManager.Commit();
+        var commitResult = await logWriter.Commit();
         if (commitResult.IsFailure)
         {
             return commitResult.Error;

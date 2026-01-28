@@ -10,7 +10,7 @@ namespace RosaDB.Library.Query.Queries;
 public class InsertQuery(
     string[] tokens,
     IContextManager cellManager,
-    ILogManager logManager,
+    ILogWriter logWriter,
     IIndexManager indexManager,
     SessionState sessionState) : IQuery
 {
@@ -54,9 +54,9 @@ public class InsertQuery(
                     }
                 }
 
-                logManager.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
+                logWriter.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
                 
-                if (!sessionState.IsInTransaction) return await logManager.Commit();
+                if (!sessionState.IsInTransaction) return await logWriter.Commit();
 
                 return Result.Success();
             })))

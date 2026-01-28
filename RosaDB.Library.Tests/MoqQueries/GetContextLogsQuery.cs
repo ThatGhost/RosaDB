@@ -1,13 +1,13 @@
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
-namespace RosaDB.Library.MoqQueries;
+namespace RosaDB.Library.Tests.MoqQueries;
 
-public class GetContextLogsQuery(ILogManager logManager, IContextManager cellManager)
+public class GetContextLogsQuery(ILogReader logReader, IContextManager cellManager)
 {
     public async Task<List<string>> Execute(string contextName, string tableName, object[] indexValues)
     {
-        var logs = logManager.GetAllLogsForContextInstanceTable(contextName, tableName, indexValues);
+        var logs = logReader.GetAllLogsForContextInstanceTable(contextName, tableName, indexValues);
 
         var cellFromDb = await cellManager.GetColumnsFromTable(contextName, tableName);
         if(cellFromDb.IsFailure) return [];

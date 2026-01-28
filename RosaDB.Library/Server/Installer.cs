@@ -25,7 +25,9 @@ public static class Installer
 
         container.RegisterScoped<ISystemLogPublisher, SystemLogPublisher>();
         container.RegisterScoped<SessionState>();
-        container.RegisterScoped<ILogManager, LogManager>();
+        container.RegisterScoped<ILogReader, LogReader>();
+        container.RegisterScoped<ILogWriter, LogWriter>();
+        container.RegisterSingleton<WriteAheadLogCache>();
         container.RegisterScoped<IIndexManager, IndexManager>();
         container.RegisterScoped<IContextManager, ContextManager>();
         container.RegisterScoped<WebsocketQueryPlanner>();

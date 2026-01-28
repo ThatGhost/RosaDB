@@ -5,7 +5,7 @@ using RosaDB.Library.Core;
 
 namespace RosaDB.Library.MoqQueries;
 
-public class WriteLogAndCommitQuery(ILogManager logManager, IContextManager cellManager)
+public class WriteLogAndCommitQuery(ILogWriter logWriter, IContextManager cellManager)
 {
     public async Task<Result> Execute(string context, string table, string data)
     {
@@ -23,10 +23,10 @@ public class WriteLogAndCommitQuery(ILogManager logManager, IContextManager cell
             var bytesResult = RowSerializer.Serialize(row);
             if(!bytesResult.TryGetValue(out var bytes)) return bytesResult.Error;
             
-            logManager.Put(context, table, [random.Next(0,4)], bytes);
+            logWriter.Put(context, table, [random.Next(0,4)], bytes);
         }
 
-        await logManager.Commit();
+        await logWriter.Commit();
         return Result.Success();
     }
 }

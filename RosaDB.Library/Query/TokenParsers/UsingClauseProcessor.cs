@@ -13,7 +13,7 @@ namespace RosaDB.Library.Query.Queries
         public static async Task<Result<IAsyncEnumerable<Log>>> Process(
             string[] tokens,
             IContextManager cellManager,
-            ILogManager logManager,
+            ILogReader logReader,
             ContextEnvironment cellEnv)
         {
             var cellIndexesResult = await GetIndexHashesFromUsing(tokens, cellManager, cellEnv);
@@ -29,14 +29,14 @@ namespace RosaDB.Library.Query.Queries
                 cellsThatApply.Add(cellInstanceResult.Value);
             }
 
-            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(logManager, cellsThatApply, tableName, contextName, cellEnv));
+            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(logReader, cellsThatApply, tableName, contextName, cellEnv));
         }
 
-        private static async IAsyncEnumerable<Log> TurnContextRowsToLogs(ILogManager logManager, List<Row> cells, string tableName, string contextName, ContextEnvironment cellEnv)
+        private static async IAsyncEnumerable<Log> TurnContextRowsToLogs(ILogReader logReader, List<Row> cells, string tableName, string contextName, ContextEnvironment cellEnv)
         {
             foreach (var context in cells)
             {
-                await foreach (var log in logManager.GetAllLogsForContextInstanceTable(contextName, tableName, cellEnv.GetIndexValues(context)))
+                await foreach (var log in logReader.GetAllLogsForContextInstanceTable(contextName, tableName, cellEnv.GetIndexValues(context)))
                 {
                     yield return log;
                 }

@@ -43,7 +43,7 @@ namespace RosaDB.Library.Server.Logging
         {
             await using (var scope = serviceContainer.BeginScope())
             {
-                var logManager = scope.GetInstance<ILogManager>();
+                var logWriter = scope.GetInstance<ILogWriter>();
                 var sessionState = scope.GetInstance<SessionState>();
                 var databaseManager = scope.GetInstance<IDatabaseManager>();
                 var cellManager = scope.GetInstance<IContextManager>();
@@ -76,8 +76,8 @@ namespace RosaDB.Library.Server.Logging
                     return;
                 }
                 
-                logManager.Put(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], serializedRow, []);
-                await logManager.Commit();
+                logWriter.Put(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], serializedRow, []);
+                await logWriter.Commit();
             }
         }
 

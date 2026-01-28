@@ -14,7 +14,7 @@ namespace RosaDB.Library.Tests
     public class SelectQueryTests
     {
         private Mock<IContextManager> _mockContextManager;
-        private Mock<ILogManager> _mockLogManager;
+        private Mock<ILogReader> _mockLogReader;
 
         private const string contextName = "TestContext";
         private const string tableName = "TestTable";
@@ -41,7 +41,7 @@ namespace RosaDB.Library.Tests
         private Log fakeLog3;
         private Row fakeContextInstance1;
 
-        private bool AreObjectArraysEqual(object?[] a1, object?[] a2)
+        private bool AreObjectArraysEqual(object[] a1, object[] a2)
         {
             if (ReferenceEquals(a1, a2)) return true;
             if (a1 == null || a2 == null) return false;
@@ -57,7 +57,7 @@ namespace RosaDB.Library.Tests
         public void Setup()
         {
             _mockContextManager = new Mock<IContextManager>();
-            _mockLogManager = new Mock<ILogManager>();
+            _mockLogReader = new Mock<ILogReader>();
 
             _mockContextManager.Setup(cm => cm.GetColumnsFromTable(contextName, tableName)).ReturnsAsync(tableColumns);
 
@@ -121,11 +121,11 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_AllRowsInTable()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
+            _mockLogReader.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -139,21 +139,21 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithUSING_ShouldReturnLogsInContextWithIndexedValue()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)2 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)2 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)1 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)1 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "USING", "cellId", "=", "1", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -176,21 +176,21 @@ namespace RosaDB.Library.Tests
                         Row.Create([(long)2, "test"], cellColumns).Value
                     }
                 ));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)2 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)2 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)1 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)1 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "USING", "name", "=", "test", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -208,21 +208,21 @@ namespace RosaDB.Library.Tests
         {
             // Arrange
             _mockContextManager.Setup(c => c.GetAllContextInstances(contextName)).Returns(() => Task.FromResult<Result<IEnumerable<Row>>>(new[] { Row.Create([(long)1, "test"], cellColumns).Value } ));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)2 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)2 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)1 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)1 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "USING", "name", "=", "test", "AND", "cellId", "=", "1", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -239,13 +239,13 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithWHERE_ShouldReturnRowsAcrossContextsWithCorrectWhere()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() =>
+            _mockLogReader.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() =>
                 ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "WHERE", "age", "=", "30", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -259,21 +259,21 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithWHEREAndUSING_ShouldReturnRowsWithCorrectWhereAndUsing()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)2 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)2 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1]));
-            _mockLogManager.Setup(l => l.GetAllLogsForContextInstanceTable(
+            _mockLogReader.Setup(l => l.GetAllLogsForContextInstanceTable(
                 contextName, 
                 tableName, 
-                It.Is<object?[]>(arr => AreObjectArraysEqual(arr, new object?[] { (long)1 }))))
+                It.Is<object[]>(arr => AreObjectArraysEqual(arr, new object[] { (long)1 }))))
                 .Returns(() => ToAsyncEnumerable((List<Log>) [fakeLog2, fakeLog3]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "USING", "cellId", "=", "1", "WHERE", "city", "=", "Chicago", ";" ];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -287,11 +287,11 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_ProjectOneColumn_ShouldReturnRowsWithOneColumn()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
+            _mockLogReader.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "city", "FROM", $"{contextName}.{tableName}", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -307,12 +307,12 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_ProjectMultipleColumns_ShouldReturnRowsWithMultipleColumns()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() =>
+            _mockLogReader.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() =>
                 ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2]));
             string[] tokens = ["SELECT", "age", ",", "city", "FROM", $"{contextName}.{tableName}", ";"];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert
@@ -329,12 +329,12 @@ namespace RosaDB.Library.Tests
         public async Task SELECT_WithWHEREAnd_ShouldReturnRowsWithCorrectWhere()
         {
             // Arrange
-            _mockLogManager.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2, fakeLog3]));
+            _mockLogReader.Setup(l => l.GetAllLogsForContextTable(contextName, tableName)).Returns(() => ToAsyncEnumerable((List<Log>)[fakeLog1, fakeLog2, fakeLog3]));
 
             string[] tokens = ["SELECT", "*", "FROM", $"{contextName}.{tableName}", "WHERE", "age", "=", "30", "AND", "city", "=", "New York", ";" ];
 
             // Act
-            var query = new SelectQuery(tokens, _mockLogManager.Object, _mockContextManager.Object);
+            var query = new SelectQuery(tokens, _mockLogReader.Object, _mockContextManager.Object);
             var result = await query.Execute();
 
             // Assert

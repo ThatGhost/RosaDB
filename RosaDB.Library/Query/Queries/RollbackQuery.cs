@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class RollbackQuery(SessionState sessionState, ILogManager logManager) : IQuery
+public class RollbackQuery(SessionState sessionState, ILogWriter logWriter) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -14,7 +14,7 @@ public class RollbackQuery(SessionState sessionState, ILogManager logManager) : 
             return new Error(ErrorPrefixes.StateError, "No transaction is currently in progress.");
         }
 
-        logManager.Rollback();
+        logWriter.Rollback();
         sessionState.IsInTransaction = false;
         
         //This is a synchronous operation, but the interface requires an async method.
