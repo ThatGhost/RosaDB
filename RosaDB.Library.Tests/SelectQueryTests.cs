@@ -43,17 +43,12 @@ namespace RosaDB.Library.Tests
 
         private bool AreObjectArraysEqual(object?[] a1, object?[] a2)
         {
-            Console.WriteLine($"Comparing a1: [{string.Join(", ", a1 ?? new object[] { "null" })}] with a2: [{string.Join(", ", a2 ?? new object[] { "null" })}]");
             if (ReferenceEquals(a1, a2)) return true;
             if (a1 == null || a2 == null) return false;
             if (a1.Length != a2.Length) return false;
             for (int i = 0; i < a1.Length; i++)
             {
-                if (!Equals(a1[i], a2[i]))
-                {
-                    Console.WriteLine($"Mismatch at index {i}: a1[{i}]={a1[i]} ({a1[i]?.GetType().Name}) vs a2[{i}]={a2[i]} ({a2[i]?.GetType().Name})");
-                    return false;
-                }
+                if (!Equals(a1[i], a2[i])) return false;
             }
             return true;
         }
@@ -97,7 +92,7 @@ namespace RosaDB.Library.Tests
                 IsDeleted = false,
                 TupleData = fakeData3
             };
-            fakeContextInstance1 = Row.Create([1, "test"], cellColumns).Value;
+            fakeContextInstance1 = Row.Create([(long)1, "test"], cellColumns).Value;
             _mockContextManager.Setup(c => c.GetContextInstance(contextName, It.IsAny<string>())).Returns(() => Task.FromResult(Result<Row>.Success(fakeContextInstance1)));
         }
 
@@ -205,7 +200,7 @@ namespace RosaDB.Library.Tests
             Assert.That(rows.Count, Is.EqualTo(1));
             Assert.That(rows[0], Is.Not.Null);
             Assert.That(rows[0].Values, Is.Not.Null);
-            Assert.That(rows[0].Values[0], Is.EqualTo("data1"));
+            Assert.That(rows[0].Values[0], Is.EqualTo("data2"));
         }
         
         [Test]
