@@ -1,22 +1,21 @@
+using System.Text.Json.Serialization;
 using RosaDB.Library.Core;
 
 namespace RosaDB.Library.Models;
 
-public class Module
+[method: JsonConstructor]
+public class Module(string name, List<Table> tables, List<Column> columns)
 {
-    public string Name { get; init; } = string.Empty;
-    public List<Table> Tables { get; set; } = [];
-    public List<Column> Columns { get; set; } = [];
+    public string Name { get; } = name;
+    public List<Table> Tables { get; } = tables;
+    public List<Column> Columns { get; } = columns;
 
-    public static Result<Module> Create(string name)
+    public static Result<Module> Create(string name, List<Column> columns)
     {
         if (string.IsNullOrWhiteSpace(name))
             return new Error(ErrorPrefixes.DataError, "Module name cannot be empty.");
 
-        return new Module()
-        {
-            Name = name
-        };
+        return new Module(name, [] ,columns);
     }
     
     public Table? GetTable(string name) => Tables.FirstOrDefault(t => t.Name == name);
