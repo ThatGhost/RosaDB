@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
+public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -13,18 +13,18 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
 
         switch (tokens[1].ToUpperInvariant())
         {
-            case "CONTEXT":
-                return await ExecuteAlterContext();
+            case "MODULE":
+                return await ExecuteAlterModule();
             case "TABLE":
                 return new Error(ErrorPrefixes.QueryParsingError, "ALTER TABLE is not implemented.");
             default:
-                return new Error(ErrorPrefixes.QueryParsingError, "Unsupported ALTER statement. Expected CONTEXT or TABLE.");
+                return new Error(ErrorPrefixes.QueryParsingError, "Unsupported ALTER statement. Expected MODULE or TABLE.");
         }
     }
 
-    private async Task<QueryResult> ExecuteAlterContext()
+    private async Task<QueryResult> ExecuteAlterModule()
     {
-        if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER CONTEXT syntax.");
+        if (tokens.Length < 5) return new Error(ErrorPrefixes.QueryParsingError, "Invalid ALTER MODULE syntax.");
         
         switch (tokens[3].ToUpperInvariant())
         {
@@ -41,11 +41,11 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
     
     private async Task<QueryResult> ExecuteAddColumn()
     {
-        // Expecting: ALTER CONTEXT <contextName> ADD COLUMN <colName> <colType>
+        // Expecting: ALTER MODULE <moduleName> ADD COLUMN <colName> <colType>
         if (tokens.Length != 7 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CONTEXT <contextName> ADD COLUMN <colName> <colType>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <moduleName> ADD COLUMN <colName> <colType>");
 
-        var contextName = tokens[2];
+        var moduleName = tokens[2];
         var columnName = tokens[5];
         var columnTypeStr = tokens[6];
 
@@ -54,30 +54,30 @@ public class AlterQuery(string[] tokens, IContextManager cellManager) : IQuery
         var newColumn = Column.Create(columnName, columnType, false);
         if (newColumn.IsFailure) return newColumn.Error;
 
-        var getEnvResult = await cellManager.GetEnvironment(contextName);
+        var getEnvResult = await cellManager.GetEnvironment(moduleName);
         if (!getEnvResult.TryGetValue(out var env)) return getEnvResult.Error;
 
         var currentColumns = env.Columns.ToList();
         if (currentColumns.Any(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase)))
-            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in context '{contextName}'.");
+            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in module '{moduleName}'.");
         
         currentColumns.Add(newColumn.Value);
         
-        var result = await cellManager.UpdateContextEnvironment(contextName, currentColumns.ToArray());
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to context {contextName}.");
+        var result = await cellManager.UpdateModuleEnvironment(moduleName, currentColumns.ToArray());
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to module {moduleName}.");
     }
 
     private async Task<QueryResult> ExecuteDropColumn()
     {
-        // Expecting: ALTER CONTEXT <contextName> DROP COLUMN <colName>
+        // Expecting: ALTER MODULE <moduleName> DROP COLUMN <colName>
         if (tokens.Length != 6 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER CONTEXT <contextName> DROP COLUMN <colName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <moduleName> DROP COLUMN <colName>");
 
-        var contextName = tokens[2];
+        var moduleName = tokens[2];
         var columnName = tokens[5];
 
-        var result = await cellManager.DropColumnAsync(contextName, columnName);
+        var result = await cellManager.DropColumnAsync(moduleName, columnName);
 
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from context {contextName}.");
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from module {moduleName}.");
     }
 }

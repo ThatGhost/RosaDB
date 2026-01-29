@@ -14,9 +14,9 @@ public class LogReader(
     IIndexManager indexManager,
     WriteAheadLogCache writeAheadLogCache) : ILogReader
 {
-    public async Task<Result<Log>> FindLastestLog(string contextName, string tableName, string instanceHash, long id)
+    public async Task<Result<Log>> FindLastestLog(string moduleName, string tableName, string instanceHash, long id)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
         
         if (writeAheadLogCache.Logs.TryGetValue(identifier, out var logs))
         {
@@ -48,11 +48,11 @@ public class LogReader(
         return log;
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForContextTable(string contextName, string tableName)
+    public async IAsyncEnumerable<Log> GetAllLogsForModuleTable(string moduleName, string tableName)
     {
         if (sessionState.CurrentDatabase is null) yield break;
 
-        var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, tableName);
+        var tablePath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, moduleName, tableName);
         if (!fileSystem.Directory.Exists(tablePath)) yield break;
 
         var dataFiles = fileSystem.Directory.GetFiles(tablePath, "*.dat", SearchOption.AllDirectories);
@@ -78,10 +78,10 @@ public class LogReader(
         }
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForContextInstanceTable(string contextName, string tableName, string instanceHash)
+    public async IAsyncEnumerable<Log> GetAllLogsForModuleInstanceTable(string moduleName, string tableName, string instanceHash)
     {
         if (sessionState.CurrentDatabase is null) throw new Exception();
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
 
         var allLogs = new List<Log>();
 
@@ -91,7 +91,7 @@ public class LogReader(
         }
         
         var dbPath = fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name);
-        var instancePath = fileSystem.Path.Combine(dbPath, identifier.ContextName, identifier.TableName, identifier.InstanceHash.Substring(0, 2));
+        var instancePath = fileSystem.Path.Combine(dbPath, identifier.ModuleName, identifier.TableName, identifier.InstanceHash.Substring(0, 2));
 
         if (fileSystem.Directory.Exists(instancePath))
         {
@@ -129,7 +129,7 @@ public class LogReader(
 
         return fileSystem.Path.Combine(
             folderManager.BasePath, sessionState.CurrentDatabase.Name, 
-            identifier.ContextName, identifier.TableName, 
+            identifier.ModuleName, identifier.TableName, 
             hashPrefix,
             $"{identifier.InstanceHash}_{segmentNumber}.dat");
     }

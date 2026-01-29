@@ -8,20 +8,20 @@ using System.IO.Abstractions;
 
 namespace RosaDB.Library.StorageEngine
 {
-    public class ContextManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager, IIndexManager indexManager) : IContextManager
+    public class ModuleManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager, IIndexManager indexManager) : IModuleManager
     {
-        private readonly Dictionary<string,ContextEnvironment> _cachedEnvironment = new();
+        private readonly Dictionary<string,ModuleEnvironment> _cachedEnvironment = new();
 
-        public async Task<Result> CreateContextEnvironment(string contextName, Column[] columns)
+        public async Task<Result> CreateModuleEnvironment(string contextName, Column[] columns)
         {
-            ContextEnvironment env = new ContextEnvironment
+            ModuleEnvironment env = new ModuleEnvironment
             {
                 Columns = columns.ToArray()
             };
             return await SaveEnvironment(env, contextName);
         }
 
-        public async Task<Result> UpdateContextEnvironment(string contextName, Column[] columns)
+        public async Task<Result> UpdateModuleEnvironment(string contextName, Column[] columns)
         {
             var envResult = await GetEnvironment(contextName);
             if (!envResult.TryGetValue(out var env)) return envResult.Error;
@@ -31,16 +31,16 @@ namespace RosaDB.Library.StorageEngine
             return await SaveEnvironment(env, contextName);
         }
 
-        public Result CreateContextInstance(string contextGroupName, string instanceHash, Row instanceData, Column[] schema)
+        public Result CreateModuleInstance(string contextGroupName, string instanceHash, Row instanceData, Column[] schema)
         {
             // 1. Save main data
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
-            var existsResult = indexManager.ContextDataExists(contextGroupName, hashBytes);
+            var existsResult = indexManager.ModuleDataExists(contextGroupName, hashBytes);
             if (existsResult.IsFailure) return existsResult.Error;
-            if (existsResult.Value) return new Error(ErrorPrefixes.DataError, "Context instance already exists");
+            if (existsResult.Value) return new Error(ErrorPrefixes.DataError, "Module instance already exists");
             
-            var insertDataResult = indexManager.InsertContextData(contextGroupName, hashBytes, instanceData.BSON);
+            var insertDataResult = indexManager.InsertModuleData(contextGroupName, hashBytes, instanceData.BSON);
             if (insertDataResult.IsFailure) return insertDataResult.Error;
 
             // 2. Update property indexes
@@ -50,17 +50,17 @@ namespace RosaDB.Library.StorageEngine
                 if (value == null) continue;
                 
                 var keyBytes = IndexKeyConverter.ToByteArray(value);
-                var insertIndexResult = indexManager.InsertContextPropertyIndex(contextGroupName, col.Name, keyBytes, hashBytes);
+                var insertIndexResult = indexManager.InsertModulePropertyIndex(contextGroupName, col.Name, keyBytes, hashBytes);
                 if (insertIndexResult.IsFailure) return insertIndexResult.Error;
             }
             return Result.Success();
         }
 
-        public async Task<Result<Row>> GetContextInstance(string contextGroupName, string instanceHash)
+        public async Task<Result<Row>> GetModuleInstance(string contextGroupName, string instanceHash)
         {
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
-            var rowBytesResult = indexManager.GetContextData(contextGroupName, hashBytes);
+            var rowBytesResult = indexManager.GetModuleData(contextGroupName, hashBytes);
             if (!rowBytesResult.IsSuccess) return rowBytesResult.Error;
             
             var envResult = await GetEnvironment(contextGroupName);
@@ -71,9 +71,9 @@ namespace RosaDB.Library.StorageEngine
         }
 
         // TODO change to streaming of rows
-        public async Task<Result<IEnumerable<Row>>> GetAllContextInstances(string contextGroupName)
+        public async Task<Result<IEnumerable<Row>>> GetAllModuleInstances(string contextGroupName)
         {
-            var allDataResult = indexManager.GetAllContextData(contextGroupName);
+            var allDataResult = indexManager.GetAllModuleData(contextGroupName);
             if (allDataResult.IsFailure) return allDataResult.Error;
 
             var envResult = await GetEnvironment(contextGroupName);
@@ -162,21 +162,21 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        public async Task<Result<ContextEnvironment>> GetEnvironment(string contextName)
+        public async Task<Result<ModuleEnvironment>> GetEnvironment(string contextName)
         {
             if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
 
             if (_cachedEnvironment.TryGetValue(contextName, out var env)) return env;
 
-            var filePathResult = GetContextFilePath(contextName, "_env");
+            var filePathResult = GetModuleFilePath(contextName, "_env");
             if(filePathResult.IsFailure) return filePathResult.Error;
-            if (!fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
+            if (!fileSystem.File.Exists(filePathResult.Value)) return new Error(ErrorPrefixes.FileError, "Module Environment does not exist");
 
             var bytes = await ByteReaderWriter.ReadBytesFromFile(fileSystem, filePathResult.Value, CancellationToken.None);
-            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
+            if (bytes.Length == 0) return new Error(ErrorPrefixes.FileError, "Module Environment does not exist");
             
-            env = ByteObjectConverter.ByteArrayToObject<ContextEnvironment>(bytes);
-            if(env is null) return new Error(ErrorPrefixes.FileError, "Context Environment does not exist");
+            env = ByteObjectConverter.ByteArrayToObject<ModuleEnvironment>(bytes);
+            if(env is null) return new Error(ErrorPrefixes.FileError, "Module Environment does not exist");
 
             _cachedEnvironment[contextName] = env;
             return env;
@@ -196,7 +196,7 @@ namespace RosaDB.Library.StorageEngine
         public Task<Result> DropColumnAsync(string contextName, string columnName)
         {
             return GetEnvironment(contextName)
-                .Then<ContextEnvironment, (ContextEnvironment, Column[], Column[])>(env =>
+                .Then<ModuleEnvironment, (ModuleEnvironment, Column[], Column[])>(env =>
                 {
                     var oldColumns = env.Columns;
                     var columnToRemove = oldColumns.FirstOrDefault(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
@@ -206,13 +206,13 @@ namespace RosaDB.Library.StorageEngine
                     var newColumns = oldColumns.Where(c => c != columnToRemove).ToArray();
                     return (env, oldColumns, newColumns);
                 })
-                .Then<(ContextEnvironment, Column[], Column[]), (ContextEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>)>(data =>
+                .Then<(ModuleEnvironment, Column[], Column[]), (ModuleEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>)>(data =>
                 { 
-                    var contextData = indexManager.GetAllContextData(contextName);
+                    var contextData = indexManager.GetAllModuleData(contextName);
                     if (contextData.IsFailure) return contextData.Error;
                     return (data.Item1, data.Item2, data.Item3, contextData.Value);
                 })
-                .ThenAsync<(ContextEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>), (ContextEnvironment, Column[])>(async data =>
+                .ThenAsync<(ModuleEnvironment, Column[], Column[], IEnumerable<KeyValuePair<byte[], byte[]>>), (ModuleEnvironment, Column[])>(async data =>
                 {
                     var migrationResult = await MigrateDroppedColumnData(contextName, data.Item2, data.Item3, data.Item4);
                     return migrationResult.IsSuccess ? (data.Item1, data.Item3) : migrationResult.Error;
@@ -226,15 +226,15 @@ namespace RosaDB.Library.StorageEngine
                 });
         }
         
-        private Result<string> GetContextFilePath(string contextName, string fileName)
+        private Result<string> GetModuleFilePath(string contextName, string fileName)
         {
             if(sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
             return fileSystem.Path.Combine(folderManager.BasePath, sessionState.CurrentDatabase.Name, contextName, fileName);
         }
         
-        private async Task<Result> SaveEnvironment(ContextEnvironment env, string contextName)
+        private async Task<Result> SaveEnvironment(ModuleEnvironment env, string contextName)
         {
-            var filePath = GetContextFilePath(contextName, "_env");
+            var filePath = GetModuleFilePath(contextName, "_env");
             if(filePath.IsFailure) return filePath.Error;
 
             var bytes = ByteObjectConverter.ObjectToByteArray(env);
@@ -244,9 +244,9 @@ namespace RosaDB.Library.StorageEngine
             return Result.Success();
         }
 
-        private async Task<Result> MigrateDroppedColumnData(string contextName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allContextData)
+        private async Task<Result> MigrateDroppedColumnData(string contextName, Column[] oldColumns, Column[] newColumns, IEnumerable<KeyValuePair<byte[], byte[]>> allModuleData)
         {
-            foreach (var kvp in allContextData)
+            foreach (var kvp in allModuleData)
             {
                 var migrationResult = 
                     RowSerializer.Deserialize(kvp.Value, oldColumns)
@@ -259,7 +259,7 @@ namespace RosaDB.Library.StorageEngine
                         }
                         return Row.Create(newValues, newColumns);
                     })
-                    .Finally(row => indexManager.InsertContextData(contextName, kvp.Key, row.BSON));
+                    .Finally(row => indexManager.InsertModuleData(contextName, kvp.Key, row.BSON));
 
                 if (migrationResult.IsFailure) return migrationResult.Error;
             }

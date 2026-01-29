@@ -10,7 +10,7 @@ namespace RosaDB.Library.Query;
 
 public class QueryPlanner(
     IDatabaseManager databaseManager, 
-    IContextManager contextManager, 
+    IModuleManager moduleManager, 
     RootManager rootManager,
     SessionState sessionState,
     ILogReader logReader,
@@ -53,14 +53,14 @@ public class QueryPlanner(
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, contextManager),
-            "DROP" => new DropQuery(tokens, rootManager, databaseManager, contextManager),
+            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, moduleManager),
+            "DROP" => new DropQuery(tokens, rootManager, databaseManager, moduleManager),
             "USE" => new UseQuery(tokens, sessionState, rootManager),
-            "SELECT" => new SelectQuery(tokens, logReader, contextManager),
-            "INSERT" => new InsertQuery(tokens, contextManager, logWriter, indexManager, sessionState),
-            "DELETE" => new DeleteQuery(tokens, contextManager, logReader, logWriter, sessionState),
+            "SELECT" => new SelectQuery(tokens, logReader, moduleManager),
+            "INSERT" => new InsertQuery(tokens, moduleManager, logWriter, indexManager, sessionState),
+            "DELETE" => new DeleteQuery(tokens, moduleManager, logReader, logWriter, sessionState),
             "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer),
-            "ALTER" => new AlterQuery(tokens, contextManager),
+            "ALTER" => new AlterQuery(tokens, moduleManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logWriter),
             "ROLLBACK" => new RollbackQuery(sessionState, logWriter),

@@ -29,7 +29,7 @@ public static class Installer
         container.RegisterScoped<ILogWriter, LogWriter>();
         container.RegisterSingleton<WriteAheadLogCache>();
         container.RegisterScoped<IIndexManager, IndexManager>();
-        container.RegisterScoped<IContextManager, ContextManager>();
+        container.RegisterScoped<IModuleManager, ModuleManager>();
         container.RegisterScoped<WebsocketQueryPlanner>();
         
         container.Register<TcpClient, Scope, ClientSession>((factory, client, scope) => new ClientSession(client, scope, scope.GetInstance<ISystemLogPublisher>()));

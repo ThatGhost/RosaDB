@@ -10,7 +10,7 @@ namespace RosaDB.Library.Query.Queries;
 // TODO complete redo
 public class InsertQuery(
     string[] tokens,
-    IContextManager cellManager,
+    IModuleManager cellManager,
     ILogWriter logWriter,
     IIndexManager indexManager,
     SessionState sessionState) : IQuery
@@ -21,7 +21,7 @@ public class InsertQuery(
 
         return tokens[1].ToUpperInvariant() switch
         {
-            "CONTEXT" => await InsertContextAsync(),
+            "MODULE" => await InsertModuleAsync(),
             "INTO" => await InsertIntoAsync(),
             _ => new Error(ErrorPrefixes.QueryParsingError, $"Unknown INSERT target: {tokens[1]}"),
         };
@@ -31,19 +31,19 @@ public class InsertQuery(
     {
         return await ParseInsertInto()
             .ThenAsync(parsed => AssertUsingClause(parsed)
-            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.ContextGroupName, parsed.TableName)
+            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.ModuleGroupName, parsed.TableName)
             .ThenAsync(async tableSchemaColumns =>
             {
                 var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
                 
                 var rowResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
                     .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
-                    .Then(tableRow => CheckPrimaryKeys(parsed.ContextGroupName, parsed.TableName, tableRow.InstanceHash, tableRow));
+                    .Then(tableRow => CheckPrimaryKeys(parsed.ModuleGroupName, parsed.TableName, tableRow.InstanceHash, tableRow));
                 
                 if (rowResult.IsFailure) return rowResult.Error;
                 var row = rowResult.Value;
 
-                logWriter.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, row.BSON, row.InstanceHash);
+                logWriter.Put(parsed.ModuleGroupName, parsed.TableName, usingIndexValues, row.BSON, row.InstanceHash);
                 
                 if (!sessionState.IsInTransaction) return await logWriter.Commit();
 
@@ -55,9 +55,9 @@ public class InsertQuery(
             );
     }
     
-    private Result<Row> CheckPrimaryKeys(string contextName, string tableName, string instanceHash, Row tableRow)
+    private Result<Row> CheckPrimaryKeys(string moduleName, string tableName, string instanceHash, Row tableRow)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
 
         foreach (var col in tableRow.Columns)
         {
@@ -78,14 +78,14 @@ public class InsertQuery(
         return tableRow;
     }
 
-    private async Task<QueryResult> InsertContextAsync()
+    private async Task<QueryResult> InsertModuleAsync()
     {
         // 1. PARSE
-        var parseResult = ParseInsertContext();
+        var parseResult = ParseInsertModule();
         if (!parseResult.TryGetValue(out var parsed)) return parseResult.Error;
 
         // 2. GET SCHEMA & VALIDATE
-        var envResult = await cellManager.GetEnvironment(parsed.ContextGroupName);
+        var envResult = await cellManager.GetEnvironment(parsed.ModuleGroupName);
         if (!envResult.TryGetValue(out var cellEnv)) return envResult.Error;
 
         var schemaColumns = cellEnv.Columns;
@@ -104,20 +104,20 @@ public class InsertQuery(
         if (indexValues.Count != requiredIndexCols.Count)
         {
              var missingCols = string.Join(", ", requiredIndexCols.Select(c => c.Name).Except(indexValues.Keys));
-             return new Error(ErrorPrefixes.DataError, $"INSERT CONTEXT requires values for all indexed columns. Missing: {missingCols}");
+             return new Error(ErrorPrefixes.DataError, $"INSERT MODULE requires values for all indexed columns. Missing: {missingCols}");
         }
 
         // 3. GENERATE HASH
-        var instanceHash = InstanceHasher.GenerateContextInstanceHash(indexValues);
+        var instanceHash = InstanceHasher.GenerateModuleInstanceHash(indexValues);
 
         // 4. CREATE ROW and SAVE
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
         if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
 
-        var saveResult = cellManager.CreateContextInstance(parsed.ContextGroupName, instanceHash, row, schemaColumns);
+        var saveResult = cellManager.CreateModuleInstance(parsed.ModuleGroupName, instanceHash, row, schemaColumns);
         if (saveResult.IsFailure) return saveResult.Error;
 
-        return new QueryResult("1 context instance inserted successfully.", 1);
+        return new QueryResult("1 module instance inserted successfully.", 1);
     }
 
     private Result AddValuesToCollections(Column col, Dictionary<string, string> valueMap, object?[] rowValues, Dictionary<string, string> indexValues, int i)
@@ -137,12 +137,12 @@ public class InsertQuery(
         return Result.Success();
     }
 
-    private Result<(string ContextGroupName, string[] Props, string[] Values)> ParseInsertContext()
+    private Result<(string ModuleGroupName, string[] Props, string[] Values)> ParseInsertModule()
     {
-        // INSERT CONTEXT <ContextGroup> (<props>) VALUES (<vals>)
-        if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT CONTEXT syntax.");
+        // INSERT MODULE <ModuleGroup> (<props>) VALUES (<vals>)
+        if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT MODULE syntax.");
 
-        var contextName = tokens[2];
+        var moduleName = tokens[2];
 
         var propsResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, 3, out int propsEnd);
         if (!propsResult.TryGetValue(out var props))
@@ -156,27 +156,27 @@ public class InsertQuery(
 
         if (props.Length != values.Length) return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
 
-        return (contextName, props, values);
+        return (moduleName, props, values);
     }
     
-    private Result<(string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
+    private Result<(string ModuleGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
     {
-        // INSERT INTO <contextName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
+        // INSERT INTO <moduleName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
         if (tokens.Length < 10)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <context>.<table> USING (...) (...) VALUES (...)");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <module>.<table> USING (...) (...) VALUES (...)");
 
         return Result.Success()
             .Then(() => ParseTableNamePart(3))
             .Then(parsedTableName => ParseUsingClausePart(parsedTableName.NextIndex)
             .Then(parsedUsing => ParseColumnsPart(parsedUsing.NextIndex)
             .Then(parsedColumns => ParseValuesPart(parsedColumns.NextIndex)
-            .Then<(string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)>(parsedValues =>
+            .Then<(string ModuleGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)>(parsedValues =>
             {
                 if (parsedColumns.Columns.Length != parsedValues.Values.Length)
                     return new Error(ErrorPrefixes.QueryParsingError, "Column count does not match value count.");
 
                 return (
-                    parsedTableName.ContextGroupName,
+                    parsedTableName.ModuleGroupName,
                     parsedTableName.TableName,
                     parsedUsing.UsingProperties,
                     parsedColumns.Columns,
@@ -185,16 +185,16 @@ public class InsertQuery(
             }))));
     }
 
-    private Result<(string ContextGroupName, string TableName, int NextIndex)> ParseTableNamePart(int startIndex)
+    private Result<(string ModuleGroupName, string TableName, int NextIndex)> ParseTableNamePart(int startIndex)
     {
         var fullTableName = tokens[startIndex -1].Split('.');
         if (fullTableName.Length != 2)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <contextName>.<tableName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <moduleName>.<tableName>");
         
-        var contextName = fullTableName[0];
+        var moduleName = fullTableName[0];
         var tableName = fullTableName[1];
 
-        return (contextName, tableName, startIndex);
+        return (moduleName, tableName, startIndex);
     }
 
     private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)
@@ -259,9 +259,9 @@ public class InsertQuery(
         return usingProperties;
     }
 
-    private async Task<Result<Object[]>> AssertUsingClause((string ContextGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
+    private async Task<Result<Object[]>> AssertUsingClause((string ModuleGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values) parsed)
     {
-        var cellEnvResult = await cellManager.GetEnvironment(parsed.ContextGroupName);
+        var cellEnvResult = await cellManager.GetEnvironment(parsed.ModuleGroupName);
         if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
 
         var cellSchemaColumns = cellEnv.Columns;
@@ -270,18 +270,18 @@ public class InsertQuery(
         foreach (var kvp in parsed.UsingProperties)
         {
             var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ContextGroup '{parsed.ContextGroupName}'.");
-            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ContextGroup '{parsed.ContextGroupName}'.");
+            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ModuleGroup '{parsed.ModuleGroupName}'.");
+            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ModuleGroup '{parsed.ModuleGroupName}'.");
 
             usingIndexValues[col.Name] = kvp.Value;
         }
 
-        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed ContextGroup columns.");
+        if (usingIndexValues.Count != cellSchemaColumns.Count(c => c.IsIndex)) return new Error(ErrorPrefixes.DataError, $"USING clause requires values for all indexed ModuleGroup columns.");
 
-        var cellInstanceHash = InstanceHasher.GenerateContextInstanceHash(usingIndexValues);
+        var cellInstanceHash = InstanceHasher.GenerateModuleInstanceHash(usingIndexValues);
 
-        var getContextInstanceResult = await cellManager.GetContextInstance(parsed.ContextGroupName, cellInstanceHash);
-        if (getContextInstanceResult.IsFailure) return getContextInstanceResult.Error;
+        var getModuleInstanceResult = await cellManager.GetModuleInstance(parsed.ModuleGroupName, cellInstanceHash);
+        if (getModuleInstanceResult.IsFailure) return getModuleInstanceResult.Error;
         return usingIndexValues.Values.Cast<object>().ToArray();
     }
 

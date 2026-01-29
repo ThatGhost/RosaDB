@@ -32,9 +32,9 @@ This document outlines a sequential development plan for RosaDB.
     *   ~~Extend `QueryTokenizer` and `QueryPlanner` to support basic `INSERT INTO ... VALUES ...` syntax.~~
     *   ~~Implement an `InsertOperator` that can add new rows to a table, ensuring data is correctly serialized and stored using the existing `LogManager`.~~
 4. ~~**Implement USING in SELECT Queries:**~~
-   ~~*   Add the `USING` keywork to select queries to be able to search on Context instances.~~
-    ~~*   Add the `USING` keywork to select queries to be able to search on Context instances with clause test.~~
-    ~~*   Use indexes for the indexed properties of the context~~
+   ~~*   Add the `USING` keywork to select queries to be able to search on Module instances.~~
+    ~~*   Add the `USING` keywork to select queries to be able to search on Module instances with clause test.~~
+    ~~*   Use indexes for the indexed properties of the module~~
 5. ~~**Add Greater and Lesser than operations to `SELECT`**~~
 
 ## ~~Phase 4: Feature Development~~
@@ -44,10 +44,10 @@ This document outlines a sequential development plan for RosaDB.
     *   ~~Create and register a `SubscriptionManager` service using `LightInject`.~~
     *   ~~Enhance `Websockets` to process a `SUBSCRIBE` command, registering client interests with the `SubscriptionManager`.~~
     *   ~~Modify `LogManager.Commit` to notify the `SubscriptionManager` of data changes, allowing it to push updates to subscribed WebSocket clients (leveraging the existing `/ws` endpoint in `Program.cs`).~~
-3. ~~**Context Metadata:**~~
-    ~~*   Add a `Dictionary<string, object> Metadata` property to the `Context` model (`Context.cs`).~~
-    ~~*   Update `ContextEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
-    ~~*   Implement an `ALTER CONTEXT` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from context metadata.~~ (Only added ADD and DROP Column for now)
+3. ~~**Module Metadata:**~~
+    ~~*   Add a `Dictionary<string, object> Metadata` property to the `Module` model (`Module.cs`).~~
+    ~~*   Update `ModuleEnvironment.cs` to include this new metadata, relying on `ByteObjectConverter`'s JSON serialization.~~
+    ~~*   Implement an `ALTER MODULE` query within the `QueryPlanner` to enable adding, updating, or removing key-value pairs from module metadata.~~ (Only added ADD and DROP Column for now)
 4. ~~**Implement Transactions:**~~
     ~~*   Design a transaction model that allows grouping multiple `INSERT`, `UPDATE`, and `DELETE` operations into a single atomic unit.~~
     ~~*   Implement `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` commands in the `QueryPlanner`.~~
@@ -58,17 +58,17 @@ This document outlines a sequential development plan for RosaDB.
 ## ~~Phase 5: Developer Experience and Server Enhancements~~
 
 1. ~~**Integrate Logging Framework:** Implement a robust logging framework (e.g., Serilog, NLog) across `RosaDB.Server` and `RosaDB.Library`, replacing existing `Console.WriteLine` calls with structured logging.~~
-   *    ~~Add this to a special context instance that users can `SUBSCRIBE` to using the websockets.~~
+   *    ~~Add this to a special module instance that users can `SUBSCRIBE` to using the websockets.~~
    *    ~~Add a session id to all sessions and make the logs identifiable by session id.~~ 
 2. ~~**TUI Enhancements:** Improve the `ContentView` in the `RosaDB.Client` to enhance the readability and formatting of query results.~~
 3. ~~**Saving of queries in the TUI:** Add the ability to save queries and delete them. This should be persisted throughout sessions. This will replace the current `DefaultQueryView.cs`~~
-4. ~~**Better seeder:** Add better seeding data. with lots of context instances and maybe tables. Real-ish data.~~
+4. ~~**Better seeder:** Add better seeding data. with lots of module instances and maybe tables. Real-ish data.~~
 
-## ~~Phase 5.5: Change `CONTEXT` to `CONTEXT`~~
+## ~~Phase 5.5: Change `MODULE` to `MODULE`~~
 
 ## Phase 6: Rigorous Testing and further Feature Development
 1. **Unit Testing:** Testing should be the applied to every line and every type of query. Good and bad paths.
-   * ~~ContextManager~~
+   * ~~ModuleManager~~
    * DatabaseManager
    * FolderManager
    * IndexManager
@@ -82,11 +82,11 @@ This document outlines a sequential development plan for RosaDB.
    * UseQuery
    * Transactions
 2. **Integration Tests:** Add integration testing to Every type of query and see that the effects are correct.
-3. **Add `DELETE` Query:** Add the ability to delete rows or contexts.
+3. **Add `DELETE` Query:** Add the ability to delete rows or modules.
     *   ~~Take into account transactions~~
 4. **Altering of `Tables`:** Add the ability to alter tables and update its rows using the `ALTER TABLE` query.
 5. **Add `COMPACT`:** This query should start compacting log files into higher level ones.
-6. **Add `UPDATE` Query:** Add the ability to update rows or contexts.
+6. **Add `UPDATE` Query:** Add the ability to update rows or modules.
     *   Take into account transactions
 
 ## Phase 7: Optimization
@@ -100,13 +100,13 @@ This document outlines a sequential development plan for RosaDB.
 ## Phase 8: User/Settings management and Connection strings
 
 ## Phase 9: Missing features
-1.  **`ALTER TABLE` & `CONTEXT` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
-2.  **Default Context:** When a context is not present in the query. Replace the context with `default`. This will be used as a context with one instance that can function as a regular database
-3.  **Foreign keys:** Implement foreign keys. they can link tables of the same context or tables and contexts.
-     * Example: `TABLE` Users in the default connects to the accounts `CONTEXT`.
+1.  **`ALTER TABLE` & `MODULE` Modify columns:** You can only `ADD` or `DROP` columns right now. add the modify column feature.
+2.  **Default Module:** When a module is not present in the query. Replace the module with `default`. This will be used as a module with one instance that can function as a regular database
+3.  **Foreign keys:** Implement foreign keys. they can link tables of the same module or tables and modules.
+     * Example: `TABLE` Users in the default connects to the accounts `MODULE`.
 4. **Rework `DELETE` Query**: Query now get all the instances and uses a crude method. 
      * If the indexes are present only use the indexes
-     * Stream the Context instances
+     * Stream the Module instances
      * Smarter lookups if possible
-     * Make it work for context instances as well.
+     * Make it work for module instances as well.
 5. **Rework the `LogManager` ... again**: The `LogManager` should be split in reading and writing. And rework the instance hash out of the parameters

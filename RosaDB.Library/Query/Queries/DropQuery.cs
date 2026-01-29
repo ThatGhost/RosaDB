@@ -8,7 +8,7 @@ public class DropQuery(
     string[] tokens,
     RootManager rootManager,
     IDatabaseManager databaseManager,
-    IContextManager cellManager) : IQuery
+    IModuleManager cellManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -18,7 +18,7 @@ public class DropQuery(
         return tokens[1].ToUpperInvariant() switch
         {
             "DATABASE" => await DROP_DATABASE(tokens[2]),
-            "CONTEXT" => await DROP_CONTEXT(tokens[2]),
+            "MODULE" => await DROP_MODULE(tokens[2]),
             "TABLE" => await DROP_TABLE(tokens[2..]),
             _ => new Error(ErrorPrefixes.QueryParsingError, "DROP type not supported"),
         };
@@ -32,23 +32,23 @@ public class DropQuery(
         return new QueryResult($"Database: {name} was deleted successfully");
     }
 
-    private async Task<QueryResult> DROP_CONTEXT(string name)
+    private async Task<QueryResult> DROP_MODULE(string name)
     {
-        var result = await databaseManager.DeleteContext(name);
+        var result = await databaseManager.DeleteModule(name);
         if (result.IsFailure) return result.Error;
 
-        return new QueryResult($"Context: {name} was deleted successfully");
+        return new QueryResult($"Module: {name} was deleted successfully");
     }
 
     private async Task<QueryResult> DROP_TABLE(string[] tableTokens)
     {
         string tableName = tableTokens[0];
         if (tableTokens[1] != "IN") return new Error(ErrorPrefixes.QueryParsingError, "Delete table does not define IN structure");
-        string contextName = tableTokens[2];
+        string moduleName = tableTokens[2];
 
-        var result = await cellManager.DeleteTable(contextName, tableName);
+        var result = await cellManager.DeleteTable(moduleName, tableName);
         if(result.IsFailure) return result.Error;
 
-        return new QueryResult($"Table with name: {tableName} in context: {contextName} was successfully dropped");
+        return new QueryResult($"Table with name: {tableName} in module: {moduleName} was successfully dropped");
     }
 }

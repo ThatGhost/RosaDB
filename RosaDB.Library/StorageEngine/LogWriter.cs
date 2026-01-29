@@ -14,7 +14,7 @@ public class LogWriter(
     IFileSystem fileSystem,
     IFolderManager folderManager,
     IIndexManager indexManager,
-    IContextManager contextManager,
+    IModuleManager moduleManager,
     ISubscriptionManager subscriptionManager,
     WriteAheadLogCache writeAheadLogCache) : ILogWriter
 {
@@ -35,7 +35,7 @@ public class LogWriter(
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
-            var columnsResult = await contextManager.GetColumnsFromTable(identifier.ContextName, identifier.TableName);
+            var columnsResult = await moduleManager.GetColumnsFromTable(identifier.ModuleName, identifier.TableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
             var result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
@@ -67,18 +67,18 @@ public class LogWriter(
         writeAheadLogCache.Logs.Clear();
     }
     
-    public void Put(string contextName, string tableName, object[] tableIndex, byte[] data, string instanceHash, long? logId = null)
+    public void Put(string moduleName, string tableName, object[] tableIndex, byte[] data, string instanceHash, long? logId = null)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
         Log log = new() { TupleData = data, Id = finalLogId };
         PutLog(log, identifier);
     }
 
-    public void Delete(string contextName, string tableName, string instanceHash, long logId)
+    public void Delete(string moduleName, string tableName, string instanceHash, long logId)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
         Log log = new() { Id = logId, IsDeleted = true };
         PutLog(log, identifier);
     }
@@ -184,7 +184,7 @@ public class LogWriter(
 
         return fileSystem.Path.Combine(
             folderManager.BasePath, sessionState.CurrentDatabase.Name, 
-            identifier.ContextName, identifier.TableName, 
+            identifier.ModuleName, identifier.TableName, 
             hashPrefix,
             $"{identifier.InstanceHash}_{segmentNumber}.dat");
     }

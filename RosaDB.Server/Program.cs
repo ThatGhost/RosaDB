@@ -30,17 +30,17 @@ var tcpService = app.Services.GetRequiredService<TcpServerService>();
 tcpService!.serviceContainer = container;
 var socketManager = new SocketManager(container);
 
-app.Map("/ws", async context =>
+app.Map("/ws", async module =>
 {
     // TODO: Add Authorization callback here
-    if (context.WebSockets.IsWebSocketRequest)
+    if (module.WebSockets.IsWebSocketRequest)
     {
-        var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        var webSocket = await module.WebSockets.AcceptWebSocketAsync();
         await socketManager.AddSocket(webSocket);
     }
     else
     {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        module.Response.StatusCode = StatusCodes.Status400BadRequest;
     }
 });
 

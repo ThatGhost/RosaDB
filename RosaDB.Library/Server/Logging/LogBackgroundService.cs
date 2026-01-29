@@ -43,13 +43,13 @@ namespace RosaDB.Library.Server.Logging
                 var logWriter = scope.GetInstance<ILogWriter>();
                 var sessionState = scope.GetInstance<SessionState>();
                 var databaseManager = scope.GetInstance<IDatabaseManager>();
-                var cellManager = scope.GetInstance<IContextManager>();
+                var cellManager = scope.GetInstance<IModuleManager>();
 
                 var dbResult = databaseManager.GetDatabase(LogSystemInitializer.SystemDatabaseName);
                 if (!dbResult.TryGetValue(out var db)) return;
                 sessionState.CurrentDatabase = db;
 
-                var tableSchemaResult = await cellManager.GetColumnsFromTable(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName);
+                var tableSchemaResult = await cellManager.GetColumnsFromTable(LogSystemInitializer.LogModuleGroupName, LogSystemInitializer.LogTableName);
                 if (!tableSchemaResult.TryGetValue(out var tableSchema)) return;
 
                 var rowResult = Row.Create(
@@ -58,7 +58,7 @@ namespace RosaDB.Library.Server.Logging
                 );
                 if (!rowResult.TryGetValue(out var row)) return;
                 
-                logWriter.Put(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], row.BSON, "");
+                logWriter.Put(LogSystemInitializer.LogModuleGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], row.BSON, "");
                 await logWriter.Commit();
             }
         }

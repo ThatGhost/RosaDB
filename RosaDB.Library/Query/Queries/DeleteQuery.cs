@@ -9,32 +9,32 @@ namespace RosaDB.Library.Query.Queries;
 
 public class DeleteQuery(
     string[] tokens,
-    IContextManager cellManager,
+    IModuleManager cellManager,
     ILogReader logReader,
     ILogWriter logWriter,
     SessionState sessionState) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
-        // DELETE FROM <context>.<table> USING ... WHERE ...
+        // DELETE FROM <module>.<table> USING ... WHERE ...
         if (tokens[0].ToUpperInvariant() != "DELETE") return new Error(ErrorPrefixes.QueryParsingError, "Incorrect query type");
 
         var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
-        var (contextName, tableName) = TokensToContextAndTableParser.TokensToContextAndName(tokens[fromIndex + 1]);
-        var columnsResult = await cellManager.GetColumnsFromTable(contextName, tableName);
+        var (moduleName, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+        var columnsResult = await cellManager.GetColumnsFromTable(moduleName, tableName);
         if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
         
         IAsyncEnumerable<Log> logs;
         if (usingIndex != -1)
         {
-            var cellEnv = await cellManager.GetEnvironment(contextName);
+            var cellEnv = await cellManager.GetEnvironment(moduleName);
             if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
             var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
             if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
             logs = result.Value;
         }
-        else logs = logReader.GetAllLogsForContextTable(contextName, tableName);
+        else logs = logReader.GetAllLogsForModuleTable(moduleName, tableName);
             
         if (logs is null) return new Error(ErrorPrefixes.DataError, "No logs found");
 
@@ -45,7 +45,7 @@ public class DeleteQuery(
         int count = 0;
         await foreach ((Row, Log) tuple in filteredStream)
         {
-            logWriter.Delete(contextName, tableName, tuple.Item1.InstanceHash, tuple.Item2.Id);
+            logWriter.Delete(moduleName, tableName, tuple.Item1.InstanceHash, tuple.Item2.Id);
             count++;
         }
         
