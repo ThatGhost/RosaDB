@@ -36,20 +36,17 @@ namespace RosaDB.Library.StorageEngine
             // 1. Save main data
             var hashBytes = IndexKeyConverter.ToByteArray(instanceHash);
 
-            var rowBytesResult = RowSerializer.Serialize(instanceData);
-            if (!rowBytesResult.TryGetValue(out var rowBytes)) return rowBytesResult.Error;
-
             var existsResult = indexManager.ContextDataExists(contextGroupName, hashBytes);
             if (existsResult.IsFailure) return existsResult.Error;
             if (existsResult.Value) return new Error(ErrorPrefixes.DataError, "Context instance already exists");
             
-            var insertDataResult = indexManager.InsertContextData(contextGroupName, hashBytes, rowBytes);
+            var insertDataResult = indexManager.InsertContextData(contextGroupName, hashBytes, instanceData.BSON);
             if (insertDataResult.IsFailure) return insertDataResult.Error;
 
             // 2. Update property indexes
             foreach (var col in schema.Where(c => c.IsIndex || c.IsPrimaryKey))
             {
-                var value = instanceData[col.Name];
+                var value = instanceData.GetValue(col.Name);
                 if (value == null) continue;
                 
                 var keyBytes = IndexKeyConverter.ToByteArray(value);
@@ -262,8 +259,7 @@ namespace RosaDB.Library.StorageEngine
                         }
                         return Row.Create(newValues, newColumns);
                     })
-                    .Then(RowSerializer.Serialize)
-                    .Finally(newRowBytes => indexManager.InsertContextData(contextName, kvp.Key, newRowBytes));
+                    .Finally(row => indexManager.InsertContextData(contextName, kvp.Key, row.BSON));
 
                 if (migrationResult.IsFailure) return migrationResult.Error;
             }

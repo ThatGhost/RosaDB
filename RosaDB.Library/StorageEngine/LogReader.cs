@@ -14,9 +14,9 @@ public class LogReader(
     IIndexManager indexManager,
     WriteAheadLogCache writeAheadLogCache) : ILogReader
 {
-    public async Task<Result<Log>> FindLastestLog(string contextName, string tableName, object[] indexValues, long id)
+    public async Task<Result<Log>> FindLastestLog(string contextName, string tableName, string instanceHash, long id)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
         
         if (writeAheadLogCache.Logs.TryGetValue(identifier, out var logs))
         {
@@ -78,10 +78,10 @@ public class LogReader(
         }
     }
 
-    public async IAsyncEnumerable<Log> GetAllLogsForContextInstanceTable(string contextName, string tableName, object?[] indexValues)
+    public async IAsyncEnumerable<Log> GetAllLogsForContextInstanceTable(string contextName, string tableName, string instanceHash)
     {
         if (sessionState.CurrentDatabase is null) throw new Exception();
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
 
         var allLogs = new List<Log>();
 

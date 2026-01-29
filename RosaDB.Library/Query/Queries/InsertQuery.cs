@@ -7,6 +7,7 @@ using RosaDB.Library.Server;
 
 namespace RosaDB.Library.Query.Queries;
 
+// TODO complete redo
 public class InsertQuery(
     string[] tokens,
     IContextManager cellManager,
@@ -37,24 +38,12 @@ public class InsertQuery(
                 
                 var rowResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
                     .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
-                    .Then(tableRow => CheckPrimaryKeys(parsed.ContextGroupName, parsed.TableName, usingIndexValues, tableRow));
+                    .Then(tableRow => CheckPrimaryKeys(parsed.ContextGroupName, parsed.TableName, tableRow.InstanceHash, tableRow));
                 
                 if (rowResult.IsFailure) return rowResult.Error;
                 var row = rowResult.Value;
 
-                var serializeResult = RowSerializer.Serialize(row);
-                if (serializeResult.IsFailure) return serializeResult.Error;
-                
-                var indexValuesList = new List<(string, byte[], bool)>();
-                for(int i=0; i < row.Columns.Length; i++)
-                {
-                    if (row.Columns[i].IsIndex || row.Columns[i].IsPrimaryKey)
-                    {
-                         indexValuesList.Add((row.Columns[i].Name, IndexKeyConverter.ToByteArray(row.Values[i]), row.Columns[i].IsPrimaryKey));
-                    }
-                }
-
-                logWriter.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, serializeResult.Value, indexValuesList);
+                logWriter.Put(parsed.ContextGroupName, parsed.TableName, usingIndexValues, row.BSON, row.InstanceHash);
                 
                 if (!sessionState.IsInTransaction) return await logWriter.Commit();
 
@@ -66,15 +55,15 @@ public class InsertQuery(
             );
     }
     
-    private Result<Row> CheckPrimaryKeys(string contextName, string tableName, object[] usingIndexValues, Row tableRow)
+    private Result<Row> CheckPrimaryKeys(string contextName, string tableName, string instanceHash, Row tableRow)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, usingIndexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
 
         foreach (var col in tableRow.Columns)
         {
             if (col.IsPrimaryKey)
             {
-                var val = tableRow[col.Name];
+                var val = tableRow.GetValue(col.Name);
                 if (val == null) continue; // Should not happen for PK, but safe check
                 
                 var keyBytes = IndexKeyConverter.ToByteArray(val);

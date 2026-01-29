@@ -5,11 +5,9 @@ namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class InstanceHasher
 {
-    public static TableInstanceIdentifier CreateIdentifier(string contextName, string tableName, object?[] indexValues)
+    public static TableInstanceIdentifier CreateIdentifier(string contextName, string tableName, string instanceHash)
     {
-        var indexString = string.Join(";", indexValues.Select(v => v?.ToString()));
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexString)));
-        return new TableInstanceIdentifier(contextName, tableName, hash);
+        return new TableInstanceIdentifier(contextName, tableName, instanceHash);
     }
     
     public static string GenerateContextInstanceHash(Dictionary<string, string> indexValues)

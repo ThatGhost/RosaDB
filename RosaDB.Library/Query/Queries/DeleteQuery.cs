@@ -45,7 +45,7 @@ public class DeleteQuery(
         int count = 0;
         await foreach ((Row, Log) tuple in filteredStream)
         {
-            logWriter.Delete(contextName, tableName, tuple.Item1.ToIndexDictionary().Select(d => d.Value).ToArray(), tuple.Item2.Id);
+            logWriter.Delete(contextName, tableName, tuple.Item1.InstanceHash, tuple.Item2.Id);
             count++;
         }
         

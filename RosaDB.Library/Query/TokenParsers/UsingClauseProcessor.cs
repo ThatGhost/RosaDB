@@ -29,14 +29,14 @@ namespace RosaDB.Library.Query.Queries
                 cellsThatApply.Add(cellInstanceResult.Value);
             }
 
-            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(logReader, cellsThatApply, tableName, contextName, cellEnv));
+            return Result<IAsyncEnumerable<Log>>.Success(TurnContextRowsToLogs(logReader, cellsThatApply, tableName, contextName));
         }
 
-        private static async IAsyncEnumerable<Log> TurnContextRowsToLogs(ILogReader logReader, List<Row> cells, string tableName, string contextName, ContextEnvironment cellEnv)
+        private static async IAsyncEnumerable<Log> TurnContextRowsToLogs(ILogReader logReader, List<Row> cells, string tableName, string contextName)
         {
             foreach (var context in cells)
             {
-                await foreach (var log in logReader.GetAllLogsForContextInstanceTable(contextName, tableName, cellEnv.GetIndexValues(context)))
+                await foreach (var log in logReader.GetAllLogsForContextInstanceTable(contextName, tableName, context.InstanceHash))
                 {
                     yield return log;
                 }
@@ -157,11 +157,7 @@ namespace RosaDB.Library.Query.Queries
                 }
 
                 if (!doesUsingApply) continue;
-                
-                var instanceHash = InstanceHasher.GenerateContextInstanceHash(context.ToIndexDictionary()
-                    .Select(c => new KeyValuePair<string, string>(c.Key, c.Value?.ToString() ?? "NULL"))
-                    .ToDictionary());
-                cellsThatApply.Add(instanceHash);
+                cellsThatApply.Add(context.InstanceHash);
             }
 
             return cellsThatApply;

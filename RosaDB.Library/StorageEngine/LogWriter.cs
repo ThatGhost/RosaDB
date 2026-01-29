@@ -35,10 +35,10 @@ public class LogWriter(
             var condensedLogs = logCondenser.Condense(logs).OrderBy(l => l.Id).ToList();
             if (condensedLogs.Count == 0) continue;
 
-            Result<Column[]> columnsResult = await contextManager.GetColumnsFromTable(identifier.ContextName, identifier.TableName);
+            var columnsResult = await contextManager.GetColumnsFromTable(identifier.ContextName, identifier.TableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
-            Result<(SegmentMetadata metadata, string segmentFilePath, List<(Log log, byte[] bytes)> serializedLogs)> result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
+            var result = GetCommitFilePathsAndMetadata(identifier, condensedLogs);
             if (result.IsFailure) return result.Error;
             
             var path = result.Value.segmentFilePath;
@@ -67,18 +67,18 @@ public class LogWriter(
         writeAheadLogCache.Logs.Clear();
     }
     
-    public void Put(string contextName, string tableName, object[] tableIndex, byte[] data, List<(string Name, byte[] Value, bool IsPrimaryKey)>? indexValues = null, long? logId = null)
+    public void Put(string contextName, string tableName, object[] tableIndex, byte[] data, string instanceHash, long? logId = null)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, tableIndex);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
         long finalLogId = logId ?? Guid.NewGuid().GetHashCode(); 
         
-        Log log = new() { TupleData = data, Id = finalLogId, IndexValues = indexValues };
+        Log log = new() { TupleData = data, Id = finalLogId };
         PutLog(log, identifier);
     }
 
-    public void Delete(string contextName, string tableName, object?[] indexValues, long logId)
+    public void Delete(string contextName, string tableName, string instanceHash, long logId)
     {
-        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, indexValues);
+        var identifier = InstanceHasher.CreateIdentifier(contextName, tableName, instanceHash);
         Log log = new() { Id = logId, IsDeleted = true };
         PutLog(log, identifier);
     }

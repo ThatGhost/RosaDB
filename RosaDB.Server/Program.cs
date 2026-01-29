@@ -19,7 +19,7 @@ Installer.Install(container);
 // ---- START LOGGING SERVICE ----
 var logService = container.GetInstance<LogBackgroundService>();
 
-logService.Start();
+//logService.Start();
 
 // Ensure the logger is stopped gracefully on application shutdown
 app.Lifetime.ApplicationStopping.Register(() => logService.Stop());

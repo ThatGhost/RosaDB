@@ -13,12 +13,12 @@ namespace RosaDB.Library.Server.Logging
         public void Start()
         {
             _cancellationTokenSource = new CancellationTokenSource();
-            //_backgroundTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
+            _backgroundTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
         }
 
         public void Stop()
         {
-            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource.Cancel();
             _backgroundTask?.Wait();
         }
 
@@ -29,10 +29,7 @@ namespace RosaDB.Library.Server.Logging
                 try
                 {
                     var record = logQueue.Dequeue(cancellationToken);
-                    if (record != null)
-                    {
-                        await WriteLogRecord(record);
-                    }
+                    await WriteLogRecord(record);
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex) { Console.Error.WriteLine($"Error in logger background service: {ex.Message}"); }
@@ -49,11 +46,7 @@ namespace RosaDB.Library.Server.Logging
                 var cellManager = scope.GetInstance<IContextManager>();
 
                 var dbResult = databaseManager.GetDatabase(LogSystemInitializer.SystemDatabaseName);
-                if (!dbResult.TryGetValue(out var db))
-                {
-                    Console.Error.WriteLine($"Failed to get system database: {dbResult.Error.Message}");
-                    return;
-                }
+                if (!dbResult.TryGetValue(out var db)) return;
                 sessionState.CurrentDatabase = db;
 
                 var tableSchemaResult = await cellManager.GetColumnsFromTable(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName);
@@ -63,20 +56,9 @@ namespace RosaDB.Library.Server.Logging
                     [record.SessionId, record.Message, record.Timestamp.ToString("o"), record.Level.ToString()],
                     tableSchema
                 );
-                if (!rowResult.TryGetValue(out var row))
-                {
-                    Console.Error.WriteLine($"Failed to create log row: {rowResult.Error.Message}");
-                    return;
-                }
-
-                var serializeResult = RowSerializer.Serialize(row);
-                if (!serializeResult.TryGetValue(out var serializedRow))
-                {
-                    Console.Error.WriteLine($"Failed to serialize log row: {serializeResult.Error.Message}");
-                    return;
-                }
+                if (!rowResult.TryGetValue(out var row)) return;
                 
-                logWriter.Put(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], serializedRow, []);
+                logWriter.Put(LogSystemInitializer.LogContextGroupName, LogSystemInitializer.LogTableName, [sessionState.SessionId.ToString()], row.BSON, "");
                 await logWriter.Commit();
             }
         }

@@ -6,13 +6,10 @@ namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class RowSerializer
 {
-    public static Result<byte[]> Serialize(Row row)
+    public static Result<byte[]> Serialize(object?[] values, Column[] columns)
     {
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
-
-        var columns = row.Columns;
-        var values = row.Values;
 
         writer.Write(columns.Length);
 
@@ -46,13 +43,6 @@ public static class RowSerializer
                     writer.Write((long)value);
                     break;
                 case DataType.VARCHAR:
-                {
-                    var str = (string)value;
-                    var bytes = Encoding.UTF8.GetBytes(str);
-                    writer.Write(bytes.Length);
-                    writer.Write(bytes);
-                    break;
-                }
                 case DataType.TEXT:
                 {
                     var str = (string)value;
@@ -63,6 +53,15 @@ public static class RowSerializer
                 }
                 case DataType.BOOLEAN:
                     writer.Write((bool)value);
+                    break;
+                case DataType.DECIMAL:
+                    writer.Write((decimal)value);
+                    break;
+                case DataType.CHAR:
+                    writer.Write((char)value);
+                    break;
+                case DataType.SMALLINT:
+                    writer.Write((short)value);
                     break;
                 default:
                     return new Error(ErrorPrefixes.DataError, $"Data type {type} is not supported for serialization.");
@@ -118,12 +117,6 @@ public static class RowSerializer
                         values[i] = reader.ReadInt64();
                         break;
                     case DataType.VARCHAR:
-                    {
-                        var length = reader.ReadInt32();
-                        var bytes = reader.ReadBytes(length);
-                        values[i] = Encoding.UTF8.GetString(bytes);
-                        break;
-                    }
                     case DataType.TEXT:
                     {
                         var length = reader.ReadInt32();
@@ -133,6 +126,15 @@ public static class RowSerializer
                     }
                     case DataType.BOOLEAN:
                         values[i] = reader.ReadBoolean();
+                        break;
+                    case DataType.DECIMAL:
+                        values[i] = reader.ReadDecimal();
+                        break;
+                    case DataType.CHAR:
+                        values[i] = reader.ReadChar();
+                        break;
+                    case DataType.SMALLINT:
+                        values[i] = reader.ReadInt16();
                         break;
                     default:
                         return new Error(ErrorPrefixes.DataError, $"Unknown or unsupported data type: {type}");
