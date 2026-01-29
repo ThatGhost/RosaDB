@@ -1,9 +1,12 @@
+using RosaDB.Library.Models;
+
 namespace RosaDB.Library.StorageEngine.Interfaces;
 
-public interface ILogWriter : IAsyncDisposable
+public interface ILogWriter
 {
-    ValueTask<Core.Result> Commit();
-    void Rollback();
-    void Put(string moduleName, string tableName, object[] tableIndex, byte[] data, string instanceHash, long? logId = null);
-    void Delete(string moduleName, string tableName, string instanceHash, long logId);
+    public void Rollback();
+    public ValueTask<Core.Result> Commit();
+    public void Insert(string path, Row row);
+    public void Update(string path, Row row, long logId);
+    public void Delete(string path, long logId);
 }

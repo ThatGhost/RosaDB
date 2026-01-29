@@ -41,11 +41,11 @@ public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
     
     private async Task<QueryResult> ExecuteAddColumn()
     {
-        // Expecting: ALTER MODULE <moduleName> ADD COLUMN <colName> <colType>
+        // Expecting: ALTER MODULE <module> ADD COLUMN <colName> <colType>
         if (tokens.Length != 7 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <moduleName> ADD COLUMN <colName> <colType>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <module> ADD COLUMN <colName> <colType>");
 
-        var moduleName = tokens[2];
+        var module = tokens[2];
         var columnName = tokens[5];
         var columnTypeStr = tokens[6];
 
@@ -54,30 +54,30 @@ public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
         var newColumn = Column.Create(columnName, columnType, false);
         if (newColumn.IsFailure) return newColumn.Error;
 
-        var getEnvResult = await cellManager.GetEnvironment(moduleName);
+        var getEnvResult = await cellManager.GetEnvironment(module);
         if (!getEnvResult.TryGetValue(out var env)) return getEnvResult.Error;
 
         var currentColumns = env.Columns.ToList();
         if (currentColumns.Any(c => c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase)))
-            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in module '{moduleName}'.");
+            return new Error(ErrorPrefixes.QueryParsingError, $"Column '{columnName}' already exists in module '{module}'.");
         
         currentColumns.Add(newColumn.Value);
         
-        var result = await cellManager.UpdateModuleEnvironment(moduleName, currentColumns.ToArray());
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to module {moduleName}.");
+        var result = await cellManager.UpdateModuleEnvironment(module, currentColumns.ToArray());
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to module {module}.");
     }
 
     private async Task<QueryResult> ExecuteDropColumn()
     {
-        // Expecting: ALTER MODULE <moduleName> DROP COLUMN <colName>
+        // Expecting: ALTER MODULE <module> DROP COLUMN <colName>
         if (tokens.Length != 6 || tokens[4].ToUpperInvariant() != "COLUMN")
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <moduleName> DROP COLUMN <colName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid syntax. Expected: ALTER MODULE <module> DROP COLUMN <colName>");
 
-        var moduleName = tokens[2];
+        var module = tokens[2];
         var columnName = tokens[5];
 
-        var result = await cellManager.DropColumnAsync(moduleName, columnName);
+        var result = await cellManager.DropColumnAsync(module, columnName);
 
-        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from module {moduleName}.");
+        return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from module {module}.");
     }
 }

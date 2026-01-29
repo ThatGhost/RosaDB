@@ -23,15 +23,15 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         string[] nameParts = tokens[1].Split(".");
         if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse module instance name. Correct format is '<module>.<table>'");
 
-        string moduleName = nameParts[0];
+        string module = nameParts[0];
         string tableName = nameParts[1];
 
         if (!tokens[2].Equals("USING", StringComparison.InvariantCultureIgnoreCase)) return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'SUBSCRIBE <module> USING <clause>'");
 
-        var cellInstanceResult = await GetModuleInstance(moduleName, tokens);
+        var cellInstanceResult = await GetModuleInstance(module, tokens);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
 
-        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(moduleName, tableName, cellInstanceResult.Value);
+        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(module, tableName, cellInstanceResult.Value);
         try
         {
             if (!_subscriptions.ContainsKey(tableIdentifier))
@@ -42,10 +42,10 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         }
         catch
         {
-            return new Error(ErrorPrefixes.StateError, $"Failed to subscribe to {moduleName}. You might already be subscribed.");
+            return new Error(ErrorPrefixes.StateError, $"Failed to subscribe to {module}. You might already be subscribed.");
         }
 
-        return new QueryResult($"Successfully subscribed to {moduleName}.{tableName} instance");
+        return new QueryResult($"Successfully subscribed to {module}.{tableName} instance");
     }
 
     private Result<Dictionary<string, string>> ParseUsingClause(int startIndex, string[] tokens)
@@ -68,9 +68,9 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         return usingProperties;
     }
 
-    private async Task<Result<string>> GetModuleInstance(string moduleName, string[] tokens)
+    private async Task<Result<string>> GetModuleInstance(string module, string[] tokens)
     {
-        var cellEnvResult = await cellManager.GetEnvironment(moduleName);
+        var cellEnvResult = await cellManager.GetEnvironment(module);
         if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
 
         var parsed = ParseUsingClause(3, tokens);
@@ -82,8 +82,8 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         foreach (var kvp in parsed.Value)
         {
             var col = cellSchemaColumns.FirstOrDefault(c => c.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ModuleGroup '{moduleName}'.");
-            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ModuleGroup '{moduleName}'.");
+            if (col == null) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause does not exist in ModuleGroup '{module}'.");
+            if (!col.IsIndex) return new Error(ErrorPrefixes.DataError, $"Property '{kvp.Key}' in USING clause is not an indexed column for ModuleGroup '{module}'.");
 
             usingIndexValues[col.Name] = kvp.Value;
         }
@@ -92,7 +92,7 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
 
         var cellInstanceHash = InstanceHasher.GenerateModuleInstanceHash(usingIndexValues);
 
-        var cellInstanceResult = await cellManager.GetModuleInstance(moduleName, cellInstanceHash);
+        var cellInstanceResult = await cellManager.GetModuleInstance(module, cellInstanceHash);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
 
         return cellInstanceHash;
@@ -104,17 +104,17 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         string[] nameParts = tokens[1].Split(".");
         if (nameParts.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Could not parse module instance name. Correct format is '<module>.<table>'");
 
-        string moduleName = nameParts[0];
+        string module = nameParts[0];
         string tableName = nameParts[1];
 
         if (tokens[2].ToUpperInvariant() != "USING") return new Error(ErrorPrefixes.QueryParsingError, "Could not find USING statement at correct position. Correct statement is 'UNSUBSCRIBE <module> USING <clause>'");
 
-        var cellInstanceResult = await GetModuleInstance(moduleName, tokens);
+        var cellInstanceResult = await GetModuleInstance(module, tokens);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
         
-        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(moduleName, tableName, cellInstanceResult.Value);
-        if (!_subscriptions.ContainsKey(tableIdentifier)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {moduleName}. You might not be subscribed.");
-        if (!_subscriptions[tableIdentifier].Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {moduleName}. You might not be subscribed.");
+        TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(module, tableName, cellInstanceResult.Value);
+        if (!_subscriptions.ContainsKey(tableIdentifier)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
+        if (!_subscriptions[tableIdentifier].Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
 
         return new QueryResult($"Succesfully unsubscribed to {nameParts} instance");
     }

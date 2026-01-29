@@ -35,7 +35,7 @@ public class CreateQuery(
         );
     }
 
-    private async Task<QueryResult> CREATE_MODULE(string moduleName, string[] columnTokens)
+    private async Task<QueryResult> CREATE_MODULE(string module, string[] columnTokens)
     {
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
         
@@ -43,9 +43,9 @@ public class CreateQuery(
             async columns =>
             {
                 foreach (var c in columns) if (c.IsPrimaryKey) return new Error(ErrorPrefixes.QueryParsingError, "Primary key columns are not allowed. Use the INDEX keyword instead");
-                var result = await databaseManager.CreateModule(moduleName, columns);
+                var result = await databaseManager.CreateModule(module, columns);
                 return result.Match(
-                    () => new QueryResult($"Successfully created module: {moduleName}"),
+                    () => new QueryResult($"Successfully created module: {module}"),
                     error => error
                 );
             }, 
@@ -56,9 +56,9 @@ public class CreateQuery(
     private async Task<QueryResult> CREATE_TABLE(string nameComposite, string[] columnTokens)
     {
         string[] names = nameComposite.Split('.');
-        if (names.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format, Expected: <moduleName>.<tableName>");
+        if (names.Length != 2) return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format, Expected: <module>.<tableName>");
         
-        string moduleName = names[0];
+        string module = names[0];
         string tableName = names[1];
         
         var columnResult = TokensToColumnsParser.TokensToColumns(columnTokens);
@@ -68,7 +68,7 @@ public class CreateQuery(
             {
                 var tableResult = Table.Create(tableName, columns);
                 if (!tableResult.TryGetValue(out var table)) return tableResult.Error;
-                var result = await moduleManager.CreateTable(moduleName, table);
+                var result = await moduleManager.CreateTable(module, table);
                 return result.Match(
                     () => new QueryResult($"Successfully created Table: {tableName}"),
                     error => error

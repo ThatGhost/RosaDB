@@ -10,9 +10,9 @@ namespace RosaDB.Library.Query.Queries
         public async ValueTask<QueryResult> Execute()
         {
             var (selectIndex, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
-            var (moduleName, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+            var (module, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
 
-            var columnsResult = await cellManager.GetColumnsFromTable(moduleName, tableName);
+            var columnsResult = await cellManager.GetColumnsFromTable(module, tableName);
             if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
 
             return new QueryResult(StreamRows(selectIndex, fromIndex, whereIndex, usingIndex, columns));
@@ -20,19 +20,19 @@ namespace RosaDB.Library.Query.Queries
 
         private async IAsyncEnumerable<Row> StreamRows(int selectIndex, int fromIndex, int whereIndex, int usingIndex, Column[] columns)
         {
-            var (moduleName, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+            var (module, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
 
             IAsyncEnumerable<Log> logs;
             if (usingIndex != -1)
             {
-                var cellEnv = await cellManager.GetEnvironment(moduleName);
+                var cellEnv = await cellManager.GetEnvironment(module);
                 if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
                 var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
                 if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
                 logs = result.Value;
             }
-            else logs = logReader.GetAllLogsForModuleTable(moduleName, tableName);
+            else logs = logReader.GetAllLogsForModuleTable(module, tableName);
             
             if (logs is null) yield break;
 

@@ -5,9 +5,9 @@ namespace RosaDB.Library.StorageEngine.Serializers;
 
 public static class InstanceHasher
 {
-    public static TableInstanceIdentifier CreateIdentifier(string moduleName, string tableName, string instanceHash)
+    public static TableInstanceIdentifier CreateIdentifier(string module, string tableName, string instanceHash)
     {
-        return new TableInstanceIdentifier(moduleName, tableName, instanceHash);
+        return new TableInstanceIdentifier(module, tableName, instanceHash);
     }
     
     public static string GenerateModuleInstanceHash(Dictionary<string, string> indexValues)

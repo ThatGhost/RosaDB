@@ -5,6 +5,7 @@ namespace RosaDB.Library.Models;
 public class Database
 {
     public string Name { get; private init; } = "";
+    public List<Module> Modules { get; set; } = [];
 
     public static Result<Database> Create(string name)
     {

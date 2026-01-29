@@ -2,9 +2,9 @@ namespace RosaDB.Library.StorageEngine.Interfaces;
 
 public interface IFolderManager
 {
-    string BasePath { get; }
-    void CreateFolder(string folderName);
-    void DeleteFolder(string folderName);
-    bool DoesFolderExist(string folderName);
-    void RenameFolder(string oldName, string newName);
+    public string BasePath { get; }
+    public void CreateFolder(string folderName);
+    public void DeleteFolder(string folderName);
+    public bool DoesFolderExist(string folderName);
+    public void RenameFolder(string oldName, string newName);
 }

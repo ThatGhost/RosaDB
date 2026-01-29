@@ -55,9 +55,9 @@ public class InsertQuery(
             );
     }
     
-    private Result<Row> CheckPrimaryKeys(string moduleName, string tableName, string instanceHash, Row tableRow)
+    private Result<Row> CheckPrimaryKeys(string module, string tableName, string instanceHash, Row tableRow)
     {
-        var identifier = InstanceHasher.CreateIdentifier(moduleName, tableName, instanceHash);
+        var identifier = InstanceHasher.CreateIdentifier(module, tableName, instanceHash);
 
         foreach (var col in tableRow.Columns)
         {
@@ -142,7 +142,7 @@ public class InsertQuery(
         // INSERT MODULE <ModuleGroup> (<props>) VALUES (<vals>)
         if (tokens.Length < 6) return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT MODULE syntax.");
 
-        var moduleName = tokens[2];
+        var module = tokens[2];
 
         var propsResult = TokensToParenthesizedList.ParseParenthesizedList(tokens, 3, out int propsEnd);
         if (!propsResult.TryGetValue(out var props))
@@ -156,12 +156,12 @@ public class InsertQuery(
 
         if (props.Length != values.Length) return new Error(ErrorPrefixes.QueryParsingError, "Property count does not match value count.");
 
-        return (moduleName, props, values);
+        return (module, props, values);
     }
     
     private Result<(string ModuleGroupName, string TableName, Dictionary<string, string> UsingProperties, string[] Columns, string[] Values)> ParseInsertInto()
     {
-        // INSERT INTO <moduleName>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
+        // INSERT INTO <module>.<tableName> USING (<prop1>=<val1>, ...) (<columns>) VALUES (<values>)
         if (tokens.Length < 10)
             return new Error(ErrorPrefixes.QueryParsingError, "Invalid INSERT INTO syntax. Expected: INSERT INTO <module>.<table> USING (...) (...) VALUES (...)");
 
@@ -189,12 +189,12 @@ public class InsertQuery(
     {
         var fullTableName = tokens[startIndex -1].Split('.');
         if (fullTableName.Length != 2)
-            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <moduleName>.<tableName>");
+            return new Error(ErrorPrefixes.QueryParsingError, "Invalid table name format. Expected: <module>.<tableName>");
         
-        var moduleName = fullTableName[0];
+        var module = fullTableName[0];
         var tableName = fullTableName[1];
 
-        return (moduleName, tableName, startIndex);
+        return (module, tableName, startIndex);
     }
 
     private Result<(Dictionary<string, string> UsingProperties, int NextIndex)> ParseUsingClausePart(int startIndex)

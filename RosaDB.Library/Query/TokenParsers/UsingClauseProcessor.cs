@@ -1,12 +1,10 @@
-using System.Collections.ObjectModel;
 using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.Models.Environments;
-using RosaDB.Library.Query.TokenParsers;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 
-namespace RosaDB.Library.Query.Queries
+namespace RosaDB.Library.Query.TokenParsers
 {
     public static class UsingClauseProcessor
     {
@@ -19,24 +17,24 @@ namespace RosaDB.Library.Query.Queries
             var cellIndexesResult = await GetIndexHashesFromUsing(tokens, cellManager, cellEnv);
             if(cellIndexesResult.IsFailure) return cellIndexesResult.Error;
             var (_, fromIndex, _, _) = TokensToIndexesParser.ParseQueryTokens(tokens);
-            var (moduleName, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+            var (module, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
 
             List<Row> cellsThatApply = [];
             foreach (var cellIndex in cellIndexesResult.Value)
             {
-                var cellInstanceResult = await cellManager.GetModuleInstance(moduleName, cellIndex);
+                var cellInstanceResult = await cellManager.GetModuleInstance(module, cellIndex);
                 if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
                 cellsThatApply.Add(cellInstanceResult.Value);
             }
 
-            return Result<IAsyncEnumerable<Log>>.Success(TurnModuleRowsToLogs(logReader, cellsThatApply, tableName, moduleName));
+            return Result<IAsyncEnumerable<Log>>.Success(TurnModuleRowsToLogs(logReader, cellsThatApply, tableName, module));
         }
 
-        private static async IAsyncEnumerable<Log> TurnModuleRowsToLogs(ILogReader logReader, List<Row> cells, string tableName, string moduleName)
+        private static async IAsyncEnumerable<Log> TurnModuleRowsToLogs(ILogReader logReader, List<Row> cells, string tableName, string module)
         {
             foreach (var module in cells)
             {
-                await foreach (var log in logReader.GetAllLogsForModuleInstanceTable(moduleName, tableName, module.InstanceHash))
+                await foreach (var log in logReader.GetAllLogsForModuleInstanceTable(module, tableName, module.InstanceHash))
                 {
                     yield return log;
                 }
@@ -48,7 +46,7 @@ namespace RosaDB.Library.Query.Queries
             ModuleEnvironment cellEnv)
         {
             var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
-            var (moduleName, _) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+            var (module, _) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
             
             var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
             var usingTokens = tokens[(usingIndex + 1)..endIndex];
@@ -72,7 +70,7 @@ namespace RosaDB.Library.Query.Queries
             }
 
             // if it's not the indexes then get all the module instances and concat all the conforming cells
-            var cellsResult = await cellManager.GetAllModuleInstances(moduleName);
+            var cellsResult = await cellManager.GetAllModuleInstances(module);
             if (cellsResult.IsFailure) return cellsResult.Error;
 
             List<List<object?>> cellsThatApply = [];
@@ -110,7 +108,7 @@ namespace RosaDB.Library.Query.Queries
             ModuleEnvironment cellEnv)
         {
             var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
-            var (moduleName, _) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+            var (module, _) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
             
             var endIndex = whereIndex != -1 ? whereIndex : tokens.Length - 1;
             var usingTokens = tokens[(usingIndex + 1)..endIndex];
@@ -133,7 +131,7 @@ namespace RosaDB.Library.Query.Queries
             }
 
             // if it's not the indexes then get all the module instances and concat all the conforming cells
-            var cellsResult = await cellManager.GetAllModuleInstances(moduleName); // TODO needs to become a stream
+            var cellsResult = await cellManager.GetAllModuleInstances(module); // TODO needs to become a stream
             if (cellsResult.IsFailure) return cellsResult.Error;
 
             List<string> cellsThatApply = [];

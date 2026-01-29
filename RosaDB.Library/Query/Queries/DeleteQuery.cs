@@ -20,21 +20,21 @@ public class DeleteQuery(
         if (tokens[0].ToUpperInvariant() != "DELETE") return new Error(ErrorPrefixes.QueryParsingError, "Incorrect query type");
 
         var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
-        var (moduleName, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
-        var columnsResult = await cellManager.GetColumnsFromTable(moduleName, tableName);
+        var (module, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
+        var columnsResult = await cellManager.GetColumnsFromTable(module, tableName);
         if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
         
         IAsyncEnumerable<Log> logs;
         if (usingIndex != -1)
         {
-            var cellEnv = await cellManager.GetEnvironment(moduleName);
+            var cellEnv = await cellManager.GetEnvironment(module);
             if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
             var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
             if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
             logs = result.Value;
         }
-        else logs = logReader.GetAllLogsForModuleTable(moduleName, tableName);
+        else logs = logReader.GetAllLogsForModuleTable(module, tableName);
             
         if (logs is null) return new Error(ErrorPrefixes.DataError, "No logs found");
 
@@ -45,7 +45,7 @@ public class DeleteQuery(
         int count = 0;
         await foreach ((Row, Log) tuple in filteredStream)
         {
-            logWriter.Delete(moduleName, tableName, tuple.Item1.InstanceHash, tuple.Item2.Id);
+            logWriter.Delete(module, tableName, tuple.Item1.InstanceHash, tuple.Item2.Id);
             count++;
         }
         

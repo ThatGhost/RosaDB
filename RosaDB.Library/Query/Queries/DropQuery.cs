@@ -44,11 +44,11 @@ public class DropQuery(
     {
         string tableName = tableTokens[0];
         if (tableTokens[1] != "IN") return new Error(ErrorPrefixes.QueryParsingError, "Delete table does not define IN structure");
-        string moduleName = tableTokens[2];
+        string module = tableTokens[2];
 
-        var result = await cellManager.DeleteTable(moduleName, tableName);
+        var result = await cellManager.DeleteTable(module, tableName);
         if(result.IsFailure) return result.Error;
 
-        return new QueryResult($"Table with name: {tableName} in module: {moduleName} was successfully dropped");
+        return new QueryResult($"Table with name: {tableName} in module: {module} was successfully dropped");
     }
 }
