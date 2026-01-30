@@ -8,6 +8,8 @@ public static class RowSerializer
 {
     public static Result<byte[]> Serialize(object?[] values, Column[] columns)
     {
+        if (values.Length == 0) return Array.Empty<byte>();
+        
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
@@ -63,6 +65,12 @@ public static class RowSerializer
                 case DataType.SMALLINT:
                     writer.Write((short)value);
                     break;
+                case DataType.DATETIME:
+                {
+                    long binaryDate = ((DateTime)value).ToBinary();
+                    writer.Write(binaryDate); 
+                    break;
+                }
                 default:
                     return new Error(ErrorPrefixes.DataError, $"Data type {type} is not supported for serialization.");
             }
@@ -135,6 +143,11 @@ public static class RowSerializer
                         break;
                     case DataType.SMALLINT:
                         values[i] = reader.ReadInt16();
+                        break;
+                    case DataType.DATETIME:
+                        long binaryDate = reader.ReadInt64();
+                        DateTime dt = DateTime.FromBinary(binaryDate);
+                        values[i] = dt;
                         break;
                     default:
                         return new Error(ErrorPrefixes.DataError, $"Unknown or unsupported data type: {type}");

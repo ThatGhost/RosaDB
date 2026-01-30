@@ -16,5 +16,6 @@ public enum DataType
     VARCHAR,
     FLOAT,
     BOOLEAN,
+    DATETIME,
     // TODO needs more ANSI types
 }

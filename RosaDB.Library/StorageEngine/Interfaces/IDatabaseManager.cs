@@ -5,6 +5,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
 {
     public interface IDatabaseManager
     {
+        public const string DefaultModuleName = "default";
         Task<Result<Database>> GetDatabase(string name);
         Task<Result> CreateDatabase(Database database);
         Task<Result> DeleteDatabase(string name);

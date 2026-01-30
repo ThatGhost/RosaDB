@@ -7,7 +7,11 @@ using System.Text.Json;
 
 namespace RosaDB.Library.StorageEngine;
 
-public class DatabaseManager(SessionState sessionState, IFileSystem fileSystem, IFolderManager folderManager) : IDatabaseManager
+public class DatabaseManager(
+    SessionState sessionState, 
+    IFileSystem fileSystem, 
+    IFolderManager folderManager,
+    IModuleManager moduleManager) : IDatabaseManager
 {
     public async Task<Result<Database>> GetDatabase(string databaseName)
     {
@@ -24,13 +28,17 @@ public class DatabaseManager(SessionState sessionState, IFileSystem fileSystem, 
         catch {  return new Error(ErrorPrefixes.DataError, "Could not read the database format"); }
     }
 
-    public Task<Result> CreateDatabase(Database database)
+    public async Task<Result> CreateDatabase(Database database)
     {
         if (!folderManager.DoesFolderExist(database.Name)) folderManager.CreateFolder(database.Name);
         string databaseEnvPath = GetDatabaseEnvPath(database.Name);
-        if (fileSystem.File.Exists(databaseEnvPath)) return Task.FromResult<Result>(new Error(ErrorPrefixes.FileError, "Database already exists"));
+        if (fileSystem.File.Exists(databaseEnvPath)) return new Error(ErrorPrefixes.FileError, "Database already exists");
 
-        return SaveDatabase(database);
+        await SaveDatabase(database);
+        
+        // Every database comes with a default module
+        await CreateModule(Module.Create(IDatabaseManager.DefaultModuleName, []).Value!);
+        return await moduleManager.CreateModuleInstance(IDatabaseManager.DefaultModuleName, Row.Create([],[]).Value!);
     }
 
     public Task<Result> DeleteDatabase(string name)

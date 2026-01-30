@@ -16,7 +16,7 @@ public class Column(string name, DataType dataType, bool isPrimaryKey, bool isIn
     {
         if (string.IsNullOrWhiteSpace(name))
             return new Error(ErrorPrefixes.DataError, "Column name cannot be empty.");
-
+        
         return new Column(name, dataType, isPrimaryKey, isIndex, isNullable);
     }
 }

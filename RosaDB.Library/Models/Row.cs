@@ -40,6 +40,8 @@ public class Row
 
     private static string GenerateInstanceHash(object?[] values, Column[] columns)
     {
+        if (values.Length == 0) return "";
+        
         var indexColumns = new Dictionary<string, string>();
         for (var index = 0; index < columns.Length; index++)
         {

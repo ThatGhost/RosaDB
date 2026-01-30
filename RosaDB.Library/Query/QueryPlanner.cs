@@ -57,7 +57,7 @@ public class QueryPlanner(
             "SELECT" => new SelectQuery(tokens, logReader, moduleManager),
             "INSERT" => new InsertQuery(tokens, moduleManager, logWriter, indexManager, sessionState),
             "DELETE" => new DeleteQuery(tokens, moduleManager, logReader, logWriter, sessionState),
-            "INITIALIZE" => new InitializeQuery(databaseManager, sessionState),
+            "INITIALIZE" => new InitializeQuery(databaseManager),
             "ALTER" => new AlterQuery(tokens, moduleManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logWriter),

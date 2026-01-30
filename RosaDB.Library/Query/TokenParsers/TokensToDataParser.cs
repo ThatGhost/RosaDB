@@ -40,6 +40,9 @@ namespace RosaDB.Library.Query.TokenParsers
                 case DataType.SMALLINT:
                     if (short.TryParse(value, out short shortValue)) return shortValue;
                     return new DataTypeError(DataType.SMALLINT, value);
+                case DataType.DATETIME:
+                    if (DateTime.TryParse(value, out DateTime dtValue)) return dtValue;
+                    return new DataTypeError(DataType.DATETIME, value);
                 default:
                     return new Error(ErrorPrefixes.DataError, $"Unsupported data type: {type}");
             }
