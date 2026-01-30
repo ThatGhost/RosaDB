@@ -5,7 +5,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
+public class AlterQuery(string[] tokens, IModuleManager moduleManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -54,7 +54,7 @@ public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
         var newColumn = Column.Create(columnName, columnType, false);
         if (newColumn.IsFailure) return newColumn.Error;
 
-        var getEnvResult = await cellManager.GetEnvironment(module);
+        var getEnvResult = await moduleManager.GetEnvironment(module);
         if (!getEnvResult.TryGetValue(out var env)) return getEnvResult.Error;
 
         var currentColumns = env.Columns.ToList();
@@ -63,7 +63,7 @@ public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
         
         currentColumns.Add(newColumn.Value);
         
-        var result = await cellManager.UpdateModuleEnvironment(module, currentColumns.ToArray());
+        var result = await moduleManager.UpdateModuleEnvironment(module, currentColumns.ToArray());
         return result.IsFailure ? result.Error : new QueryResult($"Successfully added column {columnName} to module {module}.");
     }
 
@@ -76,7 +76,7 @@ public class AlterQuery(string[] tokens, IModuleManager cellManager) : IQuery
         var module = tokens[2];
         var columnName = tokens[5];
 
-        var result = await cellManager.DropColumnAsync(module, columnName);
+        var result = await moduleManager.DropColumnAsync(module, columnName);
 
         return result.IsFailure ? result.Error : new QueryResult($"Successfully dropped column {columnName} from module {module}.");
     }

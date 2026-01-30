@@ -6,8 +6,7 @@ using RosaDB.Library.StorageEngine.Interfaces;
 namespace RosaDB.Library.Query.Queries;
 public class DropQuery(
     string[] tokens,
-    IDatabaseManager databaseManager,
-    IModuleManager cellManager) : IQuery
+    IDatabaseManager databaseManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {

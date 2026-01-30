@@ -9,7 +9,8 @@ namespace RosaDB.Library.Query.Queries;
 
 public class DeleteQuery(
     string[] tokens,
-    IModuleManager cellManager,
+    IModuleManager moduleManager,
+    IDatabaseManager databaseManager,
     ILogReader logReader,
     ILogWriter logWriter,
     SessionState sessionState) : IQuery
@@ -21,16 +22,16 @@ public class DeleteQuery(
 
         var (_, fromIndex, whereIndex, usingIndex) = TokensToIndexesParser.ParseQueryTokens(tokens);
         var (module, tableName) = TokensToModuleAndTableParser.TokensToModuleAndName(tokens[fromIndex + 1]);
-        var columnsResult = await cellManager.GetColumnsFromTable(module, tableName);
-        if (!columnsResult.TryGetValue(out var columns)) return columnsResult.Error;
+        var columns = sessionState.CurrentDatabase?.GetModule(module)?.GetTable(tableName)?.Columns;
+        if (columns == null) return new DatabaseNotSetError();
         
         IAsyncEnumerable<Log> logs;
         if (usingIndex != -1)
         {
-            var cellEnv = await cellManager.GetEnvironment(module);
+            var cellEnv = await databaseManager.GetModule(module);
             if (cellEnv.IsFailure) throw new InvalidOperationException(cellEnv.Error.Message);
                 
-            var result = await UsingClauseProcessor.Process(tokens, cellManager, logReader, cellEnv.Value);
+            var result = await UsingClauseProcessor.Process(tokens, moduleManager, logReader, cellEnv.Value);
             if(result.IsFailure) throw new InvalidOperationException(result.Error.Message);
             logs = result.Value;
         }
@@ -39,8 +40,8 @@ public class DeleteQuery(
         if (logs is null) return new Error(ErrorPrefixes.DataError, "No logs found");
 
         // 1. Get filtered stream
-        var whereFunction = ConvertWHEREToFunction(whereIndex, usingIndex, columns);
-        var filteredStream = GetFilteredStream(logs, whereFunction, columns);
+        var whereFunction = ConvertWHEREToFunction(whereIndex, usingIndex, columns.ToArray());
+        var filteredStream = GetFilteredStream(logs, whereFunction, columns.ToArray());
 
         int count = 0;
         await foreach ((Row, Log) tuple in filteredStream)

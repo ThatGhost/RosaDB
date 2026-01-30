@@ -51,12 +51,12 @@ public class QueryPlanner(
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "CREATE" => new CreateQuery(tokens, databaseManager, moduleManager),
-            "DROP" => new DropQuery(tokens, databaseManager, moduleManager),
+            "CREATE" => new CreateQuery(tokens, databaseManager),
+            "DROP" => new DropQuery(tokens, databaseManager),
             "USE" => new UseQuery(tokens, sessionState, databaseManager),
             "SELECT" => new SelectQuery(tokens, logReader, moduleManager),
             "INSERT" => new InsertQuery(tokens, moduleManager, logWriter, indexManager, sessionState),
-            "DELETE" => new DeleteQuery(tokens, moduleManager, logReader, logWriter, sessionState),
+            "DELETE" => new DeleteQuery(tokens, moduleManager, databaseManager, logReader, logWriter, sessionState),
             "INITIALIZE" => new InitializeQuery(databaseManager),
             "ALTER" => new AlterQuery(tokens, moduleManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 

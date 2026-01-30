@@ -31,24 +31,27 @@ public class InsertQuery(
     {
         return await ParseInsertInto()
             .ThenAsync(parsed => AssertUsingClause(parsed)
-            .ThenAsync(usingIndexValues => cellManager.GetColumnsFromTable(parsed.ModuleGroupName, parsed.TableName)
-            .ThenAsync(async tableSchemaColumns =>
+            .ThenAsync(async p => 
             {
+                var tableSchemaColumns = sessionState.CurrentDatabase?.GetModule(parsed.ModuleGroupName)?.GetTable(parsed.TableName)
+                    ?.Columns;
+                if (tableSchemaColumns is null) return new DatabaseNotSetError();
+                
                 var rowValueMap = parsed.Columns.Zip(parsed.Values, (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
                 
-                var rowResult = GetRowValues(rowValueMap, tableSchemaColumns, parsed.TableName)
-                    .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns))
+                var rowResult = GetRowValues(rowValueMap, tableSchemaColumns.ToArray(), parsed.TableName)
+                    .Then(tableRowValues => Row.Create(tableRowValues, tableSchemaColumns.ToArray()))
                     .Then(tableRow => CheckPrimaryKeys(parsed.ModuleGroupName, parsed.TableName, tableRow.InstanceHash, tableRow));
                 
                 if (rowResult.IsFailure) return rowResult.Error;
                 var row = rowResult.Value;
 
-                logWriter.Put(parsed.ModuleGroupName, parsed.TableName, usingIndexValues, row.BSON, row.InstanceHash);
+                logWriter.Insert(parsed.ModuleGroupName, row, 0);
                 
                 if (!sessionState.IsInTransaction) return await logWriter.Commit();
 
                 return Result.Success();
-            })))
+            }))
             .MatchAsync(
                 () => Task.FromResult(new QueryResult("1 row inserted successfully.", 1)),
                 error => Task.FromResult<QueryResult>(error)
