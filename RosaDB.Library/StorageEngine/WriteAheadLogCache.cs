@@ -4,5 +4,5 @@ namespace RosaDB.Library.StorageEngine;
 
 public class WriteAheadLogCache
 {
-    public Dictionary<TableInstanceIdentifier, Queue<Log>> Logs { get; } = new();
+    public Dictionary<string, Queue<Log>> Logs { get; } = new();
 }

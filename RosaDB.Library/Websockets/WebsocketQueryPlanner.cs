@@ -5,11 +5,12 @@ using System.Net.WebSockets;
 using RosaDB.Library.Query.Queries;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.Websockets.Interfaces;
 
 namespace RosaDB.Library.Websockets;
 
-public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, ISubscriptionManager subscriptionManager, SessionState sessionState, RootManager rootManager)
+public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, ISubscriptionManager subscriptionManager, SessionState sessionState, IDatabaseManager databaseManager)
 {
     public async Task<QueryResult> ExecuteWebsocketQuery(string query, WebSocket webSocket)
     {
@@ -23,7 +24,7 @@ public class WebsocketQueryPlanner(QueryTokenizer queryTokenizer, ISubscriptionM
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "USE" => await new UseQuery(tokens, sessionState, rootManager).Execute(),
+            "USE" => await new UseQuery(tokens, sessionState, databaseManager).Execute(),
             "SUBSCRIBE" => await subscriptionManager.HandleSubscribe(tokens, webSocket),
             "UNSUBSCRIBE" => await subscriptionManager.HandleUnsubscribe(tokens, webSocket),
             _ => new Error(ErrorPrefixes.QueryParsingError, "Unsupported websocket query type")

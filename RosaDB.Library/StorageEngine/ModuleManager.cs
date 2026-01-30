@@ -9,12 +9,12 @@ namespace RosaDB.Library.StorageEngine
     {
         public Result CreateModuleInstance(string module, string instanceHash, Row instanceData)
         {
-            
+            return new CriticalError();
         }
 
         public async Task<Result<Row>> GetModuleInstance(string module, string instanceHash)
         {
-            
+            return new CriticalError();
         }
 
         public Task<Result> DeleteModuleInstance(string module, string instanceHash)
@@ -24,7 +24,7 @@ namespace RosaDB.Library.StorageEngine
 
         public async Task<Result<IEnumerable<Row>>> GetAllModuleInstances(string module)
         {
-            
+            return new CriticalError();
         }
     }
 }

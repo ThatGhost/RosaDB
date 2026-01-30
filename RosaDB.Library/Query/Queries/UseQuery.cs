@@ -2,10 +2,11 @@
 using RosaDB.Library.Models;
 using RosaDB.Library.Server;
 using RosaDB.Library.StorageEngine;
+using RosaDB.Library.StorageEngine.Interfaces;
 
 namespace RosaDB.Library.Query.Queries;
 
-public class UseQuery(string[] tokens, SessionState sessionState, RootManager rootManager) : IQuery
+public class UseQuery(string[] tokens, SessionState sessionState, IDatabaseManager databaseManager) : IQuery
 {
     public async ValueTask<QueryResult> Execute()
     {
@@ -15,16 +16,10 @@ public class UseQuery(string[] tokens, SessionState sessionState, RootManager ro
 
         string databaseName = tokens[1];
 
-        var databaseNames = await rootManager.GetDatabaseNames();
-        if (!databaseNames.TryGetValue(out var names) || !names.Contains(databaseName))
-        {
-            return new Error(ErrorPrefixes.QueryParsingError, $"Database '{databaseName}' does not exist.");
-        }
+        var databaseResult = await databaseManager.GetDatabase(databaseName);
+        if (databaseResult.IsFailure) return databaseResult.Error;
 
-        var database = Database.Create(databaseName);
-        if (database.IsFailure) return database.Error;
-
-        sessionState.CurrentDatabase = database.Value;
+        sessionState.CurrentDatabase = databaseResult.Value;
         return new QueryResult($"Successfully using {databaseName}");
     }
 }

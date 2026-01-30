@@ -7,6 +7,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces
     {
         Task<Result<Database>> GetDatabase(string name);
         Task<Result> CreateDatabase(Database database);
+        Task<Result> DeleteDatabase(string name);
         Task<Result> CreateModule(Module module);
         Task<Result> DeleteModule(string module);
         Task<Result<Module>> GetModule(string moduleName);

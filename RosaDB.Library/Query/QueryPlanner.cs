@@ -11,12 +11,10 @@ namespace RosaDB.Library.Query;
 public class QueryPlanner(
     IDatabaseManager databaseManager, 
     IModuleManager moduleManager, 
-    RootManager rootManager,
     SessionState sessionState,
     ILogReader logReader,
     ILogWriter logWriter,
-    IIndexManager indexManager,
-    IServiceContainer serviceContainer
+    IIndexManager indexManager
     )
 {
     public Result<List<IQuery>> CreateQueryPlans(List<string[]> tokenLists)
@@ -53,13 +51,13 @@ public class QueryPlanner(
 
         return tokens[0].ToUpperInvariant() switch
         {
-            "CREATE" => new CreateQuery(tokens, rootManager, databaseManager, moduleManager),
-            "DROP" => new DropQuery(tokens, rootManager, databaseManager, moduleManager),
-            "USE" => new UseQuery(tokens, sessionState, rootManager),
+            "CREATE" => new CreateQuery(tokens, databaseManager, moduleManager),
+            "DROP" => new DropQuery(tokens, databaseManager, moduleManager),
+            "USE" => new UseQuery(tokens, sessionState, databaseManager),
             "SELECT" => new SelectQuery(tokens, logReader, moduleManager),
             "INSERT" => new InsertQuery(tokens, moduleManager, logWriter, indexManager, sessionState),
             "DELETE" => new DeleteQuery(tokens, moduleManager, logReader, logWriter, sessionState),
-            "INITIALIZE" => new InitializeQuery(rootManager, sessionState, serviceContainer),
+            "INITIALIZE" => new InitializeQuery(databaseManager, sessionState),
             "ALTER" => new AlterQuery(tokens, moduleManager),
             "BEGIN" => new BeginTransactionQuery(tokens, sessionState), 
             "COMMIT" => new CommitQuery(sessionState, logWriter),

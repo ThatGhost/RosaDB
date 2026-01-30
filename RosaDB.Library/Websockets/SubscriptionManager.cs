@@ -1,18 +1,16 @@
-﻿using CSharpTest.Net.IO;
-using RosaDB.Library.Core;
+﻿using RosaDB.Library.Core;
 using RosaDB.Library.Models;
 using RosaDB.Library.StorageEngine;
 using RosaDB.Library.StorageEngine.Interfaces;
 using RosaDB.Library.StorageEngine.Serializers;
 using RosaDB.Library.Websockets.Interfaces;
-using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 
 namespace RosaDB.Library.Websockets;
 
-public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionManager
+public class SubscriptionManager(IDatabaseManager databaseManager, IModuleManager moduleManager) : ISubscriptionManager
 {
     private readonly Dictionary<TableInstanceIdentifier, List<WebSocket>> _subscriptions = new();
 
@@ -70,7 +68,7 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
 
     private async Task<Result<string>> GetModuleInstance(string module, string[] tokens)
     {
-        var cellEnvResult = await cellManager.GetEnvironment(module);
+        var cellEnvResult = await databaseManager.GetModule(module);
         if (!cellEnvResult.TryGetValue(out var cellEnv)) return cellEnvResult.Error;
 
         var parsed = ParseUsingClause(3, tokens);
@@ -92,7 +90,7 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
 
         var cellInstanceHash = InstanceHasher.GenerateModuleInstanceHash(usingIndexValues);
 
-        var cellInstanceResult = await cellManager.GetModuleInstance(module, cellInstanceHash);
+        var cellInstanceResult = await moduleManager.GetModuleInstance(module, cellInstanceHash);
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
 
         return cellInstanceHash;
@@ -113,8 +111,8 @@ public class SubscriptionManager(IModuleManager cellManager) : ISubscriptionMana
         if (cellInstanceResult.IsFailure) return cellInstanceResult.Error;
         
         TableInstanceIdentifier tableIdentifier = new TableInstanceIdentifier(module, tableName, cellInstanceResult.Value);
-        if (!_subscriptions.ContainsKey(tableIdentifier)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
-        if (!_subscriptions[tableIdentifier].Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
+        if (!_subscriptions.TryGetValue(tableIdentifier, out var subscription)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
+        if (!subscription.Remove(webSocket)) return new Error(ErrorPrefixes.StateError, $"Failed to unsubscribe from {module}. You might not be subscribed.");
 
         return new QueryResult($"Succesfully unsubscribed to {nameParts} instance");
     }

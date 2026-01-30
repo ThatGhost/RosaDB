@@ -33,6 +33,12 @@ public class DatabaseManager(SessionState sessionState, IFileSystem fileSystem, 
         return SaveDatabase(database);
     }
 
+    public Task<Result> DeleteDatabase(string name)
+    {
+        folderManager.DeleteFolder(name);
+        return Task.FromResult(Result.Success());
+    }
+
     public async Task<Result<Module>> GetModule(string moduleName)
     {
         if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();

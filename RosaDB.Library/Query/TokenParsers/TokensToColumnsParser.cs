@@ -23,20 +23,18 @@ public static class TokensToColumnsParser
         if (!Enum.TryParse<DataType>(typeName, true, out var dataType)) return new Error(ErrorPrefixes.QueryParsingError, $"Datatype '{typeName}' is unknown");
         
         int currentIndex = 2;
-        object parameters = new { };
         
         if (columnTokens.Length > 2 && columnTokens[2] == "(")
         {
             var (paramResult, newIndex) = ParseParameters(columnTokens, currentIndex, typeName);
             if (paramResult.IsFailure) return paramResult.Error;
-            parameters = paramResult.Value;
             currentIndex = newIndex;
         }
 
         var metadataResult = TokensToColumnMetadata(columnTokens, currentIndex);
         if (!metadataResult.TryGetValue(out var metadata)) return metadataResult.Error;
         
-        return Column.Create(columnName, dataType, parameters, metadata.isPrimaryKey, metadata.isIndex, metadata.isNullable);
+        return Column.Create(columnName, dataType, metadata.isPrimaryKey, metadata.isIndex, metadata.isNullable);
     }
     
     private static (Result<object> result, int newIndex) ParseParameters(string[] tokens, int start, string typeName)

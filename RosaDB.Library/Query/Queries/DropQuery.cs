@@ -6,7 +6,6 @@ using RosaDB.Library.StorageEngine.Interfaces;
 namespace RosaDB.Library.Query.Queries;
 public class DropQuery(
     string[] tokens,
-    RootManager rootManager,
     IDatabaseManager databaseManager,
     IModuleManager cellManager) : IQuery
 {
@@ -26,7 +25,7 @@ public class DropQuery(
 
     private async Task<QueryResult> DROP_DATABASE(string name)
     {
-        var result = await rootManager.DeleteDatabase(name);
+        var result = await databaseManager.DeleteDatabase(name);
         if (result.IsFailure) return result.Error;
 
         return new QueryResult($"Database: {name} was deleted successfully");
@@ -46,7 +45,7 @@ public class DropQuery(
         if (tableTokens[1] != "IN") return new Error(ErrorPrefixes.QueryParsingError, "Delete table does not define IN structure");
         string module = tableTokens[2];
 
-        var result = await cellManager.DeleteTable(module, tableName);
+        var result = await databaseManager.DeleteTable(module, tableName);
         if(result.IsFailure) return result.Error;
 
         return new QueryResult($"Table with name: {tableName} in module: {module} was successfully dropped");

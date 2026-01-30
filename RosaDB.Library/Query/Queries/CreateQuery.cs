@@ -8,7 +8,6 @@ namespace RosaDB.Library.Query.Queries;
 
 public class CreateQuery(
     string[] tokens,
-    RootManager rootManager,
     IDatabaseManager databaseManager,
     IModuleManager moduleManager)
     : IQuery
@@ -28,7 +27,10 @@ public class CreateQuery(
 
     private async Task<QueryResult> CREATE_DATABASE(string databaseName)
     {
-        var result = await rootManager.CreateDatabase(databaseName);
+        var databaseResult = Database.Create(databaseName);
+        if (databaseResult.IsFailure) return databaseResult.Error;
+        
+        var result = await databaseManager.CreateDatabase(databaseResult.Value);
         return result.Match(
             () => new QueryResult($"Successfully created database: {databaseName}"),
             error => error
@@ -43,7 +45,9 @@ public class CreateQuery(
             async columns =>
             {
                 foreach (var c in columns) if (c.IsPrimaryKey) return new Error(ErrorPrefixes.QueryParsingError, "Primary key columns are not allowed. Use the INDEX keyword instead");
-                var result = await databaseManager.CreateModule(module, columns);
+                var moduleResult = Module.Create(module, columns.ToList());
+                if (moduleResult.IsFailure) return moduleResult.Error;
+                var result = await databaseManager.CreateModule(moduleResult.Value);
                 return result.Match(
                     () => new QueryResult($"Successfully created module: {module}"),
                     error => error
@@ -66,9 +70,9 @@ public class CreateQuery(
         return await columnResult.MatchAsync<QueryResult>(
             async columns =>
             {
-                var tableResult = Table.Create(tableName, columns);
+                var tableResult = Table.Create(tableName, columns.ToList());
                 if (!tableResult.TryGetValue(out var table)) return tableResult.Error;
-                var result = await moduleManager.CreateTable(module, table);
+                var result = await databaseManager.CreateTable(module, table);
                 return result.Match(
                     () => new QueryResult($"Successfully created Table: {tableName}"),
                     error => error
