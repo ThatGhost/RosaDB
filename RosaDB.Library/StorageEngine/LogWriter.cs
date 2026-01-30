@@ -32,9 +32,9 @@ public class LogWriter(WriteAheadLogCache writeAheadLogCache, IFileSystem fileSy
         writeAheadLogCache.Logs[path].Enqueue(log);
     }
     
-    // TODO return dictionary with LogId, LogLocation
-    public async ValueTask<Result> Commit()
+    public async ValueTask<Result<Dictionary<long, LogLocation>>> Commit()
     {
+        var result = new Dictionary<long, LogLocation>();
         foreach (var pathAndLog in writeAheadLogCache.Logs)
         {
             await using var fs = fileSystem.File.Open(pathAndLog.Key, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
@@ -65,6 +65,7 @@ public class LogWriter(WriteAheadLogCache writeAheadLogCache, IFileSystem fileSy
                     await fs.WriteAsync(logLengthBytes, 0, logLengthBytes.Length);
 
                     currentOffset += logLength + 4;
+                    result[log.Id] = new LogLocation(pathAndLog.Key, currentOffset, log.Id);
                 }
                 
                 fs.Seek(0, SeekOrigin.Begin);
@@ -78,7 +79,7 @@ public class LogWriter(WriteAheadLogCache writeAheadLogCache, IFileSystem fileSy
         
         // Clear cache after successful commit
         writeAheadLogCache.Logs.Clear();
-        return Result.Success();
+        return result;
     }
 
     private readonly byte[] defaultHeader = [

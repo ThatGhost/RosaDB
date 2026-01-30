@@ -7,7 +7,7 @@ namespace RosaDB.Library.StorageEngine;
 
 public class LogReader(IFileSystem fileSystem, WriteAheadLogCache writeAheadLogCache) : ILogReader
 {
-    public async Task<Result<Log?>> FindLastestLog(string path, long id)
+    public async Task<Result<Log?>> FindLog(string path, long id)
     {
         writeAheadLogCache.Logs.TryGetValue(path, out var logs);
         if (logs is not null)
@@ -22,6 +22,20 @@ public class LogReader(IFileSystem fileSystem, WriteAheadLogCache writeAheadLogC
         }
 
         return Result<Log?>.Success(null);
+    }
+
+    public async Task<Result<Log>> FindLog(LogLocation location)
+    {
+        await using var fs = fileSystem.File.Open(location.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        try
+        {
+            var (log, _) = await ReadLog(fs, location.Offset);
+            return log.IsDeleted ? new Error(ErrorPrefixes.FileError, "Unable to read log file") : log;
+        }
+        catch
+        {
+            return new Error(ErrorPrefixes.FileError, "Unable to read log file");
+        }
     }
 
     public async IAsyncEnumerable<Log> GetAllLogs(string path)
@@ -44,7 +58,6 @@ public class LogReader(IFileSystem fileSystem, WriteAheadLogCache writeAheadLogC
             var (log, nextLogStartPosition) = await ReadLog(fs, currentPosition);
             
             if(seenLogIds.Contains(log.Id)) continue;
-            if (log.IsDeleted) { seenLogIds.Add(log.Id); continue; }
             
             yield return log;
             

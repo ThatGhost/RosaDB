@@ -20,15 +20,27 @@ public static class ByteObjectConverter
         return result;
     }
     
-    public static T? ByteArrayToObject<T>(byte[] bytes)
+    public static T? ByteArrayToObject<T>(byte[] bytes) where T : class
     {
         try
         {
-            return JsonSerializer.Deserialize<T>(bytes[4..]);
+            return JsonSerializer.Deserialize<T>(bytes.AsSpan(4..));
         }
         catch
         {
-            return default;
+            return null;
+        }
+    } 
+    
+    public static T? ByteArrayToStruct<T>(byte[] bytes) where T : struct
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(bytes.AsSpan(4..));
+        }
+        catch
+        {
+            return null;
         }
     } 
 }

@@ -5,6 +5,7 @@ namespace RosaDB.Library.StorageEngine.Interfaces;
 
 public interface ILogReader
 {
-    Task<Result<Log?>> FindLastestLog(string path, long id);
-    IAsyncEnumerable<Log> GetAllLogs(string path);
+    public Task<Result<Log?>> FindLog(string path, long id);
+    public Task<Result<Log>> FindLog(LogLocation location);
+    public IAsyncEnumerable<Log> GetAllLogs(string path);
 }
