@@ -48,6 +48,9 @@ public class Row
             var column = columns[index];
             if(column.IsIndex || column.IsPrimaryKey) indexColumns.Add(column.Name, values[index]?.ToString() ?? "");
         }
+        
+        if(indexColumns.Count == 0) return "";
+        
         return InstanceHasher.GenerateModuleInstanceHash(indexColumns);
     }
 }

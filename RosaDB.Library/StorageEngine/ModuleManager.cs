@@ -17,22 +17,14 @@ public class ModuleManager(
 {
     private readonly Dictionary<string, string> _moduleCurrentDataPaths = new();
 
-    public async Task<Result> CreateModuleInstance(string moduleName, Row instanceData)
+    public async Task<Result> InsertModuleInstance(string moduleName, Row instanceData)
     {
-        if (sessionState.CurrentDatabase is null) return new DatabaseNotSetError();
-        var module = sessionState.CurrentDatabase.GetModule(moduleName);
-        if (module is null) return new Error(ErrorPrefixes.FileError, "Module not found");
+        var validationResult = ValidateRowToColumn(instanceData, moduleName);
+        var (moduleHashIndexPath, moduleLogIndexPath, moduleDataPath) = GetModuleContext(moduleName);
 
-        string modulePath = GetModulePath(moduleName);
-        string moduleIndexPath = fileSystem.Path.Combine(modulePath, $"hash.idx");
-        string moduleLogIndexPath = fileSystem.Path.Combine(modulePath, $"log.idx");
+        if (indexManager.Get(moduleHashIndexPath, instanceData.InstanceHash).Length != 0) return new Error(ErrorPrefixes.FileError, "A module with these indexes already exists");
+        long newLogId = indexManager.GetNextKey<long>(moduleLogIndexPath);
 
-        if (indexManager.Get(moduleIndexPath, instanceData.InstanceHash).Length != 0)
-            return new Error(ErrorPrefixes.FileError, "A module with these indexes already exists");
-        long lastLogId = indexManager.GetLastInt64Key(moduleLogIndexPath);
-        long newLogId = lastLogId + 1;
-
-        string moduleDataPath = GetCurrentDataPath(moduleName, modulePath);
         indexManager.Insert(moduleLogIndexPath, newLogId, []); // reserve the logId
 
         logWriter.Insert(moduleDataPath, instanceData, newLogId);
@@ -44,9 +36,8 @@ public class ModuleManager(
             return new Error(ErrorPrefixes.FileError, "Module could not be created");
         }
 
-        var locationBytes = ByteObjectConverter.ObjectToByteArray(logLocation);
-        indexManager.Insert(moduleIndexPath, instanceData.InstanceHash, locationBytes);
-        indexManager.Update(moduleLogIndexPath, newLogId, locationBytes);
+        indexManager.Insert(moduleHashIndexPath, instanceData.InstanceHash, logLocation);
+        indexManager.Update(moduleLogIndexPath, newLogId, logLocation);
 
         return Result.Success();
     }
@@ -152,5 +143,58 @@ public class ModuleManager(
         return fileInfo is { Exists: true, Length: < 1_000_000 } ? 
             highestFile.path : 
             fileSystem.Path.Combine(modulePath, $"{highestFile.num + 1}.dat");
+    }
+
+    private (string moduleHashIndexPath, string moduleLogIndexPath, string moduleDataPath) GetModuleContext(string moduleName)
+    {
+        string modulePath = GetModulePath(moduleName);
+        string moduleHashIndexPath = fileSystem.Path.Combine(modulePath, $"hash.idx");
+        string moduleLogIndexPath = fileSystem.Path.Combine(modulePath, $"log.idx");
+        string moduleDataPath = GetCurrentDataPath(moduleName, modulePath);
+        
+        return (moduleHashIndexPath, moduleLogIndexPath, moduleDataPath);
+    }
+    
+    private Result ValidateRowToColumn(Row row, string moduleName)
+    {
+        var columns = sessionState.CurrentDatabase?.GetModule(moduleName)?.Columns;
+        if (columns is null || columns.Count == 0) return new Error(ErrorPrefixes.StateError, "Table and/or module not part of database");
+        
+        foreach (var column in columns)
+        {
+            object? value = row.GetValue(column.Name);
+            if (value is null)
+            {
+                if (column.IsIndex) return new Error(ErrorPrefixes.DataError, $"Index column {column.Name} cannot be null");
+                if (!column.IsNullable) return new Error(ErrorPrefixes.DataError, "Trying to enter NULL into a non-nullable column");
+                continue;
+            }
+            if (!IsValueCorrectType(value, column.DataType)) return new Error(ErrorPrefixes.DataError, $"value {value} does not match column description: {column.DataType}");
+        }
+        
+        return Result.Success();
+    }
+    
+    private bool IsValueCorrectType(object value, DataType dataType)
+    {
+        return dataType switch
+        {
+            DataType.BIGINT => value is long,
+            DataType.INTEGER  => value is int,
+            DataType.INT => value is int,
+            DataType.BOOLEAN => value is bool,
+            DataType.CHAR => value is char,
+            DataType.CHARACTER => value is char,
+            DataType.DATETIME => value is DateTime,
+            DataType.DECIMAL => value is decimal,
+            DataType.FLOAT => value is float,
+            DataType.LONG => value is long,
+            DataType.NUMBER => value is decimal,
+            DataType.NUMERIC => value is int or long or float or decimal or short,
+            DataType.SMALLINT => value is short,
+            DataType.TEXT => value is string,
+            DataType.VARCHAR => value is string,
+            _ => false
+        };
     }
 }

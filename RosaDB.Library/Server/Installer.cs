@@ -31,6 +31,7 @@ public static class Installer
         container.Register<TcpClient, Scope, ClientSession>((factory, client, scope) => new ClientSession(client, scope, scope.GetInstance<ISystemLogPublisher>()));
         container.RegisterTransient<IFileSystem, FileSystem>();
         container.RegisterTransient<IFolderManager, FolderManager>();
+        container.RegisterTransient<IRowManager, RowManager>();
         container.RegisterTransient<ILogCondenser, LogCondenser>();
         container.RegisterTransient<IDatabaseManager, DatabaseManager>();
         container.RegisterTransient<DataValidator>();

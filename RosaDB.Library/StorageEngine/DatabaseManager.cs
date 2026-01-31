@@ -38,7 +38,7 @@ public class DatabaseManager(
         
         // Every database comes with a default module
         await CreateModule(Module.Create(IDatabaseManager.DefaultModuleName, []).Value!);
-        return await moduleManager.CreateModuleInstance(IDatabaseManager.DefaultModuleName, Row.Create([],[]).Value!);
+        return await moduleManager.InsertModuleInstance(IDatabaseManager.DefaultModuleName, Row.Create([],[]).Value!);
     }
 
     public Task<Result> DeleteDatabase(string name)

@@ -117,7 +117,7 @@ public class InsertQuery(
         var rowCreateResult = Row.Create(rowValues, schemaColumns);
         if (!rowCreateResult.TryGetValue(out var row)) return rowCreateResult.Error;
 
-        var saveResult = cellManager.CreateModuleInstance(parsed.ModuleGroupName, instanceHash, row, schemaColumns);
+        var saveResult = cellManager.InsertModuleInstance(parsed.ModuleGroupName, instanceHash, row, schemaColumns);
         if (saveResult.IsFailure) return saveResult.Error;
 
         return new QueryResult("1 module instance inserted successfully.", 1);

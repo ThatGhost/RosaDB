@@ -14,8 +14,8 @@ public class Column(string name, DataType dataType, bool isPrimaryKey, bool isIn
 
     public static Result<Column> Create(string name, DataType dataType, bool isPrimaryKey = false, bool isIndex = false, bool isNullable = true)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            return new Error(ErrorPrefixes.DataError, "Column name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(name)) return new Error(ErrorPrefixes.DataError, "Column name cannot be empty.");
+        if (isIndex && isNullable) return new Error(ErrorPrefixes.DataError, "RosaDB does not allow nullable indexes");
         
         return new Column(name, dataType, isPrimaryKey, isIndex, isNullable);
     }
