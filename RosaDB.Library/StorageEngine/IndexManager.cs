@@ -48,6 +48,22 @@ public class IndexManager(IFileSystem fileSystem) : IIndexManager
         return tree.TryGetValue(key, out var value) ? value : [];
     }
 
+    public U? Get<T, U>(string path, T key) where U : class
+    {
+        var options = GetOptions<T>(path);
+
+        using var tree = new BPlusTree<T, byte[]>(options);
+        return tree.TryGetValue(key, out byte[] value) ? ByteObjectConverter.ByteArrayToObject<U>(value) : null;
+    }
+
+    public U? GetStruct<T, U>(string path, T key) where U : struct
+    {
+        var options = GetOptions<T>(path);
+
+        using var tree = new BPlusTree<T, byte[]>(options);
+        return tree.TryGetValue(key, out byte[] value) ? ByteObjectConverter.ByteArrayToStruct<U>(value) : null;
+    }
+
     public T GetLastKey<T>(string path)
     {
         var options = GetOptions<T>(path);
